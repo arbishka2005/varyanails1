@@ -1,0 +1,96 @@
+import { z } from "zod";
+
+export const contactChannelSchema = z.enum(["telegram", "vk", "phone"]);
+export const nailLengthSchema = z.enum(["short", "medium", "long", "extra"]);
+export const requestStatusSchema = z.enum([
+  "new",
+  "needs_clarification",
+  "waiting_client",
+  "confirmed",
+  "declined",
+]);
+export const timeWindowStatusSchema = z.enum(["available", "offered", "reserved", "blocked"]);
+export const serviceKindSchema = z.enum(["extension", "correction", "natural", "manicure", "removal"]);
+export const serviceOptionKindSchema = z.enum([
+  "old_removal",
+  "foreign_removal",
+  "repair",
+  "french",
+  "simple_design",
+  "complex_design",
+  "strengthening",
+]);
+
+export const clientSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  phone: z.string().min(1),
+  preferredContactChannel: contactChannelSchema,
+  contactHandle: z.string().min(1),
+  firstVisit: z.boolean(),
+  notes: z.string().optional(),
+});
+
+export const photoSchema = z.object({
+  id: z.string().min(1),
+  kind: z.enum(["hands", "reference"]),
+  fileName: z.string().min(1),
+  previewUrl: z.string().optional(),
+});
+
+export const bookingRequestSchema = z.object({
+  id: z.string().min(1),
+  clientId: z.string().min(1),
+  service: serviceKindSchema,
+  optionIds: z.array(serviceOptionKindSchema),
+  length: nailLengthSchema,
+  desiredResult: z.string().min(1),
+  photoIds: z.array(z.string()),
+  preferredWindowId: z.string().nullable(),
+  customWindowText: z.string().optional(),
+  comment: z.string(),
+  estimatedMinutes: z.number().int().nonnegative(),
+  estimatedPriceFrom: z.number().int().nonnegative().optional(),
+  status: requestStatusSchema,
+  createdAt: z.string().min(1),
+  masterNote: z.string().optional(),
+  clarificationQuestion: z.string().optional(),
+});
+
+export const createBookingRequestSchema = z.object({
+  client: clientSchema,
+  photos: z.array(photoSchema),
+  request: bookingRequestSchema,
+});
+
+export const updateRequestStatusSchema = z.object({
+  status: requestStatusSchema,
+});
+
+export const updateRequestWindowSchema = z.object({
+  preferredWindowId: z.string().nullable(),
+  customWindowText: z.string().optional(),
+});
+
+export const updateClientNotesSchema = z.object({
+  notes: z.string(),
+});
+
+export const updateServiceSchema = z.object({
+  durationMinutes: z.number().int().nonnegative().optional(),
+  priceFrom: z.number().int().nonnegative().optional(),
+  requiresHandPhoto: z.boolean().optional(),
+  requiresReference: z.boolean().optional(),
+});
+
+export const createTimeWindowSchema = z.object({
+  id: z.string().min(1),
+  startAt: z.string().min(1),
+  endAt: z.string().min(1),
+  status: timeWindowStatusSchema,
+  label: z.string().min(1),
+});
+
+export const updateTimeWindowStatusSchema = z.object({
+  status: timeWindowStatusSchema,
+});

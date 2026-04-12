@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: varyanails-postgres
+    environment:
+      POSTGRES_DB: varyanails
+      POSTGRES_USER: varyanails
+      POSTGRES_PASSWORD: varyanails
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./server/db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+
+volumes:
+  postgres-data:
