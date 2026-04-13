@@ -191,6 +191,8 @@ export function App() {
   runtimeOptionCatalog = optionCatalog;
   const telegramWebApp = getTelegramWebApp();
   const isTelegramMiniApp = Boolean(telegramWebApp);
+  const telegramInitData = telegramWebApp?.initData ?? "";
+  const telegramUser = telegramWebApp?.initDataUnsafe?.user;
 
   const refreshSnapshot = async () => {
     try {
@@ -342,6 +344,23 @@ export function App() {
     return (selectedService.priceFrom ?? 0) + optionsPrice;
   }, [selectedOptions, selectedService.priceFrom]);
 
+  const normalizedDesiredResult = useMemo(() => {
+    const customText = form.desiredResult.trim();
+
+    if (customText) {
+      return customText;
+    }
+
+    const optionTitles = selectedOptions.map((option) => option.title);
+    const summaryParts = [selectedService.title, lengthLabels[form.length]];
+
+    if (optionTitles.length > 0) {
+      summaryParts.push(optionTitles.join(", "));
+    }
+
+    return summaryParts.join(" • ");
+  }, [form.desiredResult, form.length, selectedOptions, selectedService.title]);
+
   const submitRequest = async () => {
     const client: Client = {
       id: `CLI-${Date.now()}`,
@@ -360,7 +379,7 @@ export function App() {
       service: form.service,
       optionIds: form.optionIds,
       length: form.length,
-      desiredResult: form.desiredResult.trim(),
+      desiredResult: normalizedDesiredResult,
       photoIds: newPhotos.map((photo) => photo.id),
       preferredWindowId: form.preferredWindowId === customWindowValue ? null : form.preferredWindowId,
       customWindowText:
@@ -673,14 +692,19 @@ export function App() {
 
       {route.portal === "admin" && (
         <>
-          {adminAccessDenied ? (
-            <div className="panel notice-panel">
-              Админ-панель доступна только в Telegram Mini App для аккаунта мастера. Откройте приложение через кнопку в боте или проверьте, что ваш Telegram ID добавлен в список мастеров.
-              <div className="action-row">
-                <button className="secondary-button" onClick={() => navigateTo("/")}>
-                  Перейти к клиентской части
-                </button>
-              </div>
+            {adminAccessDenied ? (
+              <div className="panel notice-panel">
+                Админ-панель доступна только в Telegram Mini App для аккаунта мастера. Откройте приложение через кнопку в боте или проверьте, что ваш Telegram ID добавлен в список мастеров.
+                <div className="notice-details">
+                  <div>Telegram WebApp: {isTelegramMiniApp ? "yes" : "no"}</div>
+                  <div>InitData length: {telegramInitData.length}</div>
+                  <div>User ID: {telegramUser?.id ?? "n/a"}</div>
+                </div>
+                <div className="action-row">
+                  <button className="secondary-button" onClick={() => navigateTo("/")}>
+                    Перейти к клиентской части
+                  </button>
+                </div>
             </div>
           ) : (
             <>
@@ -835,6 +859,24 @@ function ClientRequestForm({
   const [currentStep, setCurrentStep] = useState<ClientFormStep>("contacts");
   const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
   const currentOptions = serviceOptions.filter((option) => selectedService.options.includes(option.id));
+  const normalizedDesiredResult = useMemo(() => {
+    const customText = form.desiredResult.trim();
+
+    if (customText) {
+      return customText;
+    }
+
+    const optionTitles = form.optionIds
+      .map((optionId) => serviceOptions.find((option) => option.id === optionId)?.title)
+      .filter((title): title is string => Boolean(title));
+    const summaryParts = [selectedService.title, lengthLabels[form.length]];
+
+    if (optionTitles.length > 0) {
+      summaryParts.push(optionTitles.join(", "));
+    }
+
+    return summaryParts.join(" • ");
+  }, [form.desiredResult, form.length, form.optionIds, selectedService.title, serviceOptions]);
   const needsCustomWindow = form.preferredWindowId === customWindowValue;
   const windowsByDate = useMemo(() => {
     const map = new Map<string, { dateKey: string; label: string; items: TimeWindow[] }>();
@@ -886,7 +928,7 @@ function ClientRequestForm({
   };
   const stepErrors: Record<ClientFormStep, string[]> = {
     contacts: [validationMessages.clientName, validationMessages.phone, validationMessages.contactHandle].filter(Boolean),
-    service: [validationMessages.desiredResult].filter(Boolean),
+    service: [],
     photos: [
       validationMessages.handPhoto,
       validationMessages.referencePhoto,
@@ -902,7 +944,6 @@ function ClientRequestForm({
     form.clientName.trim() &&
     phoneDigits.length >= 10 &&
     (!contactHandleRequired || form.contactHandle.trim()) &&
-    form.desiredResult.trim() &&
     (needsCustomWindow ? form.customWindowText.trim() : form.preferredWindowId) &&
     (!requiresHandPhoto || form.handPhoto) &&
     (!requiresReference || form.referencePhoto) &&
@@ -1303,7 +1344,7 @@ function ClientRequestForm({
             <Info label="Связь" value={`${contactLabels[form.contactChannel]} ${form.contactHandle}`.trim()} />
             <Info label="Процедура" value={selectedService.title} />
             <Info label="Допы" value={form.optionIds.map(optionTitle).join(", ") || "Без допов"} />
-            <Info label="Описание" value={form.desiredResult || "Не заполнено"} />
+            <Info label="Описание" value={form.desiredResult || normalizedDesiredResult} />
             <Info label="Фото рук" value={form.handPhoto?.fileName ?? "Не приложено"} />
             <Info label="Референс" value={form.referencePhoto?.fileName ?? "Не приложен"} />
             <Info

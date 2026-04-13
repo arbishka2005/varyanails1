@@ -1194,6 +1194,19 @@ textarea:focus {
   font-weight: 900;
 }
 
+.notice-details {
+  margin-top: 12px;
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(176, 106, 132, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  color: var(--color-ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .booking-celebration {
   position: relative;
   overflow: hidden;
