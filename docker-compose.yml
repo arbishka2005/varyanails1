@@ -16,14 +16,8 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: varyanails-api
-    environment:
-      DATABASE_URL: postgres://varyanails:varyanails@postgres:5432/varyanails
-      STORAGE_DRIVER: postgres
-      API_PORT: 4000
-      CORS_ORIGIN: http://127.0.0.1:5173
-      UPLOADS_DIR: /data/uploads
-      ALLOW_DEV_AUTH: "true"
-      MASTER_TELEGRAM_IDS: ""
+    env_file:
+      - .env
     ports:
       - "4000:4000"
     volumes:
