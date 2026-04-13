@@ -12,6 +12,7 @@ declare global {
             last_name?: string;
             username?: string;
           };
+          start_param?: string;
         };
         viewportHeight?: number;
         viewportStableHeight?: number;
