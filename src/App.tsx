@@ -277,6 +277,16 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (window.location.hash) {
+      return;
+    }
+    const path = window.location.pathname.replace(/^\/+/, "");
+    if (path.startsWith("admin") || path.startsWith("survey")) {
+      window.location.hash = `/${path}`;
+    }
+  }, []);
+
+  useEffect(() => {
     const webApp = getTelegramWebApp();
 
     if (!webApp) {
