@@ -127,9 +127,18 @@ function getRouteFromHash(): AppRoute {
   const hash = isTelegramPayloadHash ? "" : rawHash;
   const fallbackPath = window.location.pathname.replace(/^\/+/, "");
   const startParam = getStartParam();
-  const pathFromStartParam = startParam.replace(/^\/+/, "");
+  const startParamPath = startParam.replace(/^\/+/, "");
+  const isAdminStartParam = startParamPath.startsWith("admin");
+  const isTelegramMiniApp = Boolean(
+    window.Telegram?.WebApp?.initDataUnsafe?.user || window.Telegram?.WebApp?.initData,
+  );
+  const pathFromStartParam = startParamPath;
   const routePath = hash || fallbackPath || pathFromStartParam;
   const [path, query] = routePath.split("?");
+
+  if (path.startsWith("admin") && isTelegramMiniApp && !isAdminStartParam) {
+    return { portal: "client" };
+  }
 
   if (path === "survey") {
     const params = new URLSearchParams(query ?? "");
