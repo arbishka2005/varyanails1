@@ -3,6 +3,7 @@ import type {
   BookingRequest,
   Client,
   PhotoAttachment,
+  ServiceOption,
   ServicePreset,
   TimeWindow,
 } from "../../src/types.js";
@@ -15,6 +16,7 @@ export function toClient(row: Record<string, unknown>): Client {
     preferredContactChannel: row.preferred_contact_channel as Client["preferredContactChannel"],
     contactHandle: String(row.contact_handle),
     firstVisit: Boolean(row.first_visit),
+    telegramUserId: row.telegram_user_id ? String(row.telegram_user_id) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
   };
 }
@@ -37,6 +39,15 @@ export function toService(row: Record<string, unknown>): ServicePreset {
     requiresHandPhoto: Boolean(row.requires_hand_photo),
     requiresReference: Boolean(row.requires_reference),
     options: Array.isArray(row.options) ? (row.options as ServicePreset["options"]) : [],
+  };
+}
+
+export function toServiceOption(row: Record<string, unknown>): ServiceOption {
+  return {
+    id: row.id as ServiceOption["id"],
+    title: String(row.title),
+    durationMinutes: Number(row.duration_minutes),
+    priceFrom: row.price_from === null ? undefined : Number(row.price_from),
   };
 }
 
@@ -83,5 +94,11 @@ export function toAppointment(row: Record<string, unknown>): Appointment {
     durationMinutes: Number(row.duration_minutes),
     status: row.status as Appointment["status"],
     masterNote: row.master_note ? String(row.master_note) : undefined,
+    reminder24hSentAt: row.reminder_24h_sent_at ? new Date(String(row.reminder_24h_sent_at)).toISOString() : undefined,
+    reminder3hSentAt: row.reminder_3h_sent_at ? new Date(String(row.reminder_3h_sent_at)).toISOString() : undefined,
+    surveySentAt: row.survey_sent_at ? new Date(String(row.survey_sent_at)).toISOString() : undefined,
+    surveyRating: row.survey_rating === null || row.survey_rating === undefined ? undefined : Number(row.survey_rating),
+    surveyText: row.survey_text ? String(row.survey_text) : undefined,
+    cancelledAt: row.cancelled_at ? new Date(String(row.cancelled_at)).toISOString() : undefined,
   };
 }

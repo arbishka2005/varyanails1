@@ -13,6 +13,7 @@ import {
   Send,
   Settings,
   Sparkles,
+  Trash2,
   UserRound,
   X,
 } from "lucide-react";
@@ -21,21 +22,28 @@ import {
   servicePresets,
   timeWindows,
 } from "./data";
-import { api } from "./api";
+import { ApiError, api } from "./api";
+import heroMainImage from "./assets/hero-main.jpg";
 import type {
   AppSnapshot,
+  Appointment,
   BookingRequest,
   Client,
   ContactChannel,
   PhotoAttachment,
+  PublicBookingRequest,
   NailLength,
   RequestStatus,
   ServiceKind,
   ServiceOptionKind,
+  ServiceOption,
   ServicePreset,
   TimeWindow,
   TimeWindowStatus,
 } from "./types";
+
+let runtimeServiceCatalog = servicePresets;
+let runtimeOptionCatalog = serviceOptions;
 
 const contactLabels: Record<ContactChannel, string> = {
   telegram: "Telegram",
@@ -68,8 +76,8 @@ type FormState = {
   optionIds: ServiceOptionKind[];
   length: NailLength;
   desiredResult: string;
-  handPhotoName: string;
-  referencePhotoName: string;
+  handPhoto: PhotoAttachment | null;
+  referencePhoto: PhotoAttachment | null;
   preferredWindowId: string;
   customWindowText: string;
   comment: string;
@@ -77,7 +85,25 @@ type FormState = {
 
 const customWindowValue = "custom";
 type AdminSection = "requests" | "clients" | "settings";
-type AppRoute = { portal: "client" } | { portal: "admin"; section: AdminSection };
+type ClientStatusFilter = RequestStatus | "all";
+type ClientFormStep = "contacts" | "service" | "photos" | "time" | "confirm";
+type AppRoute =
+  | { portal: "client" }
+  | { portal: "admin"; section: AdminSection }
+  | { portal: "survey"; appointmentId: string };
+type ServiceEditorState = {
+  title: string;
+  durationMinutes: string;
+  priceFrom: string;
+  requiresHandPhoto: boolean;
+  requiresReference: boolean;
+  options: ServiceOptionKind[];
+};
+type OptionEditorState = {
+  title: string;
+  durationMinutes: string;
+  priceFrom: string;
+};
 
 const initialForm: FormState = {
   clientName: "",
@@ -89,8 +115,8 @@ const initialForm: FormState = {
   optionIds: [],
   length: "medium",
   desiredResult: "",
-  handPhotoName: "",
-  referencePhotoName: "",
+  handPhoto: null,
+  referencePhoto: null,
   preferredWindowId: timeWindows[0].id,
   customWindowText: "",
   comment: "",
@@ -98,6 +124,15 @@ const initialForm: FormState = {
 
 function getRouteFromHash(): AppRoute {
   const hash = window.location.hash.replace(/^#\/?/, "");
+  const [path, query] = hash.split("?");
+
+  if (path === "survey") {
+    const params = new URLSearchParams(query ?? "");
+    const appointmentId = params.get("appointment");
+    if (appointmentId) {
+      return { portal: "survey", appointmentId };
+    }
+  }
 
   if (hash === "admin/clients") {
     return { portal: "admin", section: "clients" };
@@ -118,33 +153,59 @@ function navigateTo(hash: string) {
   window.location.hash = hash;
 }
 
+function getTelegramWebApp() {
+  return window.Telegram?.WebApp;
+}
+
+function getTelegramUser() {
+  return getTelegramWebApp()?.initDataUnsafe?.user;
+}
+
 export function App() {
   const [route, setRoute] = useState<AppRoute>(() => getRouteFromHash());
   const [lastSubmittedRequestId, setLastSubmittedRequestId] = useState<string | null>(null);
+  const [lastRequestInfo, setLastRequestInfo] = useState<PublicBookingRequest | null>(null);
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
-  const [publicConfig, setPublicConfig] = useState<Pick<AppSnapshot, "services" | "windows"> | null>(null);
+  const [publicConfig, setPublicConfig] = useState<Pick<AppSnapshot, "services" | "windows" | "serviceOptions"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
+  const [adminAccessDenied, setAdminAccessDenied] = useState(false);
   const [form, setForm] = useState<FormState>(initialForm);
+  const [uploading, setUploading] = useState({ hands: false, reference: false });
+  const [uploadError, setUploadError] = useState({ hands: "", reference: "" });
 
   const clients = snapshot?.clients ?? [];
   const photos = snapshot?.photos ?? [];
   const requests = snapshot?.requests ?? [];
   const appointments = snapshot?.appointments ?? [];
   const windows = route.portal === "admin" ? (snapshot?.windows ?? []) : (publicConfig?.windows ?? timeWindows);
+  const optionCatalog =
+    route.portal === "admin"
+      ? snapshot?.serviceOptions.length ? snapshot.serviceOptions : serviceOptions
+      : publicConfig?.serviceOptions.length ? publicConfig.serviceOptions : serviceOptions;
   const services =
     route.portal === "admin"
       ? snapshot?.services.length ? snapshot.services : servicePresets
       : publicConfig?.services.length ? publicConfig.services : servicePresets;
+  runtimeServiceCatalog = services;
+  runtimeOptionCatalog = optionCatalog;
+  const telegramWebApp = getTelegramWebApp();
+  const isTelegramMiniApp = Boolean(telegramWebApp);
 
   const refreshSnapshot = async () => {
     try {
       setApiError(null);
+      setAdminAccessDenied(false);
       const nextSnapshot = await api.getSnapshot();
       setSnapshot(nextSnapshot);
       return nextSnapshot;
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "Не удалось подключиться к API");
+      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+        setAdminAccessDenied(true);
+        setApiError("Нет доступа к админ-панели. Откройте приложение через Telegram.");
+      } else {
+        setApiError(error instanceof Error ? error.message : "Не удалось подключиться к API");
+      }
       return null;
     } finally {
       setIsLoading(false);
@@ -165,11 +226,64 @@ export function App() {
     }
   };
 
+  const refreshLastRequest = async (requestId: string) => {
+    try {
+      const info = await api.getPublicBookingRequest(requestId);
+      setLastRequestInfo(info);
+      return info;
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось обновить статус заявки");
+      return null;
+    }
+  };
+
   useEffect(() => {
     const handleHashChange = () => setRoute(getRouteFromHash());
 
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  useEffect(() => {
+    const webApp = getTelegramWebApp();
+
+    if (!webApp) {
+      return;
+    }
+
+    const updateViewportHeight = () => {
+      const height = webApp.viewportStableHeight || webApp.viewportHeight;
+      if (height) {
+        document.documentElement.style.setProperty("--tg-viewport-height", `${height}px`);
+      }
+    };
+
+    webApp.ready?.();
+    webApp.expand?.();
+    updateViewportHeight();
+    webApp.onEvent?.("viewportChanged", updateViewportHeight);
+
+    return () => {
+      webApp.offEvent?.("viewportChanged", updateViewportHeight);
+    };
+  }, []);
+
+  useEffect(() => {
+    const user = getTelegramUser();
+
+    if (!user) {
+      return;
+    }
+
+    const fullName = [user.first_name, user.last_name].filter(Boolean).join(" ").trim();
+    const handle = user.username ? `@${user.username}` : "";
+
+    setForm((current) => ({
+      ...current,
+      clientName: current.clientName || fullName,
+      contactChannel: "telegram",
+      contactHandle: current.contactHandle || handle,
+    }));
   }, []);
 
   useEffect(() => {
@@ -182,14 +296,39 @@ export function App() {
     void refreshPublicConfig();
   }, [route.portal]);
 
+  useEffect(() => {
+    if (route.portal !== "client" || !lastSubmittedRequestId) {
+      return;
+    }
+    void refreshLastRequest(lastSubmittedRequestId);
+  }, [lastSubmittedRequestId, route.portal]);
+
+  useEffect(() => {
+    if (!services.length) {
+      return;
+    }
+
+    setForm((current) => {
+      if (services.some((service) => service.id === current.service)) {
+        return current;
+      }
+
+      return {
+        ...current,
+        service: services[0].id,
+        optionIds: current.optionIds.filter((optionId) => services[0].options.includes(optionId)),
+      };
+    });
+  }, [services]);
+
   const selectedService = useMemo(
-    () => services.find((service) => service.id === form.service)!,
+    () => services.find((service) => service.id === form.service) ?? services[0] ?? servicePresets[0],
     [form.service, services],
   );
 
   const selectedOptions = useMemo(
-    () => serviceOptions.filter((option) => form.optionIds.includes(option.id)),
-    [form.optionIds],
+    () => optionCatalog.filter((option) => form.optionIds.includes(option.id)),
+    [form.optionIds, optionCatalog],
   );
 
   const estimatedMinutes = useMemo(() => {
@@ -212,22 +351,9 @@ export function App() {
       contactHandle: form.contactHandle.trim(),
       firstVisit: form.isNewClient,
     };
-    const newPhotos: PhotoAttachment[] = [
-      form.handPhotoName
-        ? {
-            id: `PHOTO-HANDS-${Date.now()}`,
-            kind: "hands",
-            fileName: form.handPhotoName.trim(),
-          }
-        : null,
-      form.referencePhotoName
-        ? {
-            id: `PHOTO-REF-${Date.now()}`,
-            kind: "reference",
-            fileName: form.referencePhotoName.trim(),
-          }
-        : null,
-    ].filter((photo): photo is PhotoAttachment => Boolean(photo));
+    const newPhotos: PhotoAttachment[] = [form.handPhoto, form.referencePhoto].filter(
+      (photo): photo is PhotoAttachment => Boolean(photo),
+    );
     const request: BookingRequest = {
       id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
       clientId: client.id,
@@ -249,11 +375,48 @@ export function App() {
     try {
       setApiError(null);
       await api.createBookingRequest({ client, photos: newPhotos, request });
-      await refreshSnapshot();
       setLastSubmittedRequestId(request.id);
+      await refreshLastRequest(request.id);
       setForm(initialForm);
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Не удалось отправить заявку");
+    }
+  };
+
+  const confirmClientWindow = async (requestId: string) => {
+    try {
+      setApiError(null);
+      await api.confirmPublicBookingRequest(requestId);
+      await refreshLastRequest(requestId);
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось подтвердить время");
+    }
+  };
+
+  const uploadPhoto = async (kind: PhotoAttachment["kind"], file: File) => {
+    const key = kind === "hands" ? "hands" : "reference";
+    setUploading((current) => ({ ...current, [key]: true }));
+    setUploadError((current) => ({ ...current, [key]: "" }));
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      const uploaded = await api.uploadPhoto({
+        kind,
+        fileName: file.name,
+        dataUrl,
+      });
+      setForm((current) => ({
+        ...current,
+        handPhoto: kind === "hands" ? uploaded : current.handPhoto,
+        referencePhoto: kind === "reference" ? uploaded : current.referencePhoto,
+      }));
+      return uploaded;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Не удалось загрузить фото";
+      setUploadError((current) => ({ ...current, [key]: message }));
+      return null;
+    } finally {
+      setUploading((current) => ({ ...current, [key]: false }));
     }
   };
 
@@ -307,6 +470,56 @@ export function App() {
     }
   };
 
+  const createService = async (service: ServicePreset) => {
+    try {
+      setApiError(null);
+      await api.createService(service);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось добавить услугу");
+    }
+  };
+
+  const deleteService = async (id: ServiceKind) => {
+    try {
+      setApiError(null);
+      await api.deleteService(id);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось удалить услугу");
+    }
+  };
+
+  const createServiceOption = async (option: ServiceOption) => {
+    try {
+      setApiError(null);
+      await api.createServiceOption(option);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось добавить дополнение");
+    }
+  };
+
+  const updateServiceOption = async (id: ServiceOptionKind, patch: Partial<ServiceOption>) => {
+    try {
+      setApiError(null);
+      await api.updateServiceOption(id, patch);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось обновить дополнение");
+    }
+  };
+
+  const deleteServiceOption = async (id: ServiceOptionKind) => {
+    try {
+      setApiError(null);
+      await api.deleteServiceOption(id);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось удалить дополнение");
+    }
+  };
+
   const addTimeWindow = async (window: Omit<TimeWindow, "id" | "label" | "status">) => {
     const nextWindow: TimeWindow = {
       ...window,
@@ -331,6 +544,26 @@ export function App() {
       await refreshSnapshot();
     } catch (error) {
       setApiError(error instanceof Error ? error.message : "Не удалось изменить окошко");
+    }
+  };
+
+  const moveAppointment = async (appointmentId: string, windowId: string) => {
+    try {
+      setApiError(null);
+      await api.moveAppointment(appointmentId, windowId);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось перенести запись");
+    }
+  };
+
+  const updateAppointmentStatus = async (appointmentId: string, status: AppSnapshot["appointments"][number]["status"]) => {
+    try {
+      setApiError(null);
+      await api.updateAppointmentStatus(appointmentId, status);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось обновить статус записи");
     }
   };
 
@@ -381,10 +614,36 @@ export function App() {
       {route.portal === "client" && (
         <>
           <ClientHeader />
-          {lastSubmittedRequestId && (
-            <div className="panel notice-panel">
-              Заявка {lastSubmittedRequestId} отправлена. Мастер проверит фото, время и детали.
+          {lastRequestInfo ? (
+            <div className="panel notice-panel booking-celebration">
+              <strong>Заявка {lastRequestInfo.request.id}</strong>
+              <div>Статус: {statusLabels[lastRequestInfo.request.status]}</div>
+              {lastRequestInfo.window ? (
+                <div>Предложенное время: {lastRequestInfo.window.label}</div>
+              ) : lastRequestInfo.request.customWindowText ? (
+                <div>Ваше время: {lastRequestInfo.request.customWindowText}</div>
+              ) : null}
+              {lastRequestInfo.request.status === "waiting_client" && lastRequestInfo.window && (
+                <button
+                  className="primary-button"
+                  onClick={() => confirmClientWindow(lastRequestInfo.request.id)}
+                >
+                  Подтвердить время
+                </button>
+              )}
+              <button
+                className="secondary-button"
+                onClick={() => refreshLastRequest(lastRequestInfo.request.id)}
+              >
+                Обновить статус
+              </button>
             </div>
+          ) : (
+            lastSubmittedRequestId && (
+              <div className="panel notice-panel booking-celebration">
+                Заявка {lastSubmittedRequestId} отправлена. Мастер проверит фото, время и детали.
+              </div>
+            )
           )}
           <ClientRequestForm
             form={form}
@@ -393,50 +652,82 @@ export function App() {
             requiresHandPhoto={form.isNewClient || selectedService.requiresHandPhoto}
             requiresReference={selectedService.requiresReference}
             services={services}
+            serviceOptions={optionCatalog}
             selectedService={selectedService}
             availableWindows={windows.filter(
               (window) => window.status === "available" || window.status === "offered",
             )}
             setForm={setForm}
             submitRequest={submitRequest}
+            uploadPhoto={uploadPhoto}
+            uploading={uploading}
+            uploadError={uploadError}
+            isTelegramMiniApp={isTelegramMiniApp}
           />
         </>
       )}
 
+      {route.portal === "survey" && (
+        <SurveyPage appointmentId={route.appointmentId} />
+      )}
+
       {route.portal === "admin" && (
         <>
-          <AdminHeader section={route.section} />
-          {route.section === "requests" && (
-            <MasterWorkspace
-              appointments={appointments}
-              clients={clients}
-              photos={photos}
-              requests={requests}
-              windows={windows}
-              confirmRequest={confirmRequest}
-              updateStatus={updateStatus}
-              updateWindow={updateWindow}
-            />
-          )}
+          {adminAccessDenied ? (
+            <div className="panel notice-panel">
+              Админ-панель доступна только в Telegram Mini App для аккаунта мастера. Откройте приложение через кнопку в боте или проверьте, что ваш Telegram ID добавлен в список мастеров.
+              <div className="action-row">
+                <button className="secondary-button" onClick={() => navigateTo("/")}>
+                  Перейти к клиентской части
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <AdminHeader section={route.section} />
+              {route.section === "requests" && (
+                <MasterWorkspace
+                  appointments={appointments}
+                  clients={clients}
+                  photos={photos}
+                  requests={requests}
+                  windows={windows}
+                  confirmRequest={confirmRequest}
+                  updateStatus={updateStatus}
+                  updateWindow={updateWindow}
+                  updateWindowStatus={updateWindowStatus}
+                  moveAppointment={moveAppointment}
+                  updateAppointmentStatus={updateAppointmentStatus}
+                  addTimeWindow={addTimeWindow}
+                />
+              )}
 
-          {route.section === "clients" && (
-            <ClientsWorkspace
-              appointments={appointments}
-              clients={clients}
-              photos={photos}
-              requests={requests}
-              updateClientNotes={updateClientNotes}
-            />
-          )}
+              {route.section === "clients" && (
+                <ClientsWorkspace
+                  appointments={appointments}
+                  clients={clients}
+                  photos={photos}
+                  requests={requests}
+                  updateClientNotes={updateClientNotes}
+                />
+              )}
 
-          {route.section === "settings" && (
-            <SettingsWorkspace
-              services={services}
-              windows={windows}
-              addTimeWindow={addTimeWindow}
-              updateService={updateService}
-              updateWindowStatus={updateWindowStatus}
-            />
+              {route.section === "settings" && (
+                <SettingsWorkspaceV2
+                  services={services}
+                  serviceOptions={optionCatalog}
+                  windows={windows}
+                  addTimeWindow={addTimeWindow}
+                  createServiceOption={createServiceOption}
+                  updateServiceOption={updateServiceOption}
+                  deleteServiceOption={deleteServiceOption}
+                  createService={createService}
+                  updateService={updateService}
+                  deleteService={deleteService}
+                  updateWindowStatus={updateWindowStatus}
+                />
+              )}
+            </>
           )}
         </>
       )}
@@ -446,10 +737,19 @@ export function App() {
 
 function ClientHeader() {
   return (
-    <section className="topbar">
-      <div>
-        <p className="eyebrow">Varya Nails</p>
-        <h1>Заявка на ногти</h1>
+    <section className="topbar client-hero">
+      <div className="hero-copy">
+        <p className="eyebrow">vvrnailss</p>
+        <h1>Запись на ногти</h1>
+        <p className="hero-text">
+          Быстрая запись без переписки на десять сообщений: выберите услугу, приложите фото и получите аккуратное подтверждение от мастера.
+        </p>
+      </div>
+      <div className="hero-visual" aria-hidden="true">
+        <img
+          alt=""
+          src={heroMainImage}
+        />
       </div>
     </section>
   );
@@ -457,10 +757,11 @@ function ClientHeader() {
 
 function AdminHeader({ section }: { section: AdminSection }) {
   return (
-    <section className="topbar">
+    <section className="topbar admin-topbar">
       <div>
-        <p className="eyebrow">Varya Nails · Админ</p>
+        <p className="eyebrow">vvrnailss · админ</p>
         <h1>Рабочее место мастера</h1>
+        <p className="hero-text">Заявки, расписание и клиенты в одном лёгком кабинете.</p>
       </div>
       <div className="mode-switch three" aria-label="Навигация админки">
         <button
@@ -493,10 +794,15 @@ function ClientRequestForm({
   requiresHandPhoto,
   requiresReference,
   services,
+  serviceOptions,
   selectedService,
   availableWindows,
   setForm,
   submitRequest,
+  uploadPhoto,
+  uploading,
+  uploadError,
+  isTelegramMiniApp,
 }: {
   form: FormState;
   estimatedMinutes: number;
@@ -504,21 +810,178 @@ function ClientRequestForm({
   requiresHandPhoto: boolean;
   requiresReference: boolean;
   services: ServicePreset[];
+  serviceOptions: ServiceOption[];
   selectedService: (typeof servicePresets)[number];
   availableWindows: TimeWindow[];
   setForm: (next: FormState) => void;
   submitRequest: () => void;
+  uploadPhoto: (kind: PhotoAttachment["kind"], file: File) => Promise<PhotoAttachment | null>;
+  uploading: { hands: boolean; reference: boolean };
+  uploadError: { hands: string; reference: string };
+  isTelegramMiniApp: boolean;
 }) {
+  const steps = useMemo(
+    () =>
+      [
+        { id: "contacts", label: "Контакты" },
+        { id: "service", label: "Услуга" },
+        { id: "photos", label: "Фото" },
+        { id: "time", label: "Время" },
+        { id: "confirm", label: "Проверка" },
+      ] satisfies { id: ClientFormStep; label: string }[],
+    [],
+  );
+  const maxPhotoSizeBytes = 8 * 1024 * 1024;
+  const [currentStep, setCurrentStep] = useState<ClientFormStep>("contacts");
+  const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
   const currentOptions = serviceOptions.filter((option) => selectedService.options.includes(option.id));
   const needsCustomWindow = form.preferredWindowId === customWindowValue;
-  const requiredFilled =
-    form.clientName &&
-    form.phone &&
-    form.contactHandle &&
-    form.desiredResult &&
-    (needsCustomWindow ? form.customWindowText : form.preferredWindowId) &&
-    (!requiresHandPhoto || form.handPhotoName) &&
-    (!requiresReference || form.referencePhotoName);
+  const windowsByDate = useMemo(() => {
+    const map = new Map<string, { dateKey: string; label: string; items: TimeWindow[] }>();
+
+    availableWindows.forEach((window) => {
+      const dateKey = window.startAt.split("T")[0];
+      const current = map.get(dateKey) ?? {
+        dateKey,
+        label: formatDayLabel(window.startAt),
+        items: [],
+      };
+      current.items.push(window);
+      map.set(dateKey, current);
+    });
+
+    return Array.from(map.values()).sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  }, [availableWindows]);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const stepIndex = steps.findIndex((step) => step.id === currentStep);
+  const contactHandleRequired = form.contactChannel !== "phone";
+  const phoneDigits = form.phone.replace(/\D/g, "");
+  const validationMessages = {
+    clientName: form.clientName.trim() ? "" : "Напишите, как к вам обращаться.",
+    phone: phoneDigits.length >= 10 ? "" : "Оставьте, пожалуйста, номер телефона полностью, чтобы я могла связаться с вами.",
+    contactHandle:
+      !contactHandleRequired || form.contactHandle.trim()
+        ? ""
+        : "Если удобнее общаться не по телефону, оставьте здесь ваш ник или ссылку.",
+    desiredResult:
+      form.desiredResult.trim().length >= 10
+        ? ""
+        : "Расскажите, что хочется сделать: покрытие, дизайн, ремонт, снятие или другие детали.",
+    handPhoto:
+      !requiresHandPhoto || form.handPhoto
+        ? ""
+        : "Прикрепите фото рук, пожалуйста — так я смогу точнее всё оценить.",
+    referencePhoto:
+      !requiresReference || form.referencePhoto
+        ? ""
+        : "Если у вас есть референс, прикрепите его сюда — так я лучше пойму настроение и форму.",
+    time:
+      needsCustomWindow
+        ? form.customWindowText.trim()
+          ? ""
+          : "Напишите, когда вам удобно — я постараюсь подобрать подходящее время."
+        : form.preferredWindowId
+          ? ""
+          : "Выберите удобное окошко или вариант «Хочу другое время».",
+  };
+  const stepErrors: Record<ClientFormStep, string[]> = {
+    contacts: [validationMessages.clientName, validationMessages.phone, validationMessages.contactHandle].filter(Boolean),
+    service: [validationMessages.desiredResult].filter(Boolean),
+    photos: [
+      validationMessages.handPhoto,
+      validationMessages.referencePhoto,
+      fileValidationError.hands,
+      fileValidationError.reference,
+      uploadError.hands,
+      uploadError.reference,
+    ].filter(Boolean),
+    time: [validationMessages.time].filter(Boolean),
+    confirm: [],
+  };
+  const requiredFilled = Boolean(
+    form.clientName.trim() &&
+    phoneDigits.length >= 10 &&
+    (!contactHandleRequired || form.contactHandle.trim()) &&
+    form.desiredResult.trim() &&
+    (needsCustomWindow ? form.customWindowText.trim() : form.preferredWindowId) &&
+    (!requiresHandPhoto || form.handPhoto) &&
+    (!requiresReference || form.referencePhoto) &&
+    !fileValidationError.hands &&
+    !fileValidationError.reference &&
+    !uploadError.hands &&
+    !uploadError.reference,
+  );
+
+  const goToStep = (step: ClientFormStep) => setCurrentStep(step);
+  const nextStep = () => {
+    if (stepErrors[currentStep].length > 0) {
+      return;
+    }
+
+    setCurrentStep(steps[Math.min(stepIndex + 1, steps.length - 1)].id);
+  };
+  const previousStep = () => setCurrentStep(steps[Math.max(stepIndex - 1, 0)].id);
+
+  useEffect(() => {
+    if (!windowsByDate.length) {
+      setSelectedDateKey(null);
+      return;
+    }
+
+    if (!selectedDateKey || !windowsByDate.some((group) => group.dateKey === selectedDateKey)) {
+      setSelectedDateKey(windowsByDate[0].dateKey);
+    }
+  }, [selectedDateKey, windowsByDate]);
+
+  useEffect(() => {
+    const backButton = getTelegramWebApp()?.BackButton;
+
+    if (!backButton) {
+      return;
+    }
+
+    const handleBack = () => {
+      setCurrentStep((step) => {
+        const index = steps.findIndex((item) => item.id === step);
+        return steps[Math.max(index - 1, 0)].id;
+      });
+    };
+
+    if (stepIndex > 0) {
+      backButton.show();
+      backButton.onClick(handleBack);
+    } else {
+      backButton.hide();
+    }
+
+    return () => {
+      backButton.offClick(handleBack);
+      if (stepIndex > 0) {
+        backButton.hide();
+      }
+    };
+  }, [stepIndex, steps]);
+
+  const handlePhotoChange = (kind: PhotoAttachment["kind"], file?: File) => {
+    const key = kind === "hands" ? "hands" : "reference";
+
+    if (!file) {
+      return;
+    }
+
+    if (file.type && !file.type.startsWith("image/")) {
+      setFileValidationError((current) => ({ ...current, [key]: "Загрузите изображение: JPG, PNG или HEIC." }));
+      return;
+    }
+
+    if (file.size > maxPhotoSizeBytes) {
+      setFileValidationError((current) => ({ ...current, [key]: "Фото тяжелее 8 МБ. Выберите файл поменьше." }));
+      return;
+    }
+
+    setFileValidationError((current) => ({ ...current, [key]: "" }));
+    void uploadPhoto(kind, file);
+  };
 
   const toggleOption = (id: ServiceOptionKind) => {
     setForm({
@@ -549,162 +1012,325 @@ function ClientRequestForm({
           </div>
         </div>
 
-        <label>
-          Имя
-          <input
-            value={form.clientName}
-            onChange={(event) => setForm({ ...form, clientName: event.target.value })}
-            placeholder="Например, Алина"
-          />
-        </label>
-
-        <label>
-          Номер телефона
-          <input
-            value={form.phone}
-            onChange={(event) => setForm({ ...form, phone: event.target.value })}
-            placeholder="+7 ..."
-          />
-        </label>
-
-        <div className="field-row">
-          <label>
-            Где удобнее общаться
-            <select
-              value={form.contactChannel}
-              onChange={(event) =>
-                setForm({ ...form, contactChannel: event.target.value as ContactChannel })
-              }
+        <div className="form-steps" aria-label="Шаги заявки">
+          {steps.map((step, index) => (
+            <button
+              className={`step-chip${step.id === currentStep ? " active" : ""}`}
+              key={step.id}
+              onClick={() => goToStep(step.id)}
+              type="button"
             >
-              <option value="telegram">Telegram</option>
-              <option value="vk">VK</option>
-              <option value="phone">Телефон</option>
-            </select>
-          </label>
-          <label>
-            Ник или ссылка
-            <input
-              value={form.contactHandle}
-              onChange={(event) => setForm({ ...form, contactHandle: event.target.value })}
-              placeholder="@username или vk.com/..."
-            />
-          </label>
+              <span>{index + 1}</span>
+              {step.label}
+            </button>
+          ))}
         </div>
 
-        <label className="checkbox-line">
-          <input
-            type="checkbox"
-            checked={form.isNewClient}
-            onChange={(event) => setForm({ ...form, isNewClient: event.target.checked })}
-          />
-          Я первый раз у мастера
-        </label>
+        {currentStep === "contacts" && (
+          <div className="step-panel">
+            <label>
+              Имя
+              <input
+                aria-describedby="clientNameHint"
+                value={form.clientName}
+                onChange={(event) => setForm({ ...form, clientName: event.target.value })}
+                  placeholder="Например, Елена"
+              />
+              {validationMessages.clientName && <small className="field-hint" id="clientNameHint">{validationMessages.clientName}</small>}
+            </label>
 
-        <div className="field-row">
-          <label>
-            Процедура
-            <select
-              value={form.service}
-              onChange={(event) => chooseService(event.target.value as ServiceKind)}
-            >
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Длина
-            <select
-              value={form.length}
-              onChange={(event) => setForm({ ...form, length: event.target.value as NailLength })}
-            >
-              {Object.entries(lengthLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            <label>
+              Номер телефона
+              <input
+                aria-describedby="phoneHint"
+                inputMode="tel"
+                value={form.phone}
+                onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                placeholder="+7 ..."
+              />
+              {validationMessages.phone && <small className="field-hint" id="phoneHint">{validationMessages.phone}</small>}
+            </label>
 
-        <fieldset className="option-list">
-          <legend>Дополнительно</legend>
-          {currentOptions.map((option) => (
-            <label className="checkbox-line option-row" key={option.id}>
+            <div className="field-row">
+              <label>
+                Где удобнее общаться
+                <select
+                  value={form.contactChannel}
+                  onChange={(event) =>
+                    setForm({ ...form, contactChannel: event.target.value as ContactChannel })
+                  }
+                >
+                  <option value="telegram">Telegram</option>
+                  <option value="vk">VK</option>
+                  <option value="phone">Телефон</option>
+                </select>
+              </label>
+              <label>
+                Ник или ссылка
+                <input
+                  aria-describedby="contactHandleHint"
+                  value={form.contactHandle}
+                  onChange={(event) => setForm({ ...form, contactHandle: event.target.value })}
+                  placeholder={contactHandleRequired ? "@username или vk.com/..." : "Если захотите, можно оставить"}
+                />
+                {validationMessages.contactHandle && <small className="field-hint" id="contactHandleHint">{validationMessages.contactHandle}</small>}
+              </label>
+            </div>
+
+            <label className="checkbox-line first-visit-toggle">
               <input
                 type="checkbox"
-                checked={form.optionIds.includes(option.id)}
-                onChange={() => toggleOption(option.id)}
+                checked={form.isNewClient}
+                onChange={(event) => setForm({ ...form, isNewClient: event.target.checked })}
               />
-              {option.title} · +{option.durationMinutes} мин
+              <span className="checkbox-copy first-visit-copy">
+                <strong>Я первый раз у мастера</strong>
+                <small>Это поможет точнее оценить фото и подобрать комфортное время.</small>
+              </span>
             </label>
-          ))}
-        </fieldset>
-
-        <label>
-          Что будем делать
-          <textarea
-            value={form.desiredResult}
-            onChange={(event) => setForm({ ...form, desiredResult: event.target.value })}
-            placeholder="Наращивание, коррекция, на свои, дизайн, ремонт, снятие..."
-          />
-        </label>
-
-        <div className="field-row">
-          <label>
-            {requiresHandPhoto ? "Фото своих рук" : "Фото своих рук, если есть изменения"}
-            <input
-              value={form.handPhotoName}
-              onChange={(event) => setForm({ ...form, handPhotoName: event.target.value })}
-              placeholder={requiresHandPhoto ? "hands.jpg, обязательно" : "hands.jpg, если нужно"}
-            />
-          </label>
-          <label>
-            {requiresReference ? "Фото референса" : "Фото референса, если нужно"}
-            <input
-              value={form.referencePhotoName}
-              onChange={(event) => setForm({ ...form, referencePhotoName: event.target.value })}
-              placeholder={requiresReference ? "reference.jpg, обязательно" : "reference.jpg, если нужно"}
-            />
-          </label>
-        </div>
-
-        <label>
-          Окошко
-          <select
-            value={form.preferredWindowId}
-            onChange={(event) => setForm({ ...form, preferredWindowId: event.target.value })}
-          >
-            {availableWindows.map((window) => (
-              <option key={window.id} value={window.id}>
-                {window.label}
-              </option>
-            ))}
-            <option value={customWindowValue}>Хочу другое время</option>
-          </select>
-        </label>
-
-        {needsCustomWindow && (
-          <label>
-            Когда вам удобно
-            <input
-              value={form.customWindowText}
-              onChange={(event) => setForm({ ...form, customWindowText: event.target.value })}
-              placeholder="Например: после 18:00 в будни"
-            />
-          </label>
+          </div>
         )}
 
-        <label>
-          Комментарий
-          <textarea
-            value={form.comment}
-            onChange={(event) => setForm({ ...form, comment: event.target.value })}
-            placeholder="Любые детали: сколы, аллергии, пожелания по цвету..."
-          />
-        </label>
+        {currentStep === "service" && (
+          <div className="step-panel">
+            <div className="service-picker" aria-label="Выбор услуги">
+              {services.map((service) => (
+                <button
+                  className={`service-option-card${form.service === service.id ? " active" : ""}`}
+                  key={service.id}
+                  onClick={() => chooseService(service.id)}
+                  type="button"
+                >
+                  <span>{service.requiresReference ? "с референсом" : "easy care"}</span>
+                  <strong>{service.title}</strong>
+                  <small>
+                    {Math.floor(service.durationMinutes / 60)} ч {service.durationMinutes % 60} мин · от {(service.priceFrom ?? 0).toLocaleString("ru-RU")} ₽
+                  </small>
+                </button>
+              ))}
+            </div>
+
+            <div className="field-row">
+              <label>
+                Длина
+                <select
+                  value={form.length}
+                  onChange={(event) => setForm({ ...form, length: event.target.value as NailLength })}
+                >
+                  {Object.entries(lengthLabels).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <fieldset className="option-list">
+              <legend>Дополнительно</legend>
+              {currentOptions.map((option) => (
+                <label className="checkbox-line option-row" key={option.id}>
+                  <input
+                    type="checkbox"
+                    checked={form.optionIds.includes(option.id)}
+                    onChange={() => toggleOption(option.id)}
+                  />
+                  <span className="checkbox-copy">
+                    <strong>{option.title}</strong>
+                    <small>+{option.durationMinutes} мин · от {(option.priceFrom ?? 0).toLocaleString("ru-RU")} ₽</small>
+                  </span>
+                </label>
+              ))}
+            </fieldset>
+
+            <label>
+              Что будем делать
+              <textarea
+                aria-describedby="desiredResultHint"
+                value={form.desiredResult}
+                onChange={(event) => setForm({ ...form, desiredResult: event.target.value })}
+                placeholder="Наращивание, коррекция, на свои, дизайн, ремонт, снятие..."
+              />
+              {validationMessages.desiredResult && <small className="field-hint" id="desiredResultHint">{validationMessages.desiredResult}</small>}
+            </label>
+          </div>
+        )}
+
+        {currentStep === "photos" && (
+          <div className="step-panel">
+            {(uploading.hands || uploading.reference) && (
+              <small className="field-hint">Загружаю фото...</small>
+            )}
+
+            <div className="field-row">
+              <label>
+                {requiresHandPhoto ? "Фото своих рук" : "Фото своих рук, если есть изменения"}
+                <input
+                  aria-describedby="handsHint"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handlePhotoChange("hands", event.target.files?.[0])}
+                />
+                {form.handPhoto && <small className="success-text">Загружено: {form.handPhoto.fileName}</small>}
+                {(validationMessages.handPhoto || fileValidationError.hands || uploadError.hands) && (
+                  <small className="field-hint" id="handsHint">
+                    {validationMessages.handPhoto || fileValidationError.hands || uploadError.hands}
+                  </small>
+                )}
+              </label>
+              <label>
+                {requiresReference ? "Фото референса" : "Фото референса, если нужно"}
+                <input
+                  aria-describedby="referenceHint"
+                  type="file"
+                  accept="image/*"
+                  onChange={(event) => handlePhotoChange("reference", event.target.files?.[0])}
+                />
+                {form.referencePhoto && <small className="success-text">Загружено: {form.referencePhoto.fileName}</small>}
+                {(validationMessages.referencePhoto || fileValidationError.reference || uploadError.reference) && (
+                  <small className="field-hint" id="referenceHint">
+                    {validationMessages.referencePhoto || fileValidationError.reference || uploadError.reference}
+                  </small>
+                )}
+              </label>
+            </div>
+          </div>
+        )}
+
+        {currentStep === "time" && (
+          <div className="step-panel">
+            <div className="booking-calendar" aria-describedby="timeHint">
+              <div className="booking-calendar-header">
+                <span>Выберите удобное окошко</span>
+              </div>
+
+              {windowsByDate.length === 0 ? (
+                <div className="empty-state">Свободных окошек пока нет. Можно оставить своё пожелание по времени.</div>
+              ) : (
+                <>
+                  <div className="booking-day-pills" role="tablist" aria-label="Дни для записи">
+                    {windowsByDate.map((group) => (
+                      <button
+                        className={`booking-day-pill${selectedDateKey === group.dateKey ? " active" : ""}`}
+                        key={group.dateKey}
+                        onClick={() => setSelectedDateKey(group.dateKey)}
+                        type="button"
+                      >
+                        <span>{group.label}</span>
+                        <small>{group.items.length} слота</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="booking-date-groups">
+                    {windowsByDate
+                      .filter((group) => group.dateKey === selectedDateKey)
+                      .map((group) => (
+                        <section className="booking-date-group" key={group.dateKey}>
+                          <strong>{group.label}</strong>
+                          <div className="booking-slot-grid">
+                            {group.items.map((window, index) => {
+                              const isActive = form.preferredWindowId === window.id;
+                              const slotMeta =
+                                index === 0 ? "раннее" : index === group.items.length - 1 ? "вечернее" : "популярное";
+
+                              return (
+                                <button
+                                  className={`booking-slot-button${isActive ? " active" : ""}`}
+                                  key={window.id}
+                                  onClick={() =>
+                                    setForm({
+                                      ...form,
+                                      preferredWindowId: window.id,
+                                      customWindowText: "",
+                                    })
+                                  }
+                                  type="button"
+                                >
+                                  <span>{formatTimeRange(window.startAt, window.endAt)}</span>
+                                  <small>{slotMeta}</small>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </section>
+                      ))}
+                  </div>
+                </>
+              )}
+
+              <button
+                className={`calendar-custom-button${needsCustomWindow ? " active" : ""}`}
+                onClick={() =>
+                  setForm({
+                    ...form,
+                    preferredWindowId: customWindowValue,
+                  })
+                }
+                type="button"
+              >
+                Хочу другое время
+              </button>
+              {validationMessages.time && <small className="field-hint" id="timeHint">{validationMessages.time}</small>}
+            </div>
+
+            {needsCustomWindow && (
+              <label>
+                Когда вам удобно
+                <input
+                  value={form.customWindowText}
+                  onChange={(event) => setForm({ ...form, customWindowText: event.target.value })}
+                  placeholder="Например: после 18:00 в будни"
+                />
+              </label>
+            )}
+
+            <label>
+              Комментарий
+              <textarea
+                value={form.comment}
+                onChange={(event) => setForm({ ...form, comment: event.target.value })}
+                placeholder="Любые детали: сколы, аллергии, пожелания по цвету..."
+              />
+            </label>
+          </div>
+        )}
+
+        {currentStep === "confirm" && (
+          <div className="step-panel confirmation-list">
+            <Info label="Имя" value={form.clientName || "Не указано"} />
+            <Info label="Телефон" value={form.phone || "Не указан"} />
+            <Info label="Связь" value={`${contactLabels[form.contactChannel]} ${form.contactHandle}`.trim()} />
+            <Info label="Процедура" value={selectedService.title} />
+            <Info label="Допы" value={form.optionIds.map(optionTitle).join(", ") || "Без допов"} />
+            <Info label="Описание" value={form.desiredResult || "Не заполнено"} />
+            <Info label="Фото рук" value={form.handPhoto?.fileName ?? "Не приложено"} />
+            <Info label="Референс" value={form.referencePhoto?.fileName ?? "Не приложен"} />
+            <Info
+              label="Время"
+              value={
+                needsCustomWindow
+                  ? form.customWindowText || "Не указано"
+                  : availableWindows.find((window) => window.id === form.preferredWindowId)?.label ?? "Не выбрано"
+              }
+            />
+          </div>
+        )}
+
+        <div className="form-navigation">
+          <button className="secondary-button" disabled={stepIndex === 0} onClick={previousStep} type="button">
+            Назад
+          </button>
+          {currentStep === "confirm" ? (
+            <button className="primary-button" disabled={!requiredFilled} onClick={submitRequest} type="button">
+              Отправить заявку <Send size={18} />
+            </button>
+          ) : (
+            <button className="primary-button" disabled={stepErrors[currentStep].length > 0} onClick={nextStep} type="button">
+              Продолжить <ChevronRight size={18} />
+            </button>
+          )}
+        </div>
       </form>
 
       <aside className="panel summary-panel">
@@ -717,18 +1343,19 @@ function ClientRequestForm({
           Примерная стоимость: <strong>от {estimatedPriceFrom.toLocaleString("ru-RU")} ₽</strong>
         </p>
         <p>Финальные время и стоимость мастер подтвердит после просмотра заявки.</p>
-        <button className="primary-button" disabled={!requiredFilled} onClick={submitRequest}>
-          Отправить заявку <Send size={18} />
-        </button>
+        <div className="summary-progress">
+          <span>Шаг {stepIndex + 1} из {steps.length}</span>
+          <strong>{steps[stepIndex].label}</strong>
+        </div>
         {!requiredFilled && (
           <span className="hint">
-            Заполните имя, телефон, контакт, описание, время
+            Мне понадобятся имя, телефон, описание и удобное время
             {requiresHandPhoto && requiresReference
-              ? ", фото рук и референс."
+              ? ", а ещё фото рук и референс."
               : requiresHandPhoto
-                ? " и фото рук."
+                ? ", а ещё фото рук."
                 : requiresReference
-                  ? " и референс."
+                  ? ", а ещё референс."
                   : "."}
           </span>
         )}
@@ -746,6 +1373,10 @@ function MasterWorkspace({
   confirmRequest,
   updateStatus,
   updateWindow,
+  updateWindowStatus,
+  moveAppointment,
+  updateAppointmentStatus,
+  addTimeWindow,
 }: {
   appointments: AppSnapshot["appointments"];
   clients: Client[];
@@ -755,10 +1386,114 @@ function MasterWorkspace({
   confirmRequest: (id: string) => void;
   updateStatus: (id: string, status: RequestStatus) => void;
   updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void;
+  updateWindowStatus: (id: string, status: TimeWindowStatus) => void;
+  moveAppointment: (appointmentId: string, windowId: string) => void;
+  updateAppointmentStatus: (appointmentId: string, status: AppSnapshot["appointments"][number]["status"]) => void;
+  addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void;
 }) {
+  const [dragAppointmentId, setDragAppointmentId] = useState<string | null>(null);
+  const [dragOverWindowId, setDragOverWindowId] = useState<string | null>(null);
+  const [pendingMove, setPendingMove] = useState<{ appointmentId: string; windowId: string } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{ x: number; y: number; label: string } | null>(null);
+  const [windowForm, setWindowForm] = useState({
+    date: new Date().toISOString().slice(0, 10),
+    start: "11:00",
+    end: "14:00",
+  });
+
+  const windowsByDate = useMemo(() => {
+    const map = new Map<string, { key: string; label: string; items: TimeWindow[] }>();
+    windows.forEach((window) => {
+      const key = window.startAt.split("T")[0];
+      const label = formatDayLabel(window.startAt);
+      const entry = map.get(key) ?? { key, label, items: [] };
+      entry.items.push(window);
+      map.set(key, entry);
+    });
+    return Array.from(map.values()).sort((a, b) => a.key.localeCompare(b.key));
+  }, [windows]);
+
+  const findAppointmentForWindow = (window: TimeWindow) =>
+    appointments.find(
+      (appointment) =>
+        appointment.status === "scheduled" &&
+        appointment.startAt === window.startAt &&
+        appointment.endAt === window.endAt,
+    );
+
+  const scheduleMove = (appointmentId: string, windowId: string) => {
+    setPendingMove({ appointmentId, windowId });
+  };
+
+  const executeMove = async () => {
+    if (!pendingMove) {
+      return;
+    }
+    await moveAppointment(pendingMove.appointmentId, pendingMove.windowId);
+    setPendingMove(null);
+  };
+
+  const autoScroll = (clientY: number) => {
+    const threshold = 80;
+    const speed = 12;
+    if (clientY < threshold) {
+      window.scrollBy(0, -speed);
+      return;
+    }
+    if (window.innerHeight - clientY < threshold) {
+      window.scrollBy(0, speed);
+    }
+  };
+
+  const pendingDetails = pendingMove
+    ? (() => {
+        const appointment = appointments.find((item) => item.id === pendingMove.appointmentId);
+        const targetWindow = windows.find((item) => item.id === pendingMove.windowId);
+        if (!appointment || !targetWindow) {
+          return null;
+        }
+        const oldWindow = windows.find(
+          (item) => item.startAt === appointment.startAt && item.endAt === appointment.endAt,
+        );
+        return {
+          client: clients.find((item) => item.id === appointment.clientId),
+          from: oldWindow,
+          to: targetWindow,
+        };
+      })()
+    : null;
+  const newRequestsCount = requests.filter((request) => request.status === "new").length;
+  const scheduledCount = appointments.filter((appointment) => appointment.status === "scheduled").length;
+  const availableWindowsCount = windows.filter((window) => window.status === "available").length;
+  const activeClientsCount = clients.length;
+
   return (
-    <section className="master-layout">
-      <div className="requests-stack">
+    <>
+      <section className="dashboard-grid" aria-label="Показатели мастера">
+        <div className="stat-card featured">
+          <span>Сегодня в фокусе</span>
+          <strong>{newRequestsCount}</strong>
+          <small>новых заявок ждут решения</small>
+        </div>
+        <div className="stat-card">
+          <span>Записи</span>
+          <strong>{scheduledCount}</strong>
+          <small>активных визитов</small>
+        </div>
+        <div className="stat-card">
+          <span>Окошки</span>
+          <strong>{availableWindowsCount}</strong>
+          <small>доступно для записи</small>
+        </div>
+        <div className="stat-card">
+          <span>Клиенты</span>
+          <strong>{activeClientsCount}</strong>
+          <small>в базе мастера</small>
+        </div>
+      </section>
+
+      <section className="master-layout">
+        <div className="requests-stack">
         <div className="section-title">
           <UserRound size={22} />
           <div>
@@ -778,9 +1513,9 @@ function MasterWorkspace({
             updateWindow={updateWindow}
           />
         ))}
-      </div>
+        </div>
 
-      <aside className="panel calendar-panel">
+        <aside className="panel calendar-panel">
         <div className="section-title">
           <CalendarClock size={22} />
           <div>
@@ -788,24 +1523,330 @@ function MasterWorkspace({
             <p>Только подтвержденные заявки становятся записями.</p>
           </div>
         </div>
-        {appointments.length === 0 ? (
-          <div className="empty-state">Пока нет подтвержденных записей.</div>
-        ) : (
-          appointments.map((appointment) => {
-            const client = clients.find((item) => item.id === appointment.clientId);
-            return (
-              <div className="calendar-item" key={appointment.id}>
-                <strong>{formatDateTime(appointment.startAt)}</strong>
-                <span>{client?.name ?? "Клиент"}</span>
-                <small>{serviceTitle(appointment.service)} · {appointment.durationMinutes} мин</small>
+        <div className="calendar-hint">Перетащи запись на свободное окно.</div>
+
+        <div className="calendar-toolbar">
+          <label>
+            Дата
+            <input
+              type="date"
+              value={windowForm.date}
+              onChange={(event) => setWindowForm({ ...windowForm, date: event.target.value })}
+            />
+          </label>
+          <label>
+            Начало
+            <input
+              type="time"
+              value={windowForm.start}
+              onChange={(event) => setWindowForm({ ...windowForm, start: event.target.value })}
+            />
+          </label>
+          <label>
+            Конец
+            <input
+              type="time"
+              value={windowForm.end}
+              onChange={(event) => setWindowForm({ ...windowForm, end: event.target.value })}
+            />
+          </label>
+          <button
+            className="secondary-button"
+            onClick={() => {
+              if (!windowForm.date || !windowForm.start || !windowForm.end) {
+                return;
+              }
+              addTimeWindow({
+                startAt: `${windowForm.date}T${windowForm.start}:00+03:00`,
+                endAt: `${windowForm.date}T${windowForm.end}:00+03:00`,
+              });
+            }}
+          >
+            Создать окно
+          </button>
+        </div>
+
+        <div className="calendar-board">
+          {windowsByDate.length === 0 ? (
+            <div className="empty-state">Нет окошек в календаре.</div>
+          ) : (
+            windowsByDate.map((day) => (
+              <section key={day.key} className="calendar-day">
+                <h3>{day.label}</h3>
+                <div className="calendar-grid">
+                  {day.items.map((window) => {
+                    const appointment = findAppointmentForWindow(window);
+                    const client = appointment
+                      ? clients.find((item) => item.id === appointment.clientId)
+                      : null;
+                    const isFutureWindow = new Date(window.startAt).getTime() >= Date.now();
+                    const canDropHere = Boolean(dragAppointmentId) && window.status === "available" && isFutureWindow;
+                    const isDragOver = dragOverWindowId === window.id && canDropHere;
+                    return (
+                      <article
+                        key={window.id}
+                        className={`calendar-slot ${window.status}${canDropHere ? " droppable" : ""}${isDragOver ? " drag-over" : ""}`}
+                        draggable={Boolean(appointment)}
+                        onDragStart={() => {
+                          if (appointment) {
+                            setDragAppointmentId(appointment.id);
+                          }
+                        }}
+                        onDragEnd={() => {
+                          setDragAppointmentId(null);
+                          setDragOverWindowId(null);
+                        }}
+                        onDragOver={(event) => {
+                          if (dragAppointmentId) {
+                            autoScroll(event.clientY);
+                          }
+                          if (!canDropHere) {
+                            return;
+                          }
+                          event.preventDefault();
+                          setDragOverWindowId(window.id);
+                        }}
+                        onDragLeave={() => {
+                          if (dragOverWindowId === window.id) {
+                            setDragOverWindowId(null);
+                          }
+                        }}
+                        onDrop={() => {
+                          if (canDropHere && dragAppointmentId) {
+                            scheduleMove(dragAppointmentId, window.id);
+                          }
+                          setDragAppointmentId(null);
+                          setDragOverWindowId(null);
+                        }}
+                        onTouchStart={(event) => {
+                          if (!appointment) {
+                            return;
+                          }
+                          const touch = event.touches[0];
+                          setDragAppointmentId(appointment.id);
+                          setDragPreview({
+                            x: touch.clientX,
+                            y: touch.clientY,
+                            label: `${client?.name ?? "Клиент"} · ${formatTimeRange(window.startAt, window.endAt)}`,
+                          });
+                        }}
+                        onTouchMove={(event) => {
+                          if (!dragAppointmentId) {
+                            return;
+                          }
+                          const touch = event.touches[0];
+                          autoScroll(touch.clientY);
+                          setDragPreview((current) =>
+                            current ? { ...current, x: touch.clientX, y: touch.clientY } : null,
+                          );
+                          const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                          const slot = target?.closest("[data-window-id]") as HTMLElement | null;
+                          setDragOverWindowId(slot?.dataset.windowId ?? null);
+                          event.preventDefault();
+                        }}
+                        onTouchEnd={() => {
+                          if (dragAppointmentId && dragOverWindowId) {
+                            const targetWindow = windows.find((item) => item.id === dragOverWindowId);
+                            if (targetWindow?.status === "available") {
+                              scheduleMove(dragAppointmentId, dragOverWindowId);
+                            }
+                          }
+                          setDragAppointmentId(null);
+                          setDragOverWindowId(null);
+                          setDragPreview(null);
+                        }}
+                        data-window-id={window.id}
+                      >
+                        <div className="slot-header">
+                          <strong>{formatTimeRange(window.startAt, window.endAt)}</strong>
+                          <span>{windowStatusLabel(window.status)}</span>
+                        </div>
+                        {appointment ? (
+                          <div className="slot-body">
+                            <div>{client?.name ?? "Клиент"}</div>
+                            <small>{serviceTitle(appointment.service)} · {appointment.durationMinutes} мин</small>
+                          </div>
+                        ) : (
+                          <div className="slot-body">Свободно</div>
+                        )}
+                        <div className="slot-actions">
+                          {appointment ? (
+                            <div className="slot-action-stack">
+                              <span className="slot-hint">Перетащи, чтобы перенести.</span>
+                              <button
+                                className="danger-button"
+                                onClick={() => {
+                                  if (globalThis.confirm("Отменить запись?")) {
+                                    updateAppointmentStatus(appointment.id, "cancelled");
+                                  }
+                                }}
+                              >
+                                Отменить
+                              </button>
+                            </div>
+                          ) : window.status === "available" ? (
+                            <button
+                              className="secondary-button"
+                              onClick={() => updateWindowStatus(window.id, "blocked")}
+                            >
+                              Закрыть
+                            </button>
+                          ) : window.status === "blocked" ? (
+                            <button
+                              className="secondary-button"
+                              onClick={() => updateWindowStatus(window.id, "available")}
+                            >
+                              Открыть
+                            </button>
+                          ) : (
+                            <button className="secondary-button" disabled>
+                              Недоступно
+                            </button>
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
+            ))
+          )}
+        </div>
+        {pendingMove && (
+          <div className="panel notice-panel">
+            Перенести запись в выбранное окно?
+            {pendingDetails && (
+              <div className="move-details">
+                <div>
+                  Клиент: {pendingDetails.client?.name ?? "Клиент"}
+                </div>
+                {pendingDetails.from && (
+                  <div>
+                    Было: {formatDayLabel(pendingDetails.from.startAt)} {formatTimeRange(pendingDetails.from.startAt, pendingDetails.from.endAt)}
+                  </div>
+                )}
+                <div>
+                  Станет: {formatDayLabel(pendingDetails.to.startAt)} {formatTimeRange(pendingDetails.to.startAt, pendingDetails.to.endAt)}
+                </div>
               </div>
-            );
-          })
+            )}
+            <div className="action-row">
+              <button className="primary-button" onClick={executeMove}>
+                Подтвердить
+              </button>
+              <button className="secondary-button" onClick={() => setPendingMove(null)}>
+                Отменить
+              </button>
+            </div>
+          </div>
         )}
-        <button className="secondary-button">
-          <Plus size={17} /> Создать запись вручную
-        </button>
-      </aside>
+        {dragPreview && (
+          <div
+            className="drag-preview"
+            style={{ left: dragPreview.x + 10, top: dragPreview.y + 10 }}
+          >
+            {dragPreview.label}
+          </div>
+        )}
+        </aside>
+      </section>
+    </>
+  );
+}
+
+function SurveyPage({ appointmentId }: { appointmentId: string }) {
+  const [appointment, setAppointment] = useState<Appointment | null>(null);
+  const [rating, setRating] = useState<number | null>(null);
+  const [text, setText] = useState("");
+  const [status, setStatus] = useState<"loading" | "ready" | "submitted" | "error">("loading");
+
+  useEffect(() => {
+    let mounted = true;
+    setStatus("loading");
+    api
+      .getPublicAppointment(appointmentId)
+      .then((data) => {
+        if (!mounted) {
+          return;
+        }
+        setAppointment(data);
+        if (data.surveyRating) {
+          setStatus("submitted");
+          setRating(data.surveyRating);
+          setText(data.surveyText ?? "");
+        } else {
+          setStatus("ready");
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setStatus("error");
+        }
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [appointmentId]);
+
+  const submitSurvey = async () => {
+    if (!rating) {
+      return;
+    }
+    try {
+      await api.submitAppointmentSurvey(appointmentId, {
+        rating,
+        text: text.trim() ? text.trim() : undefined,
+      });
+      setStatus("submitted");
+    } catch {
+      setStatus("error");
+    }
+  };
+
+  return (
+    <section className="survey-layout">
+      <div className="panel survey-panel">
+        <h2>Оцените визит</h2>
+        {status === "loading" && <p>Загружаю данные записи...</p>}
+        {status === "error" && (
+          <p>Не удалось открыть форму. Попробуйте позже или напишите мастеру.</p>
+        )}
+        {status !== "loading" && status !== "error" && appointment && (
+          <>
+            <p>
+              Запись: {formatDateTime(appointment.startAt)}
+            </p>
+            {status === "submitted" ? (
+              <p>Спасибо! Отзыв уже получен.</p>
+            ) : (
+              <>
+                <div className="rating-row">
+                  {[1, 2, 3, 4, 5].map((value) => (
+                    <button
+                      key={value}
+                      className={`rating-button${rating === value ? " active" : ""}`}
+                      onClick={() => setRating(value)}
+                    >
+                      {value}
+                    </button>
+                  ))}
+                </div>
+                <label>
+                  Отзыв
+                  <textarea
+                    value={text}
+                    onChange={(event) => setText(event.target.value)}
+                    placeholder="Напишите пару слов о визите"
+                  />
+                </label>
+                <button className="primary-button" disabled={!rating} onClick={submitSurvey}>
+                  Отправить отзыв
+                </button>
+              </>
+            )}
+          </>
+        )}
+      </div>
     </section>
   );
 }
@@ -823,6 +1864,54 @@ function ClientsWorkspace({
   requests: BookingRequest[];
   updateClientNotes: (id: string, notes: string) => void;
 }) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<ClientStatusFilter>("all");
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
+
+  const clientRows = useMemo(
+    () =>
+      clients.map((client) => {
+        const clientRequests = requests.filter((request) => request.clientId === client.id);
+        const clientAppointments = appointments.filter((appointment) => appointment.clientId === client.id);
+        const clientPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds));
+        const clientPhotos = photos.filter((photo) => clientPhotoIds.has(photo.id));
+        const latestRequest = clientRequests[0];
+
+        return { client, clientRequests, clientAppointments, clientPhotos, latestRequest };
+      }),
+    [appointments, clients, photos, requests],
+  );
+
+  const filteredClientRows = useMemo(
+    () =>
+      clientRows.filter(({ client, clientRequests, latestRequest }) => {
+        const matchesStatus = statusFilter === "all" || latestRequest?.status === statusFilter;
+        const searchableText = [
+          client.name,
+          client.phone,
+          client.contactHandle,
+          client.notes,
+          client.id,
+          contactLabels[client.preferredContactChannel],
+          ...clientRequests.flatMap((request) => [
+            request.id,
+            serviceTitle(request.service),
+            statusLabels[request.status],
+            request.desiredResult,
+            request.comment,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("ru-RU");
+
+        return matchesStatus && (!normalizedQuery || searchableText.includes(normalizedQuery));
+      }),
+    [clientRows, normalizedQuery, statusFilter],
+  );
+
+  const hasActiveFilters = Boolean(normalizedQuery) || statusFilter !== "all";
+
   return (
     <section className="clients-layout">
       <div className="section-title">
@@ -833,16 +1922,54 @@ function ClientsWorkspace({
         </div>
       </div>
 
-      <div className="client-card-grid">
-        {clients.map((client) => {
-          const clientRequests = requests.filter((request) => request.clientId === client.id);
-          const clientAppointments = appointments.filter((appointment) => appointment.clientId === client.id);
-          const clientPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds));
-          const clientPhotos = photos.filter((photo) => clientPhotoIds.has(photo.id));
-          const latestRequest = clientRequests[0];
+      <div className="panel client-filters">
+        <label>
+          Найти клиента
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Имя, телефон, ник, услуга или заметка"
+            type="search"
+          />
+        </label>
+        <label>
+          Последний статус
+          <select
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as ClientStatusFilter)}
+          >
+            <option value="all">Все клиенты</option>
+            {Object.entries(statusLabels).map(([status, label]) => (
+              <option key={status} value={status}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="filter-summary">
+          <span>
+            Найдено: {filteredClientRows.length} из {clientRows.length}
+          </span>
+          <button
+            className="secondary-button"
+            disabled={!hasActiveFilters}
+            onClick={() => {
+              setSearchQuery("");
+              setStatusFilter("all");
+            }}
+          >
+            Сбросить
+          </button>
+        </div>
+      </div>
 
-          return (
-            <article className="panel client-card" key={client.id}>
+      <div className="client-card-grid">
+        {filteredClientRows.length === 0 ? (
+          <div className="empty-state">По этим фильтрам клиентов не найдено.</div>
+        ) : (
+          filteredClientRows.map(({ client, clientRequests, clientAppointments, clientPhotos, latestRequest }) => {
+            return (
+              <article className="panel client-card" key={client.id}>
               <div className="card-header">
                 <div>
                   <span className="status">{client.firstVisit ? "Первый визит" : "Постоянный клиент"}</span>
@@ -895,9 +2022,10 @@ function ClientsWorkspace({
                   </div>
                 )}
               </div>
-            </article>
-          );
-        })}
+              </article>
+            );
+          })
+        )}
       </div>
     </section>
   );
@@ -1011,7 +2139,10 @@ function SettingsWorkspace({
                       updateService(service.id, { requiresHandPhoto: event.target.checked })
                     }
                   />
-                  Обязательно фото рук
+                  <span className="checkbox-copy">
+                    <strong>Обязательно фото рук</strong>
+                    <small>Я заранее увижу состояние ногтей и смогу точнее подтвердить запись.</small>
+                  </span>
                 </label>
                 <label className="checkbox-line">
                   <input
@@ -1021,7 +2152,10 @@ function SettingsWorkspace({
                       updateService(service.id, { requiresReference: event.target.checked })
                     }
                   />
-                  Обязательно фото референса
+                  <span className="checkbox-copy">
+                    <strong>Обязательно фото референса</strong>
+                    <small>Так проще понять желаемую форму, длину и настроение дизайна.</small>
+                  </span>
                 </label>
               </div>
               <p className="settings-meta">
@@ -1099,6 +2233,735 @@ function SettingsWorkspace({
       </aside>
     </section>
   );
+}
+
+function SettingsWorkspaceV2({
+  services,
+  serviceOptions,
+  windows,
+  addTimeWindow,
+  createServiceOption,
+  updateServiceOption,
+  deleteServiceOption,
+  createService,
+  updateService,
+  deleteService,
+  updateWindowStatus,
+}: {
+  services: ServicePreset[];
+  serviceOptions: ServiceOption[];
+  windows: TimeWindow[];
+  addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void;
+  createServiceOption: (option: ServiceOption) => void;
+  updateServiceOption: (id: ServiceOptionKind, patch: Partial<ServiceOption>) => void;
+  deleteServiceOption: (id: ServiceOptionKind) => void;
+  createService: (service: ServicePreset) => void;
+  updateService: (id: ServiceKind, patch: Partial<ServicePreset>) => void;
+  deleteService: (id: ServiceKind) => void;
+  updateWindowStatus: (id: string, status: TimeWindowStatus) => void;
+}) {
+  const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceEditorState>>({});
+  const [optionDrafts, setOptionDrafts] = useState<Record<string, OptionEditorState>>({});
+  const [createForm, setCreateForm] = useState<ServiceEditorState>({
+    title: "",
+    durationMinutes: "120",
+    priceFrom: "",
+    requiresHandPhoto: false,
+    requiresReference: true,
+    options: [],
+  });
+  const [createOptionForm, setCreateOptionForm] = useState<OptionEditorState>({
+    title: "",
+    durationMinutes: "20",
+    priceFrom: "",
+  });
+  const [serviceError, setServiceError] = useState<string | null>(null);
+  const [optionError, setOptionError] = useState<string | null>(null);
+  const [windowForm, setWindowForm] = useState({
+    date: "2026-04-18",
+    start: "11:00",
+    end: "14:00",
+  });
+
+  useEffect(() => {
+    setServiceDrafts(
+      Object.fromEntries(services.map((service) => [service.id, toServiceEditorState(service)])),
+    );
+  }, [services]);
+
+  useEffect(() => {
+    setOptionDrafts(
+      Object.fromEntries(serviceOptions.map((option) => [option.id, toOptionEditorState(option)])),
+    );
+  }, [serviceOptions]);
+
+  const updateDraft = (serviceId: string, patch: Partial<ServiceEditorState>) => {
+    const service = services.find((item) => item.id === serviceId);
+
+    if (!service) {
+      return;
+    }
+
+    setServiceDrafts((current) => ({
+      ...current,
+      [serviceId]: {
+        ...(current[serviceId] ?? toServiceEditorState(service)),
+        ...patch,
+      },
+    }));
+  };
+
+  const toggleServiceOption = (
+    target: "draft" | "create",
+    optionId: ServiceOptionKind,
+    serviceId?: string,
+  ) => {
+    if (target === "create") {
+      setCreateForm((current) => ({
+        ...current,
+        options: current.options.includes(optionId)
+          ? current.options.filter((item) => item !== optionId)
+          : [...current.options, optionId],
+      }));
+      return;
+    }
+
+    if (!serviceId) {
+      return;
+    }
+
+    const currentOptions = serviceDrafts[serviceId]?.options ?? [];
+    updateDraft(serviceId, {
+      options: currentOptions.includes(optionId)
+        ? currentOptions.filter((item) => item !== optionId)
+        : [...currentOptions, optionId],
+    });
+  };
+
+  const updateOptionDraft = (optionId: string, patch: Partial<OptionEditorState>) => {
+    const option = serviceOptions.find((item) => item.id === optionId);
+
+    if (!option) {
+      return;
+    }
+
+    setOptionDrafts((current) => ({
+      ...current,
+      [optionId]: {
+        ...(current[optionId] ?? toOptionEditorState(option)),
+        ...patch,
+      },
+    }));
+  };
+
+  const submitWindow = () => {
+    if (!windowForm.date || !windowForm.start || !windowForm.end) {
+      return;
+    }
+
+    addTimeWindow({
+      startAt: `${windowForm.date}T${windowForm.start}:00+03:00`,
+      endAt: `${windowForm.date}T${windowForm.end}:00+03:00`,
+    });
+  };
+
+  const submitCreateService = () => {
+    const parsed = parseServiceEditor(
+      createForm,
+      makeServiceId(createForm.title, services.map((service) => service.id)),
+    );
+
+    if (!parsed) {
+      setServiceError("Заполните название и длительность, чтобы услуга сохранилась аккуратно.");
+      return;
+    }
+
+    setServiceError(null);
+    createService(parsed);
+    setCreateForm({
+      title: "",
+      durationMinutes: "120",
+      priceFrom: "",
+      requiresHandPhoto: false,
+      requiresReference: true,
+      options: [],
+    });
+  };
+
+  const saveService = (serviceId: ServiceKind) => {
+    const parsed = parseServiceEditor(serviceDrafts[serviceId], serviceId);
+
+    if (!parsed) {
+      setServiceError("У услуги должны быть название и корректная длительность.");
+      return;
+    }
+
+    setServiceError(null);
+    updateService(serviceId, parsed);
+  };
+
+  const resetService = (service: ServicePreset) => {
+    setServiceDrafts((current) => ({
+      ...current,
+      [service.id]: toServiceEditorState(service),
+    }));
+  };
+
+  const removeService = (serviceId: ServiceKind) => {
+    if (services.length <= 1) {
+      setServiceError("Нужна хотя бы одна услуга, чтобы онлайн-запись продолжала работать.");
+      return;
+    }
+
+    setServiceError(null);
+    deleteService(serviceId);
+  };
+
+  const submitCreateOption = () => {
+    const parsed = parseOptionEditor(
+      createOptionForm,
+      makeServiceId(createOptionForm.title, serviceOptions.map((option) => option.id)),
+    );
+
+    if (!parsed) {
+      setOptionError("У дополнения должны быть название и корректная длительность.");
+      return;
+    }
+
+    setOptionError(null);
+    createServiceOption(parsed);
+    setCreateOptionForm({
+      title: "",
+      durationMinutes: "20",
+      priceFrom: "",
+    });
+  };
+
+  const saveOption = (optionId: ServiceOptionKind) => {
+    const parsed = parseOptionEditor(optionDrafts[optionId], optionId);
+
+    if (!parsed) {
+      setOptionError("Не получилось сохранить дополнение: проверьте название и цифры.");
+      return;
+    }
+
+    setOptionError(null);
+    updateServiceOption(optionId, parsed);
+  };
+
+  const resetOption = (option: ServiceOption) => {
+    setOptionDrafts((current) => ({
+      ...current,
+      [option.id]: toOptionEditorState(option),
+    }));
+  };
+
+  const removeOption = (optionId: ServiceOptionKind) => {
+    setOptionError(null);
+    deleteServiceOption(optionId);
+  };
+
+  return (
+    <section className="settings-layout">
+      <div className="panel settings-panel">
+        <div className="section-title">
+          <Settings size={22} />
+          <div>
+            <h2>Процедуры</h2>
+            <p>Здесь мастер полностью собирает каталог услуг: названия, цены, длительность, обязательные фото и допы.</p>
+          </div>
+        </div>
+
+        <article className="settings-item settings-create-card">
+          <div className="settings-item-header">
+            <div>
+              <h3>Новая услуга</h3>
+              <p className="settings-meta">Добавьте новую позицию и сразу настройте, что клиент может выбрать вместе с ней.</p>
+            </div>
+            <button className="primary-button" onClick={submitCreateService} type="button">
+              <Plus size={17} /> Добавить услугу
+            </button>
+          </div>
+
+          <div className="field-row">
+            <label>
+              Название
+              <input
+                type="text"
+                value={createForm.title}
+                onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))}
+                placeholder="Например, покрытие с дизайном"
+              />
+            </label>
+            <label>
+              Цена от, ₽
+              <input
+                type="number"
+                min="0"
+                value={createForm.priceFrom}
+                onChange={(event) => setCreateForm((current) => ({ ...current, priceFrom: event.target.value }))}
+                placeholder="0"
+              />
+            </label>
+          </div>
+
+          <div className="field-row settings-grid-balanced">
+            <label>
+              Длительность, мин
+              <input
+                type="number"
+                min="0"
+                value={createForm.durationMinutes}
+                onChange={(event) =>
+                  setCreateForm((current) => ({ ...current, durationMinutes: event.target.value }))
+                }
+              />
+            </label>
+
+            <div className="settings-flags compact">
+              <label className="checkbox-line">
+                <input
+                  type="checkbox"
+                  checked={createForm.requiresHandPhoto}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({ ...current, requiresHandPhoto: event.target.checked }))
+                  }
+                />
+                <span className="checkbox-copy">
+                  <strong>Нужно фото рук</strong>
+                  <small>Чтобы заранее увидеть состояние ногтей.</small>
+                </span>
+              </label>
+
+              <label className="checkbox-line">
+                <input
+                  type="checkbox"
+                  checked={createForm.requiresReference}
+                  onChange={(event) =>
+                    setCreateForm((current) => ({ ...current, requiresReference: event.target.checked }))
+                  }
+                />
+                <span className="checkbox-copy">
+                  <strong>Нужен референс</strong>
+                  <small>Чтобы точнее понять желаемый дизайн.</small>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <div className="settings-options-grid">
+            {serviceOptions.map((option) => (
+              <label className="checkbox-line option-row option-row-compact" key={`create-${option.id}`}>
+                <input
+                  type="checkbox"
+                  checked={createForm.options.includes(option.id)}
+                  onChange={() => toggleServiceOption("create", option.id)}
+                />
+                <span className="checkbox-copy">
+                  <strong>{option.title}</strong>
+                  <small>
+                    +{option.durationMinutes} мин
+                    {option.priceFrom ? ` · от ${option.priceFrom.toLocaleString("ru-RU")} ₽` : ""}
+                  </small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </article>
+
+        {serviceError ? <p className="error-text">{serviceError}</p> : null}
+
+        <div className="settings-list">
+          {services.map((service) => (
+            <article className="settings-item" key={service.id}>
+              <div className="settings-item-header">
+                <div>
+                  <h3>{service.title}</h3>
+                  <p className="settings-meta">ID: {service.id}</p>
+                </div>
+
+                <button
+                  className="danger-button settings-delete-button"
+                  onClick={() => removeService(service.id)}
+                  type="button"
+                >
+                  <Trash2 size={16} /> Удалить
+                </button>
+              </div>
+
+              <div className="field-row">
+                <label>
+                  Название
+                  <input
+                    type="text"
+                    value={serviceDrafts[service.id]?.title ?? service.title}
+                    onChange={(event) => updateDraft(service.id, { title: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Длительность, мин
+                  <input
+                    type="number"
+                    min="0"
+                    value={serviceDrafts[service.id]?.durationMinutes ?? String(service.durationMinutes)}
+                    onChange={(event) => updateDraft(service.id, { durationMinutes: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Цена от, ₽
+                  <input
+                    type="number"
+                    min="0"
+                    value={serviceDrafts[service.id]?.priceFrom ?? String(service.priceFrom ?? "")}
+                    onChange={(event) => updateDraft(service.id, { priceFrom: event.target.value })}
+                  />
+                </label>
+              </div>
+
+              <div className="settings-flags">
+                <label className="checkbox-line">
+                  <input
+                    type="checkbox"
+                    checked={serviceDrafts[service.id]?.requiresHandPhoto ?? service.requiresHandPhoto}
+                    onChange={(event) => updateDraft(service.id, { requiresHandPhoto: event.target.checked })}
+                  />
+                  <span className="checkbox-copy">
+                    <strong>Обязательно фото рук</strong>
+                    <small>Я заранее увижу состояние ногтей и смогу точнее подтвердить запись.</small>
+                  </span>
+                </label>
+
+                <label className="checkbox-line">
+                  <input
+                    type="checkbox"
+                    checked={serviceDrafts[service.id]?.requiresReference ?? service.requiresReference}
+                    onChange={(event) => updateDraft(service.id, { requiresReference: event.target.checked })}
+                  />
+                  <span className="checkbox-copy">
+                    <strong>Обязательно фото референса</strong>
+                    <small>Так проще понять желаемую форму, длину и настроение дизайна.</small>
+                  </span>
+                </label>
+              </div>
+
+              <div className="settings-options-grid">
+                {serviceOptions.map((option) => (
+                  <label className="checkbox-line option-row option-row-compact" key={`${service.id}-${option.id}`}>
+                    <input
+                      type="checkbox"
+                      checked={(serviceDrafts[service.id]?.options ?? service.options).includes(option.id)}
+                      onChange={() => toggleServiceOption("draft", option.id, service.id)}
+                    />
+                    <span className="checkbox-copy">
+                      <strong>{option.title}</strong>
+                      <small>
+                        +{option.durationMinutes} мин
+                        {option.priceFrom ? ` · от ${option.priceFrom.toLocaleString("ru-RU")} ₽` : ""}
+                      </small>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              <div className="settings-actions">
+                <button className="secondary-button" onClick={() => resetService(service)} type="button">
+                  Отменить правки
+                </button>
+                <button className="primary-button" onClick={() => saveService(service.id)} type="button">
+                  Сохранить услугу
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+
+        <div className="section-title settings-subsection">
+          <Sparkles size={20} />
+          <div>
+            <h2>Дополнительно</h2>
+            <p>Здесь можно полностью управлять допами: снять старое покрытие, дизайн, ремонт и любые свои позиции.</p>
+          </div>
+        </div>
+
+        <article className="settings-item settings-create-card">
+          <div className="settings-item-header">
+            <div>
+              <h3>Новое дополнение</h3>
+              <p className="settings-meta">Эти позиции потом можно подключать к любым услугам выше.</p>
+            </div>
+            <button className="primary-button" onClick={submitCreateOption} type="button">
+              <Plus size={17} /> Добавить дополнение
+            </button>
+          </div>
+
+          <div className="field-row">
+            <label>
+              Название
+              <input
+                type="text"
+                value={createOptionForm.title}
+                onChange={(event) =>
+                  setCreateOptionForm((current) => ({ ...current, title: event.target.value }))
+                }
+                placeholder="Например, сложный дизайн"
+              />
+            </label>
+            <label>
+              Длительность, мин
+              <input
+                type="number"
+                min="0"
+                value={createOptionForm.durationMinutes}
+                onChange={(event) =>
+                  setCreateOptionForm((current) => ({ ...current, durationMinutes: event.target.value }))
+                }
+              />
+            </label>
+            <label>
+              Цена от, ₽
+              <input
+                type="number"
+                min="0"
+                value={createOptionForm.priceFrom}
+                onChange={(event) =>
+                  setCreateOptionForm((current) => ({ ...current, priceFrom: event.target.value }))
+                }
+                placeholder="0"
+              />
+            </label>
+          </div>
+        </article>
+
+        {optionError ? <p className="error-text">{optionError}</p> : null}
+
+        <div className="settings-list">
+          {serviceOptions.map((option) => (
+            <article className="settings-item" key={option.id}>
+              <div className="settings-item-header">
+                <div>
+                  <h3>{option.title}</h3>
+                  <p className="settings-meta">ID: {option.id}</p>
+                </div>
+                <button
+                  className="danger-button settings-delete-button"
+                  onClick={() => removeOption(option.id)}
+                  type="button"
+                >
+                  <Trash2 size={16} /> Удалить
+                </button>
+              </div>
+
+              <div className="field-row">
+                <label>
+                  Название
+                  <input
+                    type="text"
+                    value={optionDrafts[option.id]?.title ?? option.title}
+                    onChange={(event) => updateOptionDraft(option.id, { title: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Длительность, мин
+                  <input
+                    type="number"
+                    min="0"
+                    value={optionDrafts[option.id]?.durationMinutes ?? String(option.durationMinutes)}
+                    onChange={(event) =>
+                      updateOptionDraft(option.id, { durationMinutes: event.target.value })
+                    }
+                  />
+                </label>
+                <label>
+                  Цена от, ₽
+                  <input
+                    type="number"
+                    min="0"
+                    value={optionDrafts[option.id]?.priceFrom ?? String(option.priceFrom ?? "")}
+                    onChange={(event) => updateOptionDraft(option.id, { priceFrom: event.target.value })}
+                  />
+                </label>
+              </div>
+
+              <div className="settings-actions">
+                <button className="secondary-button" onClick={() => resetOption(option)} type="button">
+                  Отменить правки
+                </button>
+                <button className="primary-button" onClick={() => saveOption(option.id)} type="button">
+                  Сохранить дополнение
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </div>
+
+      <aside className="panel settings-panel">
+        <div className="section-title">
+          <CalendarClock size={22} />
+          <div>
+            <h2>Окошки</h2>
+            <p>Можно добавить свободное окно или закрыть его вручную.</p>
+          </div>
+        </div>
+
+        <div className="window-form">
+          <label>
+            Дата
+            <input
+              type="date"
+              value={windowForm.date}
+              onChange={(event) => setWindowForm({ ...windowForm, date: event.target.value })}
+            />
+          </label>
+          <div className="field-row">
+            <label>
+              Начало
+              <input
+                type="time"
+                value={windowForm.start}
+                onChange={(event) => setWindowForm({ ...windowForm, start: event.target.value })}
+              />
+            </label>
+            <label>
+              Конец
+              <input
+                type="time"
+                value={windowForm.end}
+                onChange={(event) => setWindowForm({ ...windowForm, end: event.target.value })}
+              />
+            </label>
+          </div>
+          <button className="primary-button" onClick={submitWindow} type="button">
+            <Plus size={17} /> Добавить окошко
+          </button>
+        </div>
+
+        <div className="window-list">
+          {windows.map((window) => (
+            <div className="window-item" key={window.id}>
+              <div>
+                <strong>{window.label}</strong>
+                <span>{windowStatusLabel(window.status)}</span>
+              </div>
+              {window.status === "reserved" ? (
+                <button className="secondary-button" disabled>
+                  Занято
+                </button>
+              ) : window.status === "blocked" ? (
+                <button
+                  className="secondary-button"
+                  onClick={() => updateWindowStatus(window.id, "available")}
+                  type="button"
+                >
+                  Открыть
+                </button>
+              ) : (
+                <button
+                  className="danger-button"
+                  onClick={() => updateWindowStatus(window.id, "blocked")}
+                  type="button"
+                >
+                  Закрыть
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </aside>
+    </section>
+  );
+}
+
+function toServiceEditorState(service: ServicePreset): ServiceEditorState {
+  return {
+    title: service.title,
+    durationMinutes: String(service.durationMinutes),
+    priceFrom: service.priceFrom !== undefined ? String(service.priceFrom) : "",
+    requiresHandPhoto: service.requiresHandPhoto,
+    requiresReference: service.requiresReference,
+    options: [...service.options],
+  };
+}
+
+function toOptionEditorState(option: ServiceOption): OptionEditorState {
+  return {
+    title: option.title,
+    durationMinutes: String(option.durationMinutes),
+    priceFrom: option.priceFrom !== undefined ? String(option.priceFrom) : "",
+  };
+}
+
+function parseServiceEditor(state: ServiceEditorState | undefined, id: string): ServicePreset | null {
+  if (!state) {
+    return null;
+  }
+
+  const title = state.title.trim();
+  const durationMinutes = Number(state.durationMinutes);
+  const priceFrom = state.priceFrom.trim() ? Number(state.priceFrom) : undefined;
+
+  if (!title || Number.isNaN(durationMinutes) || durationMinutes < 0) {
+    return null;
+  }
+
+  if (priceFrom !== undefined && (Number.isNaN(priceFrom) || priceFrom < 0)) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    durationMinutes,
+    priceFrom,
+    requiresHandPhoto: state.requiresHandPhoto,
+    requiresReference: state.requiresReference,
+    options: [...state.options],
+  };
+}
+
+function parseOptionEditor(state: OptionEditorState | undefined, id: string): ServiceOption | null {
+  if (!state) {
+    return null;
+  }
+
+  const title = state.title.trim();
+  const durationMinutes = Number(state.durationMinutes);
+  const priceFrom = state.priceFrom.trim() ? Number(state.priceFrom) : undefined;
+
+  if (!title || Number.isNaN(durationMinutes) || durationMinutes < 0) {
+    return null;
+  }
+
+  if (priceFrom !== undefined && (Number.isNaN(priceFrom) || priceFrom < 0)) {
+    return null;
+  }
+
+  return {
+    id,
+    title,
+    durationMinutes,
+    priceFrom,
+  };
+}
+
+function makeServiceId(title: string, existingIds: string[]) {
+  const normalized = title
+    .toLowerCase()
+    .normalize("NFKD")
+    .replace(/[^\w\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-");
+
+  const baseId = normalized || `service-${Date.now()}`;
+  let candidate = baseId;
+  let index = 2;
+
+  while (existingIds.includes(candidate)) {
+    candidate = `${baseId}-${index}`;
+    index += 1;
+  }
+
+  return candidate;
 }
 
 function RequestCard({
@@ -1228,11 +3091,39 @@ function Info({
 }
 
 function serviceTitle(id: ServiceKind) {
-  return servicePresets.find((service) => service.id === id)?.title ?? id;
+  return runtimeServiceCatalog.find((service) => service.id === id)?.title ?? id;
 }
 
 function optionTitle(id: ServiceOptionKind) {
-  return serviceOptions.find((option) => option.id === id)?.title ?? id;
+  return runtimeOptionCatalog.find((option) => option.id === id)?.title ?? id;
+}
+
+function formatDayLabel(value: string) {
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "numeric",
+    month: "long",
+  }).format(new Date(value));
+}
+
+function formatTimeRange(startAt: string, endAt: string) {
+  const start = new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(startAt));
+  const end = new Intl.DateTimeFormat("ru-RU", {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(endAt));
+  return `${start}-${end}`;
+}
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ""));
+    reader.onerror = () => reject(new Error("Не удалось прочитать файл"));
+    reader.readAsDataURL(file);
+  });
 }
 
 function formatDateTime(value: string) {

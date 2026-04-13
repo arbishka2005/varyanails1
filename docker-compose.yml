@@ -11,40 +11,25 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./server/db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
-
   api:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: varyanails-api
-    env_file:
-      - .env
     environment:
-      API_PORT: "4000"
-      STORAGE_DRIVER: "postgres"
-      DATABASE_URL: "postgres://varyanails:varyanails@postgres:5432/varyanails"
+      DATABASE_URL: postgres://varyanails:varyanails@postgres:5432/varyanails
+      STORAGE_DRIVER: postgres
+      API_PORT: 4000
+      CORS_ORIGIN: http://127.0.0.1:5173
+      UPLOADS_DIR: /data/uploads
+      ALLOW_DEV_AUTH: "true"
+      MASTER_TELEGRAM_IDS: ""
     ports:
       - "4000:4000"
+    volumes:
+      - ./server/.data/uploads:/data/uploads
     depends_on:
       - postgres
-    volumes:
-      - ./server/.data/uploads:/app/server/.data/uploads
-
-  caddy:
-    image: caddy:2
-    container_name: varyanails-caddy
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./dist:/srv:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - api
 
 volumes:
   postgres-data:
-  caddy-data:
-  caddy-config:

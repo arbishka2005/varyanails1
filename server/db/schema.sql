@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS clients (
   preferred_contact_channel TEXT NOT NULL CHECK (preferred_contact_channel IN ('telegram', 'vk', 'phone')),
   contact_handle TEXT NOT NULL,
   first_visit BOOLEAN NOT NULL DEFAULT TRUE,
+  telegram_user_id TEXT,
   notes TEXT
 );
 
@@ -23,6 +24,13 @@ CREATE TABLE IF NOT EXISTS service_presets (
   requires_hand_photo BOOLEAN NOT NULL DEFAULT FALSE,
   requires_reference BOOLEAN NOT NULL DEFAULT FALSE,
   options JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+CREATE TABLE IF NOT EXISTS service_options (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
+  price_from INTEGER CHECK (price_from >= 0)
 );
 
 CREATE TABLE IF NOT EXISTS time_windows (
@@ -64,6 +72,12 @@ CREATE TABLE IF NOT EXISTS appointments (
   duration_minutes INTEGER NOT NULL CHECK (duration_minutes >= 0),
   status TEXT NOT NULL CHECK (status IN ('scheduled', 'completed', 'cancelled', 'no_show')),
   master_note TEXT,
+  reminder_24h_sent_at TIMESTAMPTZ,
+  reminder_3h_sent_at TIMESTAMPTZ,
+  survey_sent_at TIMESTAMPTZ,
+  survey_rating INTEGER CHECK (survey_rating BETWEEN 1 AND 5),
+  survey_text TEXT,
+  cancelled_at TIMESTAMPTZ,
   CHECK (end_at > start_at)
 );
 

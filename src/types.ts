@@ -11,21 +11,9 @@ export type AppointmentStatus = "scheduled" | "completed" | "cancelled" | "no_sh
 
 export type TimeWindowStatus = "available" | "offered" | "reserved" | "blocked";
 
-export type ServiceKind =
-  | "extension"
-  | "correction"
-  | "natural"
-  | "manicure"
-  | "removal";
+export type ServiceKind = string;
 
-export type ServiceOptionKind =
-  | "old_removal"
-  | "foreign_removal"
-  | "repair"
-  | "french"
-  | "simple_design"
-  | "complex_design"
-  | "strengthening";
+export type ServiceOptionKind = string;
 
 export type NailLength = "short" | "medium" | "long" | "extra";
 
@@ -36,6 +24,7 @@ export type Client = {
   preferredContactChannel: ContactChannel;
   contactHandle: string;
   firstVisit: boolean;
+  telegramUserId?: string;
   notes?: string;
 };
 
@@ -101,6 +90,12 @@ export type Appointment = {
   durationMinutes: number;
   status: AppointmentStatus;
   masterNote?: string;
+  reminder24hSentAt?: string;
+  reminder3hSentAt?: string;
+  surveySentAt?: string;
+  surveyRating?: number;
+  surveyText?: string;
+  cancelledAt?: string;
 };
 
 export type AppSnapshot = {
@@ -110,4 +105,10 @@ export type AppSnapshot = {
   appointments: Appointment[];
   windows: TimeWindow[];
   services: ServicePreset[];
+  serviceOptions: ServiceOption[];
+};
+
+export type PublicBookingRequest = {
+  request: BookingRequest;
+  window: TimeWindow | null;
 };

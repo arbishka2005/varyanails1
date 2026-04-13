@@ -13,8 +13,18 @@ declare global {
             username?: string;
           };
         };
+        viewportHeight?: number;
+        viewportStableHeight?: number;
+        BackButton?: {
+          show: () => void;
+          hide: () => void;
+          onClick: (callback: () => void) => void;
+          offClick: (callback: () => void) => void;
+        };
         ready?: () => void;
         expand?: () => void;
+        onEvent?: (eventType: "viewportChanged", callback: () => void) => void;
+        offEvent?: (eventType: "viewportChanged", callback: () => void) => void;
       };
     };
   }
