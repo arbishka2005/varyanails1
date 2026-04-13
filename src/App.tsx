@@ -122,9 +122,24 @@ const initialForm: FormState = {
   comment: "",
 };
 
+function getStartParam(): string {
+  const searchParams = new URLSearchParams(window.location.search);
+  const queryParam =
+    searchParams.get("startapp") ??
+    searchParams.get("start_param") ??
+    searchParams.get("tgWebAppStartParam") ??
+    "";
+  const webAppParam = window.Telegram?.WebApp?.initDataUnsafe?.start_param ?? "";
+  return queryParam || webAppParam;
+}
+
 function getRouteFromHash(): AppRoute {
   const hash = window.location.hash.replace(/^#\/?/, "");
-  const [path, query] = hash.split("?");
+  const fallbackPath = window.location.pathname.replace(/^\/+/, "");
+  const startParam = getStartParam();
+  const pathFromStartParam = startParam.replace(/^\/+/, "");
+  const routePath = hash || fallbackPath || pathFromStartParam;
+  const [path, query] = routePath.split("?");
 
   if (path === "survey") {
     const params = new URLSearchParams(query ?? "");
@@ -143,6 +158,18 @@ function getRouteFromHash(): AppRoute {
   }
 
   if (hash === "admin" || hash === "admin/requests") {
+    return { portal: "admin", section: "requests" };
+  }
+
+  if (path === "admin/clients") {
+    return { portal: "admin", section: "clients" };
+  }
+
+  if (path === "admin/settings") {
+    return { portal: "admin", section: "settings" };
+  }
+
+  if (path === "admin" || path === "admin/requests" || startParam === "admin") {
     return { portal: "admin", section: "requests" };
   }
 
@@ -193,6 +220,9 @@ export function App() {
   const isTelegramMiniApp = Boolean(telegramWebApp);
   const telegramInitData = telegramWebApp?.initData ?? "";
   const telegramUser = telegramWebApp?.initDataUnsafe?.user;
+  const startParam = getStartParam();
+  const locationPath = window.location.pathname;
+  const locationHash = window.location.hash;
 
   const refreshSnapshot = async () => {
     try {
@@ -699,6 +729,9 @@ export function App() {
                   <div>Telegram WebApp: {isTelegramMiniApp ? "yes" : "no"}</div>
                   <div>InitData length: {telegramInitData.length}</div>
                   <div>User ID: {telegramUser?.id ?? "n/a"}</div>
+                  <div>Start param: {startParam || "n/a"}</div>
+                  <div>Path: {locationPath || "/"}</div>
+                  <div>Hash: {locationHash || "n/a"}</div>
                 </div>
                 <div className="action-row">
                   <button className="secondary-button" onClick={() => navigateTo("/")}>
