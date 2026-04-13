@@ -11,7 +11,11 @@ function formatMessage(payload: NotifyPayload) {
   return [header, ...payload.lines].filter(Boolean).join("\n");
 }
 
-async function sendMessage(chatId: string, text: string) {
+export async function sendTelegramMessage(
+  chatId: string,
+  text: string,
+  replyMarkup?: Record<string, unknown>,
+) {
   if (!config.telegramBotToken) {
     return;
   }
@@ -22,6 +26,7 @@ async function sendMessage(chatId: string, text: string) {
     body: JSON.stringify({
       chat_id: chatId,
       text,
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     }),
   });
 
@@ -37,7 +42,7 @@ export async function notifyMasters(payload: NotifyPayload) {
   }
 
   const message = formatMessage(payload);
-  await Promise.all(config.masterTelegramIds.map((id) => sendMessage(id, message)));
+  await Promise.all(config.masterTelegramIds.map((id) => sendTelegramMessage(id, message)));
 }
 
 export async function notifyClient(client: Client | null | undefined, payload: NotifyPayload) {
@@ -46,5 +51,5 @@ export async function notifyClient(client: Client | null | undefined, payload: N
   }
 
   const message = formatMessage(payload);
-  await sendMessage(client.telegramUserId, message);
+  await sendTelegramMessage(client.telegramUserId, message);
 }

@@ -7,7 +7,7 @@ import { config } from "./config.js";
 import { attachTelegramAuth, requireMaster } from "./auth/telegram.js";
 import { runMigrations } from "./db/migrate.js";
 import { repository } from "./repositories/index.js";
-import { notifyClient, notifyMasters } from "./notifications/telegram.js";
+import { notifyClient, notifyMasters, sendTelegramMessage } from "./notifications/telegram.js";
 import { startAppointmentScheduler } from "./notifications/scheduler.js";
 import {
   appointmentSurveySchema,
@@ -34,6 +34,20 @@ function getParamId(request: express.Request) {
   return Array.isArray(id) ? id[0] : id;
 }
 
+function getCommandName(text: string) {
+  const raw = text.trim().split(/\s+/)[0] ?? "";
+  if (!raw.startsWith("/")) {
+    return "";
+  }
+  const trimmed = raw.replace(/^\/+/, "");
+  return trimmed.split("@")[0] ?? "";
+}
+
+function getAdminWebAppUrl() {
+  const base = config.appBaseUrl.replace(/\/+$/, "");
+  return `${base}/?startapp=admin`;
+}
+
 app.use(cors({ origin: config.corsOrigin }));
 app.use(express.json({ limit: "10mb" }));
 app.use(attachTelegramAuth);
@@ -41,6 +55,44 @@ app.use("/uploads", express.static(config.uploadsDir));
 
 app.get("/health", async (_request, response) => {
   response.json({ ok: true, storage: config.storageDriver });
+});
+
+app.post("/api/telegram/webhook", async (request, response) => {
+  if (!config.telegramBotToken) {
+    response.json({ ok: true });
+    return;
+  }
+
+  const update = request.body ?? {};
+  const message = update.message ?? update.edited_message;
+  const text = typeof message?.text === "string" ? message.text : "";
+  const fromId = message?.from?.id;
+  const chatId = message?.chat?.id ?? fromId;
+
+  if (!text || !fromId || !chatId) {
+    response.json({ ok: true });
+    return;
+  }
+
+  const command = getCommandName(text);
+
+  if (command === "admin") {
+    const isMaster = config.masterTelegramIds.includes(String(fromId));
+
+    if (!isMaster) {
+      await sendTelegramMessage(String(chatId), "Нет доступа к админ-панели.");
+      response.json({ ok: true });
+      return;
+    }
+
+    await sendTelegramMessage(String(chatId), "Открыть админ-панель:", {
+      inline_keyboard: [
+        [{ text: "Открыть админку", web_app: { url: getAdminWebAppUrl() } }],
+      ],
+    });
+  }
+
+  response.json({ ok: true });
 });
 
 app.post("/api/bootstrap", requireMaster, async (_request, response) => {
