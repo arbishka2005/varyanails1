@@ -149,18 +149,6 @@ function getRouteFromHash(): AppRoute {
     }
   }
 
-  if (hash === "admin/clients") {
-    return { portal: "admin", section: "clients" };
-  }
-
-  if (hash === "admin/settings") {
-    return { portal: "admin", section: "settings" };
-  }
-
-  if (hash === "admin" || hash === "admin/requests") {
-    return { portal: "admin", section: "requests" };
-  }
-
   if (path === "admin/clients") {
     return { portal: "admin", section: "clients" };
   }
@@ -169,7 +157,7 @@ function getRouteFromHash(): AppRoute {
     return { portal: "admin", section: "settings" };
   }
 
-  if (path === "admin" || path === "admin/requests" || startParam === "admin") {
+  if (path === "admin" || path === "admin/requests") {
     return { portal: "admin", section: "requests" };
   }
 
