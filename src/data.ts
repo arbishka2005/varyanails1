@@ -8,50 +8,7 @@ import type {
   TimeWindow,
 } from "./types";
 
-export const serviceOptions: ServiceOption[] = [
-  {
-    id: "old_removal",
-    title: "Снятие старого покрытия",
-    durationMinutes: 20,
-    priceFrom: 300,
-  },
-  {
-    id: "foreign_removal",
-    title: "Снятие чужой работы",
-    durationMinutes: 35,
-    priceFrom: 500,
-  },
-  {
-    id: "repair",
-    title: "Ремонт ногтя",
-    durationMinutes: 15,
-    priceFrom: 150,
-  },
-  {
-    id: "french",
-    title: "Френч",
-    durationMinutes: 20,
-    priceFrom: 500,
-  },
-  {
-    id: "simple_design",
-    title: "Простой дизайн",
-    durationMinutes: 15,
-    priceFrom: 300,
-  },
-  {
-    id: "complex_design",
-    title: "Сложный дизайн",
-    durationMinutes: 45,
-    priceFrom: 900,
-  },
-  {
-    id: "strengthening",
-    title: "Укрепление",
-    durationMinutes: 25,
-    priceFrom: 500,
-  },
-];
+export const serviceOptions: ServiceOption[] = [];
 
 export const servicePresets: ServicePreset[] = [
   {
@@ -61,7 +18,7 @@ export const servicePresets: ServicePreset[] = [
     priceFrom: 3200,
     requiresHandPhoto: true,
     requiresReference: true,
-    options: ["foreign_removal", "repair", "french", "simple_design", "complex_design"],
+    options: [],
   },
   {
     id: "correction",
@@ -70,7 +27,7 @@ export const servicePresets: ServicePreset[] = [
     priceFrom: 2500,
     requiresHandPhoto: false,
     requiresReference: true,
-    options: ["old_removal", "repair", "french", "simple_design", "complex_design"],
+    options: [],
   },
   {
     id: "natural",
@@ -79,7 +36,7 @@ export const servicePresets: ServicePreset[] = [
     priceFrom: 2200,
     requiresHandPhoto: false,
     requiresReference: true,
-    options: ["old_removal", "repair", "french", "simple_design", "complex_design", "strengthening"],
+    options: [],
   },
   {
     id: "manicure",
@@ -88,7 +45,7 @@ export const servicePresets: ServicePreset[] = [
     priceFrom: 1200,
     requiresHandPhoto: false,
     requiresReference: false,
-    options: ["repair", "strengthening"],
+    options: [],
   },
   {
     id: "removal",
@@ -97,7 +54,7 @@ export const servicePresets: ServicePreset[] = [
     priceFrom: 700,
     requiresHandPhoto: false,
     requiresReference: false,
-    options: ["foreign_removal"],
+    options: [],
   },
 ];
 
@@ -162,7 +119,7 @@ export const seedRequests: BookingRequest[] = [
     id: "REQ-1042",
     clientId: "CLI-1001",
     service: "extension",
-    optionIds: ["french"],
+    optionIds: [],
     length: "medium",
     desiredResult: "Молочная база, мягкий квадрат, френч на всех ногтях.",
     photoIds: ["PHOTO-HANDS-1001", "PHOTO-REF-1001"],

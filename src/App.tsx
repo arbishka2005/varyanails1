@@ -17,11 +17,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import {
-  serviceOptions,
-  servicePresets,
-  timeWindows,
-} from "./data";
+import { servicePresets, timeWindows } from "./data";
 import { ApiError, api } from "./api";
 import heroMainImage from "./assets/hero-main.jpg";
 import type {
@@ -35,15 +31,12 @@ import type {
   NailLength,
   RequestStatus,
   ServiceKind,
-  ServiceOptionKind,
-  ServiceOption,
   ServicePreset,
   TimeWindow,
   TimeWindowStatus,
 } from "./types";
 
 let runtimeServiceCatalog = servicePresets;
-let runtimeOptionCatalog = serviceOptions;
 
 const contactLabels: Record<ContactChannel, string> = {
   telegram: "Telegram",
@@ -73,7 +66,6 @@ type FormState = {
   contactHandle: string;
   isNewClient: boolean;
   service: ServiceKind;
-  optionIds: ServiceOptionKind[];
   length: NailLength;
   desiredResult: string;
   handPhoto: PhotoAttachment | null;
@@ -97,12 +89,6 @@ type ServiceEditorState = {
   priceFrom: string;
   requiresHandPhoto: boolean;
   requiresReference: boolean;
-  options: ServiceOptionKind[];
-};
-type OptionEditorState = {
-  title: string;
-  durationMinutes: string;
-  priceFrom: string;
 };
 
 const initialForm: FormState = {
@@ -112,7 +98,6 @@ const initialForm: FormState = {
   contactHandle: "",
   isNewClient: true,
   service: "extension",
-  optionIds: [],
   length: "medium",
   desiredResult: "",
   handPhoto: null,
@@ -186,7 +171,7 @@ export function App() {
   const [lastSubmittedRequestId, setLastSubmittedRequestId] = useState<string | null>(null);
   const [lastRequestInfo, setLastRequestInfo] = useState<PublicBookingRequest | null>(null);
   const [snapshot, setSnapshot] = useState<AppSnapshot | null>(null);
-  const [publicConfig, setPublicConfig] = useState<Pick<AppSnapshot, "services" | "windows" | "serviceOptions"> | null>(null);
+  const [publicConfig, setPublicConfig] = useState<Pick<AppSnapshot, "services" | "windows"> | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
   const [adminAccessDenied, setAdminAccessDenied] = useState(false);
@@ -199,16 +184,11 @@ export function App() {
   const requests = snapshot?.requests ?? [];
   const appointments = snapshot?.appointments ?? [];
   const windows = route.portal === "admin" ? (snapshot?.windows ?? []) : (publicConfig?.windows ?? timeWindows);
-  const optionCatalog =
-    route.portal === "admin"
-      ? snapshot?.serviceOptions.length ? snapshot.serviceOptions : serviceOptions
-      : publicConfig?.serviceOptions.length ? publicConfig.serviceOptions : serviceOptions;
   const services =
     route.portal === "admin"
       ? snapshot?.services.length ? snapshot.services : servicePresets
       : publicConfig?.services.length ? publicConfig.services : servicePresets;
   runtimeServiceCatalog = services;
-  runtimeOptionCatalog = optionCatalog;
   const telegramWebApp = getTelegramWebApp();
   const isTelegramMiniApp = Boolean(telegramWebApp);
   const telegramInitData = telegramWebApp?.initData ?? "";
@@ -351,7 +331,6 @@ export function App() {
       return {
         ...current,
         service: services[0].id,
-        optionIds: current.optionIds.filter((optionId) => services[0].options.includes(optionId)),
       };
     });
   }, [services]);
@@ -361,21 +340,14 @@ export function App() {
     [form.service, services],
   );
 
-  const selectedOptions = useMemo(
-    () => optionCatalog.filter((option) => form.optionIds.includes(option.id)),
-    [form.optionIds, optionCatalog],
-  );
-
   const estimatedMinutes = useMemo(() => {
     const lengthBoost = { short: 0, medium: 15, long: 30, extra: 45 }[form.length];
-    const optionsBoost = selectedOptions.reduce((sum, option) => sum + option.durationMinutes, 0);
-    return selectedService.durationMinutes + lengthBoost + optionsBoost;
-  }, [form.length, selectedOptions, selectedService.durationMinutes]);
+    return selectedService.durationMinutes + lengthBoost;
+  }, [form.length, selectedService.durationMinutes]);
 
   const estimatedPriceFrom = useMemo(() => {
-    const optionsPrice = selectedOptions.reduce((sum, option) => sum + (option.priceFrom ?? 0), 0);
-    return (selectedService.priceFrom ?? 0) + optionsPrice;
-  }, [selectedOptions, selectedService.priceFrom]);
+    return selectedService.priceFrom ?? 0;
+  }, [selectedService.priceFrom]);
 
   const normalizedDesiredResult = useMemo(() => {
     const customText = form.desiredResult.trim();
@@ -384,15 +356,10 @@ export function App() {
       return customText;
     }
 
-    const optionTitles = selectedOptions.map((option) => option.title);
     const summaryParts = [selectedService.title, lengthLabels[form.length]];
 
-    if (optionTitles.length > 0) {
-      summaryParts.push(optionTitles.join(", "));
-    }
-
-    return summaryParts.join(" • ");
-  }, [form.desiredResult, form.length, selectedOptions, selectedService.title]);
+    return summaryParts.join(" - ");
+  }, [form.desiredResult, form.length, selectedService.title]);
 
   const submitRequest = async () => {
     const client: Client = {
@@ -410,7 +377,7 @@ export function App() {
       id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
       clientId: client.id,
       service: form.service,
-      optionIds: form.optionIds,
+      optionIds: [],
       length: form.length,
       desiredResult: normalizedDesiredResult,
       photoIds: newPhotos.map((photo) => photo.id),
@@ -542,6 +509,7 @@ export function App() {
     }
   };
 
+  /*
   const createServiceOption = async (option: ServiceOption) => {
     try {
       setApiError(null);
@@ -572,6 +540,7 @@ export function App() {
     }
   };
 
+  */
   const addTimeWindow = async (window: Omit<TimeWindow, "id" | "label" | "status">) => {
     const nextWindow: TimeWindow = {
       ...window,
@@ -704,7 +673,6 @@ export function App() {
             requiresHandPhoto={form.isNewClient || selectedService.requiresHandPhoto}
             requiresReference={selectedService.requiresReference}
             services={services}
-            serviceOptions={optionCatalog}
             selectedService={selectedService}
             availableWindows={windows.filter(
               (window) => window.status === "available" || window.status === "offered",
@@ -775,12 +743,8 @@ export function App() {
               {route.section === "settings" && (
                 <SettingsWorkspaceV2
                   services={services}
-                  serviceOptions={optionCatalog}
                   windows={windows}
                   addTimeWindow={addTimeWindow}
-                  createServiceOption={createServiceOption}
-                  updateServiceOption={updateServiceOption}
-                  deleteServiceOption={deleteServiceOption}
                   createService={createService}
                   updateService={updateService}
                   deleteService={deleteService}
@@ -854,7 +818,6 @@ function ClientRequestForm({
   requiresHandPhoto,
   requiresReference,
   services,
-  serviceOptions,
   selectedService,
   availableWindows,
   setForm,
@@ -870,7 +833,6 @@ function ClientRequestForm({
   requiresHandPhoto: boolean;
   requiresReference: boolean;
   services: ServicePreset[];
-  serviceOptions: ServiceOption[];
   selectedService: (typeof servicePresets)[number];
   availableWindows: TimeWindow[];
   setForm: (next: FormState) => void;
@@ -894,7 +856,6 @@ function ClientRequestForm({
   const maxPhotoSizeBytes = 8 * 1024 * 1024;
   const [currentStep, setCurrentStep] = useState<ClientFormStep>("contacts");
   const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
-  const currentOptions = serviceOptions.filter((option) => selectedService.options.includes(option.id));
   const normalizedDesiredResult = useMemo(() => {
     const customText = form.desiredResult.trim();
 
@@ -902,17 +863,10 @@ function ClientRequestForm({
       return customText;
     }
 
-    const optionTitles = form.optionIds
-      .map((optionId) => serviceOptions.find((option) => option.id === optionId)?.title)
-      .filter((title): title is string => Boolean(title));
     const summaryParts = [selectedService.title, lengthLabels[form.length]];
 
-    if (optionTitles.length > 0) {
-      summaryParts.push(optionTitles.join(", "));
-    }
-
     return summaryParts.join(" • ");
-  }, [form.desiredResult, form.length, form.optionIds, selectedService.title, serviceOptions]);
+  }, [form.desiredResult, form.length, selectedService.title]);
   const needsCustomWindow = form.preferredWindowId === customWindowValue;
   const windowsByDate = useMemo(() => {
     const map = new Map<string, { dateKey: string; label: string; items: TimeWindow[] }>();
@@ -1060,21 +1014,10 @@ function ClientRequestForm({
     void uploadPhoto(kind, file);
   };
 
-  const toggleOption = (id: ServiceOptionKind) => {
-    setForm({
-      ...form,
-      optionIds: form.optionIds.includes(id)
-        ? form.optionIds.filter((optionId) => optionId !== id)
-        : [...form.optionIds, id],
-    });
-  };
-
   const chooseService = (service: ServiceKind) => {
-    const nextService = services.find((item) => item.id === service)!;
     setForm({
       ...form,
       service,
-      optionIds: form.optionIds.filter((optionId) => nextService.options.includes(optionId)),
     });
   };
 
@@ -1202,23 +1145,6 @@ function ClientRequestForm({
                 </select>
               </label>
             </div>
-
-            <fieldset className="option-list">
-              <legend>Дополнительно</legend>
-              {currentOptions.map((option) => (
-                <label className="checkbox-line option-row" key={option.id}>
-                  <input
-                    type="checkbox"
-                    checked={form.optionIds.includes(option.id)}
-                    onChange={() => toggleOption(option.id)}
-                  />
-                  <span className="checkbox-copy">
-                    <strong>{option.title}</strong>
-                    <small>+{option.durationMinutes} мин · от {(option.priceFrom ?? 0).toLocaleString("ru-RU")} ₽</small>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
 
             <label>
               Что будем делать
@@ -1379,7 +1305,6 @@ function ClientRequestForm({
             <Info label="Телефон" value={form.phone || "Не указан"} />
             <Info label="Связь" value={`${contactLabels[form.contactChannel]} ${form.contactHandle}`.trim()} />
             <Info label="Процедура" value={selectedService.title} />
-            <Info label="Допы" value={form.optionIds.map(optionTitle).join(", ") || "Без допов"} />
             <Info label="Описание" value={form.desiredResult || normalizedDesiredResult} />
             <Info label="Фото рук" value={form.handPhoto?.fileName ?? "Не приложено"} />
             <Info label="Референс" value={form.referencePhoto?.fileName ?? "Не приложен"} />
@@ -2235,9 +2160,6 @@ function SettingsWorkspace({
                   </span>
                 </label>
               </div>
-              <p className="settings-meta">
-                Допы: {service.options.map(optionTitle).join(", ") || "не настроены"}
-              </p>
             </article>
           ))}
         </div>
@@ -2314,46 +2236,30 @@ function SettingsWorkspace({
 
 function SettingsWorkspaceV2({
   services,
-  serviceOptions,
   windows,
   addTimeWindow,
-  createServiceOption,
-  updateServiceOption,
-  deleteServiceOption,
   createService,
   updateService,
   deleteService,
   updateWindowStatus,
 }: {
   services: ServicePreset[];
-  serviceOptions: ServiceOption[];
   windows: TimeWindow[];
   addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void;
-  createServiceOption: (option: ServiceOption) => void;
-  updateServiceOption: (id: ServiceOptionKind, patch: Partial<ServiceOption>) => void;
-  deleteServiceOption: (id: ServiceOptionKind) => void;
   createService: (service: ServicePreset) => void;
   updateService: (id: ServiceKind, patch: Partial<ServicePreset>) => void;
   deleteService: (id: ServiceKind) => void;
   updateWindowStatus: (id: string, status: TimeWindowStatus) => void;
 }) {
   const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceEditorState>>({});
-  const [optionDrafts, setOptionDrafts] = useState<Record<string, OptionEditorState>>({});
   const [createForm, setCreateForm] = useState<ServiceEditorState>({
     title: "",
     durationMinutes: "120",
     priceFrom: "",
     requiresHandPhoto: false,
     requiresReference: true,
-    options: [],
-  });
-  const [createOptionForm, setCreateOptionForm] = useState<OptionEditorState>({
-    title: "",
-    durationMinutes: "20",
-    priceFrom: "",
   });
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const [optionError, setOptionError] = useState<string | null>(null);
   const [windowForm, setWindowForm] = useState({
     date: "2026-04-18",
     start: "11:00",
@@ -2366,12 +2272,6 @@ function SettingsWorkspaceV2({
     );
   }, [services]);
 
-  useEffect(() => {
-    setOptionDrafts(
-      Object.fromEntries(serviceOptions.map((option) => [option.id, toOptionEditorState(option)])),
-    );
-  }, [serviceOptions]);
-
   const updateDraft = (serviceId: string, patch: Partial<ServiceEditorState>) => {
     const service = services.find((item) => item.id === serviceId);
 
@@ -2383,49 +2283,6 @@ function SettingsWorkspaceV2({
       ...current,
       [serviceId]: {
         ...(current[serviceId] ?? toServiceEditorState(service)),
-        ...patch,
-      },
-    }));
-  };
-
-  const toggleServiceOption = (
-    target: "draft" | "create",
-    optionId: ServiceOptionKind,
-    serviceId?: string,
-  ) => {
-    if (target === "create") {
-      setCreateForm((current) => ({
-        ...current,
-        options: current.options.includes(optionId)
-          ? current.options.filter((item) => item !== optionId)
-          : [...current.options, optionId],
-      }));
-      return;
-    }
-
-    if (!serviceId) {
-      return;
-    }
-
-    const currentOptions = serviceDrafts[serviceId]?.options ?? [];
-    updateDraft(serviceId, {
-      options: currentOptions.includes(optionId)
-        ? currentOptions.filter((item) => item !== optionId)
-        : [...currentOptions, optionId],
-    });
-  };
-
-  const updateOptionDraft = (optionId: string, patch: Partial<OptionEditorState>) => {
-    const option = serviceOptions.find((item) => item.id === optionId);
-
-    if (!option) {
-      return;
-    }
-
-    setOptionDrafts((current) => ({
-      ...current,
-      [optionId]: {
-        ...(current[optionId] ?? toOptionEditorState(option)),
         ...patch,
       },
     }));
@@ -2461,7 +2318,6 @@ function SettingsWorkspaceV2({
       priceFrom: "",
       requiresHandPhoto: false,
       requiresReference: true,
-      options: [],
     });
   };
 
@@ -2494,6 +2350,7 @@ function SettingsWorkspaceV2({
     deleteService(serviceId);
   };
 
+  /*
   const submitCreateOption = () => {
     const parsed = parseOptionEditor(
       createOptionForm,
@@ -2537,6 +2394,7 @@ function SettingsWorkspaceV2({
     setOptionError(null);
     deleteServiceOption(optionId);
   };
+  */
 
   return (
     <section className="settings-layout">
@@ -2545,7 +2403,7 @@ function SettingsWorkspaceV2({
           <Settings size={22} />
           <div>
             <h2>Процедуры</h2>
-            <p>Здесь мастер полностью собирает каталог услуг: названия, цены, длительность, обязательные фото и допы.</p>
+            <p>Здесь мастер полностью собирает каталог услуг: названия, цены, длительность, обязательные фото.</p>
           </div>
         </div>
 
@@ -2626,24 +2484,6 @@ function SettingsWorkspaceV2({
             </div>
           </div>
 
-          <div className="settings-options-grid">
-            {serviceOptions.map((option) => (
-              <label className="checkbox-line option-row option-row-compact" key={`create-${option.id}`}>
-                <input
-                  type="checkbox"
-                  checked={createForm.options.includes(option.id)}
-                  onChange={() => toggleServiceOption("create", option.id)}
-                />
-                <span className="checkbox-copy">
-                  <strong>{option.title}</strong>
-                  <small>
-                    +{option.durationMinutes} мин
-                    {option.priceFrom ? ` · от ${option.priceFrom.toLocaleString("ru-RU")} ₽` : ""}
-                  </small>
-                </span>
-              </label>
-            ))}
-          </div>
         </article>
 
         {serviceError ? <p className="error-text">{serviceError}</p> : null}
@@ -2721,25 +2561,6 @@ function SettingsWorkspaceV2({
                 </label>
               </div>
 
-              <div className="settings-options-grid">
-                {serviceOptions.map((option) => (
-                  <label className="checkbox-line option-row option-row-compact" key={`${service.id}-${option.id}`}>
-                    <input
-                      type="checkbox"
-                      checked={(serviceDrafts[service.id]?.options ?? service.options).includes(option.id)}
-                      onChange={() => toggleServiceOption("draft", option.id, service.id)}
-                    />
-                    <span className="checkbox-copy">
-                      <strong>{option.title}</strong>
-                      <small>
-                        +{option.durationMinutes} мин
-                        {option.priceFrom ? ` · от ${option.priceFrom.toLocaleString("ru-RU")} ₽` : ""}
-                      </small>
-                    </span>
-                  </label>
-                ))}
-              </div>
-
               <div className="settings-actions">
                 <button className="secondary-button" onClick={() => resetService(service)} type="button">
                   Отменить правки
@@ -2752,124 +2573,6 @@ function SettingsWorkspaceV2({
           ))}
         </div>
 
-        <div className="section-title settings-subsection">
-          <Sparkles size={20} />
-          <div>
-            <h2>Дополнительно</h2>
-            <p>Здесь можно полностью управлять допами: снять старое покрытие, дизайн, ремонт и любые свои позиции.</p>
-          </div>
-        </div>
-
-        <article className="settings-item settings-create-card">
-          <div className="settings-item-header">
-            <div>
-              <h3>Новое дополнение</h3>
-              <p className="settings-meta">Эти позиции потом можно подключать к любым услугам выше.</p>
-            </div>
-            <button className="primary-button" onClick={submitCreateOption} type="button">
-              <Plus size={17} /> Добавить дополнение
-            </button>
-          </div>
-
-          <div className="field-row">
-            <label>
-              Название
-              <input
-                type="text"
-                value={createOptionForm.title}
-                onChange={(event) =>
-                  setCreateOptionForm((current) => ({ ...current, title: event.target.value }))
-                }
-                placeholder="Например, сложный дизайн"
-              />
-            </label>
-            <label>
-              Длительность, мин
-              <input
-                type="number"
-                min="0"
-                value={createOptionForm.durationMinutes}
-                onChange={(event) =>
-                  setCreateOptionForm((current) => ({ ...current, durationMinutes: event.target.value }))
-                }
-              />
-            </label>
-            <label>
-              Цена от, ₽
-              <input
-                type="number"
-                min="0"
-                value={createOptionForm.priceFrom}
-                onChange={(event) =>
-                  setCreateOptionForm((current) => ({ ...current, priceFrom: event.target.value }))
-                }
-                placeholder="0"
-              />
-            </label>
-          </div>
-        </article>
-
-        {optionError ? <p className="error-text">{optionError}</p> : null}
-
-        <div className="settings-list">
-          {serviceOptions.map((option) => (
-            <article className="settings-item" key={option.id}>
-              <div className="settings-item-header">
-                <div>
-                  <h3>{option.title}</h3>
-                  <p className="settings-meta">ID: {option.id}</p>
-                </div>
-                <button
-                  className="danger-button settings-delete-button"
-                  onClick={() => removeOption(option.id)}
-                  type="button"
-                >
-                  <Trash2 size={16} /> Удалить
-                </button>
-              </div>
-
-              <div className="field-row">
-                <label>
-                  Название
-                  <input
-                    type="text"
-                    value={optionDrafts[option.id]?.title ?? option.title}
-                    onChange={(event) => updateOptionDraft(option.id, { title: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Длительность, мин
-                  <input
-                    type="number"
-                    min="0"
-                    value={optionDrafts[option.id]?.durationMinutes ?? String(option.durationMinutes)}
-                    onChange={(event) =>
-                      updateOptionDraft(option.id, { durationMinutes: event.target.value })
-                    }
-                  />
-                </label>
-                <label>
-                  Цена от, ₽
-                  <input
-                    type="number"
-                    min="0"
-                    value={optionDrafts[option.id]?.priceFrom ?? String(option.priceFrom ?? "")}
-                    onChange={(event) => updateOptionDraft(option.id, { priceFrom: event.target.value })}
-                  />
-                </label>
-              </div>
-
-              <div className="settings-actions">
-                <button className="secondary-button" onClick={() => resetOption(option)} type="button">
-                  Отменить правки
-                </button>
-                <button className="primary-button" onClick={() => saveOption(option.id)} type="button">
-                  Сохранить дополнение
-                </button>
-              </div>
-            </article>
-          ))}
-        </div>
       </div>
 
       <aside className="panel settings-panel">
@@ -2956,10 +2659,10 @@ function toServiceEditorState(service: ServicePreset): ServiceEditorState {
     priceFrom: service.priceFrom !== undefined ? String(service.priceFrom) : "",
     requiresHandPhoto: service.requiresHandPhoto,
     requiresReference: service.requiresReference,
-    options: [...service.options],
   };
 }
 
+/*
 function toOptionEditorState(option: ServiceOption): OptionEditorState {
   return {
     title: option.title,
@@ -2967,6 +2670,7 @@ function toOptionEditorState(option: ServiceOption): OptionEditorState {
     priceFrom: option.priceFrom !== undefined ? String(option.priceFrom) : "",
   };
 }
+*/
 
 function parseServiceEditor(state: ServiceEditorState | undefined, id: string): ServicePreset | null {
   if (!state) {
@@ -2992,10 +2696,11 @@ function parseServiceEditor(state: ServiceEditorState | undefined, id: string): 
     priceFrom,
     requiresHandPhoto: state.requiresHandPhoto,
     requiresReference: state.requiresReference,
-    options: [...state.options],
+    options: [],
   };
 }
 
+/*
 function parseOptionEditor(state: OptionEditorState | undefined, id: string): ServiceOption | null {
   if (!state) {
     return null;
@@ -3020,7 +2725,7 @@ function parseOptionEditor(state: OptionEditorState | undefined, id: string): Se
     priceFrom,
   };
 }
-
+*/
 function makeServiceId(title: string, existingIds: string[]) {
   const normalized = title
     .toLowerCase()
@@ -3087,7 +2792,6 @@ function RequestCard({
           value={client?.firstVisit ? "Первый раз, проверить фото рук" : "Постоянный"}
         />
         <Info label="Процедура" value={serviceTitle(request.service)} />
-        <Info label="Допы" value={request.optionIds.map(optionTitle).join(", ") || "Без допов"} />
         <Info label="Длина" value={lengthLabels[request.length]} />
         <Info label="Окошко" value={selectedWindow?.label ?? request.customWindowText ?? "Нужно согласовать"} />
         <Info label="Фото рук" value={handPhoto?.fileName ?? "Не приложено"} />
@@ -3171,9 +2875,11 @@ function serviceTitle(id: ServiceKind) {
   return runtimeServiceCatalog.find((service) => service.id === id)?.title ?? id;
 }
 
+/*
 function optionTitle(id: ServiceOptionKind) {
   return runtimeOptionCatalog.find((option) => option.id === id)?.title ?? id;
 }
+*/
 
 function formatDayLabel(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
