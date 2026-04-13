@@ -134,7 +134,12 @@ function getStartParam(): string {
 }
 
 function getRouteFromHash(): AppRoute {
-  const hash = window.location.hash.replace(/^#\/?/, "");
+  const rawHash = window.location.hash.replace(/^#\/?/, "");
+  const isTelegramPayloadHash =
+    rawHash.startsWith("tgWebAppData=") ||
+    rawHash.startsWith("tgwebappdata=") ||
+    rawHash.startsWith("tgWebAppData");
+  const hash = isTelegramPayloadHash ? "" : rawHash;
   const fallbackPath = window.location.pathname.replace(/^\/+/, "");
   const startParam = getStartParam();
   const pathFromStartParam = startParam.replace(/^\/+/, "");
