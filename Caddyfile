@@ -1,0 +1,19 @@
+vvrnailss.ru, www.vvrnailss.ru {
+  handle /health* {
+    reverse_proxy api:4000
+  }
+
+  handle /api/* {
+    reverse_proxy api:4000
+  }
+
+  handle /uploads/* {
+    reverse_proxy api:4000
+  }
+
+  handle {
+    root * /srv
+    try_files {path} /index.html
+    file_server
+  }
+}
