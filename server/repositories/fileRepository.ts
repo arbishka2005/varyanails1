@@ -190,6 +190,43 @@ export const fileRepository: Repository = {
     });
   },
 
+  async deleteClient(id: string) {
+    return mutateSnapshot((snapshot) => {
+      const clientRequests = snapshot.requests.filter((request) => request.clientId === id);
+      if (!snapshot.clients.some((client) => client.id === id)) {
+        return false;
+      }
+
+      const removedPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds));
+      const affectedWindowIds = new Set(
+        clientRequests
+          .map((request) => request.preferredWindowId)
+          .filter((windowId): windowId is string => Boolean(windowId)),
+      );
+
+      snapshot.clients = snapshot.clients.filter((client) => client.id !== id);
+      snapshot.requests = snapshot.requests.filter((request) => request.clientId !== id);
+      snapshot.appointments = snapshot.appointments.filter((appointment) => appointment.clientId !== id);
+      snapshot.photos = snapshot.photos.filter((photo) => !removedPhotoIds.has(photo.id));
+
+      snapshot.windows = snapshot.windows.map((window) => {
+        if (!affectedWindowIds.has(window.id)) {
+          return window;
+        }
+
+        const stillOffered = snapshot.requests.some(
+          (request) => request.preferredWindowId === window.id && request.status !== "declined",
+        );
+
+        return !stillOffered && window.status === "offered"
+          ? { ...window, status: "available" }
+          : window;
+      });
+
+      return true;
+    });
+  },
+
   async createServiceOption(option: ServiceOption) {
     await mutateSnapshot((snapshot) => {
       snapshot.serviceOptions = [...snapshot.serviceOptions, option].sort((a, b) => a.title.localeCompare(b.title));

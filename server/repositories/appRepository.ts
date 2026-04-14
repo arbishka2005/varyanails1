@@ -257,6 +257,42 @@ export async function updateClientNotes(id: string, notes: string) {
   return result.rows[0] ? toClient(result.rows[0]) : null;
 }
 
+export async function deleteClient(id: string) {
+  return withTransaction(async (client) => {
+    const requestsResult = await client.query(
+      "SELECT preferred_window_id, photo_ids FROM booking_requests WHERE client_id = $1 FOR UPDATE",
+      [id],
+    );
+    const requestRows = requestsResult.rows as { preferred_window_id: string | null; photo_ids: string[] }[];
+    const affectedWindowIds = [
+      ...new Set(requestRows.map((row) => row.preferred_window_id).filter((value): value is string => Boolean(value))),
+    ];
+    const photoIds = [
+      ...new Set(
+        requestRows.flatMap((row) =>
+          Array.isArray(row.photo_ids) ? row.photo_ids.map((photoId) => String(photoId)) : [],
+        ),
+      ),
+    ];
+
+    if (photoIds.length > 0) {
+      await client.query("DELETE FROM photo_attachments WHERE id = ANY($1::text[])", [photoIds]);
+    }
+
+    const result = await client.query("DELETE FROM clients WHERE id = $1", [id]);
+
+    if (result.rowCount === 0) {
+      return false;
+    }
+
+    for (const windowId of affectedWindowIds) {
+      await releaseWindowIfUnused(client, windowId);
+    }
+
+    return true;
+  });
+}
+
 export async function createService(service: ServicePreset) {
   const result = await pool.query(
     `INSERT INTO service_presets
@@ -317,7 +353,7 @@ export async function deleteServiceOption(id: string) {
     );
 
     const result = await client.query("DELETE FROM service_options WHERE id = $1", [id]);
-    return result.rowCount > 0;
+    return (result.rowCount ?? 0) > 0;
   });
 }
 
@@ -349,7 +385,7 @@ export async function updateService(id: string, patch: Partial<ServicePreset>) {
 
 export async function deleteService(id: string) {
   const result = await pool.query("DELETE FROM service_presets WHERE id = $1", [id]);
-  return result.rowCount > 0;
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function createTimeWindow(window: TimeWindow) {

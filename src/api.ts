@@ -115,6 +115,11 @@ export const api = {
       body: JSON.stringify({ notes }),
     }),
 
+  deleteClient: (id: string) =>
+    request<void>(`/api/clients/${id}`, {
+      method: "DELETE",
+    }),
+
   createServiceOption: (option: ServiceOption) =>
     request<ServiceOption>("/api/service-options", {
       method: "POST",

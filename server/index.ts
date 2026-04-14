@@ -355,6 +355,17 @@ app.patch("/api/clients/:id/notes", requireMaster, async (request, response) => 
   response.json(updated);
 });
 
+app.delete("/api/clients/:id", requireMaster, async (request, response) => {
+  const deleted = await repository.deleteClient(getParamId(request));
+
+  if (!deleted) {
+    response.status(404).json({ error: "Client not found" });
+    return;
+  }
+
+  response.status(204).end();
+});
+
 app.patch("/api/services/:id", requireMaster, async (request, response) => {
   const payload = updateServiceSchema.parse(request.body);
   const updated = await repository.updateService(getParamId(request), payload);

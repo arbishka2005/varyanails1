@@ -46,6 +46,7 @@ export type Repository = {
     customWindowText?: string,
   ) => Promise<BookingRequest | null>;
   updateClientNotes: (id: string, notes: string) => Promise<Client | null>;
+  deleteClient: (id: string) => Promise<boolean>;
   createServiceOption: (option: ServiceOption) => Promise<ServiceOption>;
   updateServiceOption: (id: string, patch: Partial<ServiceOption>) => Promise<ServiceOption | null>;
   deleteServiceOption: (id: string) => Promise<boolean>;

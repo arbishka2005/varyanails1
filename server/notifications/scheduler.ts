@@ -1,10 +1,16 @@
-import type { Appointment, Client } from "../../src/types.js";
+﻿import type { Client } from "../../src/types.js";
 import type { Repository } from "../repositories/types.js";
+import {
+  buildReminder24hPayload,
+  buildReminder3hPayload,
+  buildSurveyPayload,
+  type NotificationPayload,
+} from "./templates.js";
 
 const HOUR_MS = 60 * 60 * 1000;
 const REMINDER_WINDOW_MS = 60 * 60 * 1000;
 
-type NotifyClient = (client: Client | null | undefined, payload: { title: string; lines: string[] }) => Promise<void>;
+type NotifyClient = (client: Client | null | undefined, payload: NotificationPayload) => Promise<void>;
 
 function formatTimeRange(startAt: string, endAt: string) {
   const start = new Intl.DateTimeFormat("ru-RU", {
@@ -17,7 +23,7 @@ function formatTimeRange(startAt: string, endAt: string) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(endAt));
-  return `${start} – ${end}`;
+  return `${start} - ${end}`;
 }
 
 function isWithinWindow(diffMs: number, targetHours: number) {
@@ -56,47 +62,20 @@ export function startAppointmentScheduler(options: {
         const client = clientsById.get(appointment.clientId);
         const timeLabel = formatTimeRange(appointment.startAt, appointment.endAt);
 
-        if (!appointment.reminder24hSentAt && isWithinWindow(diffMs, 24)) {
-          if (client?.telegramUserId) {
-            await notifyClient(client, {
-              title: "Напоминание за 24 часа",
-              lines: [
-                `Ваша запись через 24 часа.`,
-                `Время: ${timeLabel}`,
-                "Если нужно перенести, напишите мастеру в Telegram.",
-              ],
-            });
-            await repository.markAppointmentReminder(appointment.id, "24h", new Date().toISOString());
-          }
+        if (!appointment.reminder24hSentAt && isWithinWindow(diffMs, 24) && client?.telegramUserId) {
+          await notifyClient(client, buildReminder24hPayload(timeLabel, client.name));
+          await repository.markAppointmentReminder(appointment.id, "24h", new Date().toISOString());
         }
 
-        if (!appointment.reminder3hSentAt && isWithinWindow(diffMs, 3)) {
-          if (client?.telegramUserId) {
-            await notifyClient(client, {
-              title: "Напоминание за 3 часа",
-              lines: [
-                `Ваша запись через 3 часа.`,
-                `Время: ${timeLabel}`,
-                "Если нужно перенести, напишите мастеру в Telegram.",
-              ],
-            });
-            await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
-          }
+        if (!appointment.reminder3hSentAt && isWithinWindow(diffMs, 3) && client?.telegramUserId) {
+          await notifyClient(client, buildReminder3hPayload(timeLabel));
+          await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
         }
 
-        if (!appointment.surveySentAt && !appointment.surveyRating && endAt < now - HOUR_MS) {
-          if (client?.telegramUserId) {
-            const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.id}`;
-            await notifyClient(client, {
-              title: "Оцените визит",
-              lines: [
-                "Спасибо, что пришли!",
-                "Оцените визит и оставьте короткий отзыв:",
-                surveyUrl,
-              ],
-            });
-            await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
-          }
+        if (!appointment.surveySentAt && !appointment.surveyRating && endAt < now - HOUR_MS && client?.telegramUserId) {
+          const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.id}`;
+          await notifyClient(client, buildSurveyPayload(surveyUrl));
+          await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
         }
       }
     } catch (error) {

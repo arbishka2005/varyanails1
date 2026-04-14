@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
 import {
   CalendarClock,
   Check,
@@ -18,7 +18,8 @@ import {
   X,
 } from "lucide-react";
 import { servicePresets, timeWindows } from "./data";
-import { ApiError, api } from "./api";
+import { isPhoneComplete, normalizePhoneInput, PHONE_PREFIX, toStoredPhone } from "./lib/phone";
+import { ApiError, api, resolveApiUrl } from "./api";
 import heroMainImage from "./assets/hero-main.jpg";
 import type {
   AppSnapshot,
@@ -26,11 +27,12 @@ import type {
   BookingRequest,
   Client,
   ContactChannel,
+  NailLength,
   PhotoAttachment,
   PublicBookingRequest,
-  NailLength,
   RequestStatus,
   ServiceKind,
+  ServiceOptionKind,
   ServicePreset,
   TimeWindow,
   TimeWindowStatus,
@@ -66,6 +68,7 @@ type FormState = {
   contactHandle: string;
   isNewClient: boolean;
   service: ServiceKind;
+  optionIds: ServiceOptionKind[];
   length: NailLength;
   desiredResult: string;
   handPhoto: PhotoAttachment | null;
@@ -93,11 +96,12 @@ type ServiceEditorState = {
 
 const initialForm: FormState = {
   clientName: "",
-  phone: "",
+  phone: PHONE_PREFIX,
   contactChannel: "telegram",
   contactHandle: "",
   isNewClient: true,
   service: "extension",
+  optionIds: [],
   length: "medium",
   desiredResult: "",
   handPhoto: null,
@@ -374,7 +378,7 @@ export function App() {
     const client: Client = {
       id: `CLI-${Date.now()}`,
       name: form.clientName.trim(),
-      phone: form.phone.trim(),
+      phone: toStoredPhone(form.phone),
       preferredContactChannel: form.contactChannel,
       contactHandle: form.contactHandle.trim(),
       firstVisit: form.isNewClient,
@@ -386,7 +390,7 @@ export function App() {
       id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
       clientId: client.id,
       service: form.service,
-      optionIds: [],
+      optionIds: form.optionIds,
       length: form.length,
       desiredResult: normalizedDesiredResult,
       photoIds: newPhotos.map((photo) => photo.id),
@@ -616,6 +620,16 @@ export function App() {
     }
   };
 
+  const deleteClient = async (id: string) => {
+    try {
+      setApiError(null);
+      await api.deleteClient(id);
+      await refreshSnapshot();
+    } catch (error) {
+      setApiError(error instanceof Error ? error.message : "Не удалось удалить клиента");
+    }
+  };
+
   const confirmRequest = async (requestId: string) => {
     try {
       setApiError(null);
@@ -745,6 +759,7 @@ export function App() {
                   clients={clients}
                   photos={photos}
                   requests={requests}
+                  deleteClient={deleteClient}
                   updateClientNotes={updateClientNotes}
                 />
               )}
@@ -791,7 +806,7 @@ function ClientHeader() {
 function AdminHeader({ section }: { section: AdminSection }) {
   return (
     <section className="topbar admin-topbar">
-      <div>
+      <div className="admin-hero-copy">
         <p className="eyebrow">vvrnailss · админ</p>
         <h1>Рабочее место мастера</h1>
         <p className="hero-text">Заявки, расписание и клиенты в одном лёгком кабинете.</p>
@@ -842,9 +857,9 @@ function ClientRequestForm({
   requiresHandPhoto: boolean;
   requiresReference: boolean;
   services: ServicePreset[];
-  selectedService: (typeof servicePresets)[number];
+  selectedService: ServicePreset;
   availableWindows: TimeWindow[];
-  setForm: (next: FormState) => void;
+  setForm: Dispatch<SetStateAction<FormState>>;
   submitRequest: () => void;
   uploadPhoto: (kind: PhotoAttachment["kind"], file: File) => Promise<PhotoAttachment | null>;
   uploading: { hands: boolean; reference: boolean };
@@ -865,6 +880,9 @@ function ClientRequestForm({
   const maxPhotoSizeBytes = 8 * 1024 * 1024;
   const [currentStep, setCurrentStep] = useState<ClientFormStep>("contacts");
   const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
+  const patchForm = (patch: Partial<FormState>) => {
+    setForm((current) => ({ ...current, ...patch }));
+  };
   const normalizedDesiredResult = useMemo(() => {
     const customText = form.desiredResult.trim();
 
@@ -874,7 +892,7 @@ function ClientRequestForm({
 
     const summaryParts = [selectedService.title, lengthLabels[form.length]];
 
-    return summaryParts.join(" • ");
+    return summaryParts.join(" - ");
   }, [form.desiredResult, form.length, selectedService.title]);
   const needsCustomWindow = form.preferredWindowId === customWindowValue;
   const windowsByDate = useMemo(() => {
@@ -896,10 +914,9 @@ function ClientRequestForm({
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const stepIndex = steps.findIndex((step) => step.id === currentStep);
   const contactHandleRequired = form.contactChannel !== "phone";
-  const phoneDigits = form.phone.replace(/\D/g, "");
   const validationMessages = {
     clientName: form.clientName.trim() ? "" : "Напишите, как к вам обращаться.",
-    phone: phoneDigits.length >= 10 ? "" : "Оставьте, пожалуйста, номер телефона полностью, чтобы я могла связаться с вами.",
+    phone: isPhoneComplete(form.phone) ? "" : "Оставьте, пожалуйста, номер телефона полностью, чтобы я могла связаться с вами.",
     contactHandle:
       !contactHandleRequired || form.contactHandle.trim()
         ? ""
@@ -941,7 +958,7 @@ function ClientRequestForm({
   };
   const requiredFilled = Boolean(
     form.clientName.trim() &&
-    phoneDigits.length >= 10 &&
+    isPhoneComplete(form.phone) &&
     (!contactHandleRequired || form.contactHandle.trim()) &&
     (needsCustomWindow ? form.customWindowText.trim() : form.preferredWindowId) &&
     (!requiresHandPhoto || form.handPhoto) &&
@@ -1024,10 +1041,7 @@ function ClientRequestForm({
   };
 
   const chooseService = (service: ServiceKind) => {
-    setForm({
-      ...form,
-      service,
-    });
+    patchForm({ service });
   };
 
   return (
@@ -1062,7 +1076,7 @@ function ClientRequestForm({
               <input
                 aria-describedby="clientNameHint"
                 value={form.clientName}
-                onChange={(event) => setForm({ ...form, clientName: event.target.value })}
+                onChange={(event) => patchForm({ clientName: event.target.value })}
                   placeholder="Например, Елена"
               />
               {validationMessages.clientName && <small className="field-hint" id="clientNameHint">{validationMessages.clientName}</small>}
@@ -1074,8 +1088,8 @@ function ClientRequestForm({
                 aria-describedby="phoneHint"
                 inputMode="tel"
                 value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                placeholder="+7 ..."
+                onChange={(event) => patchForm({ phone: normalizePhoneInput(event.target.value) })}
+                placeholder="+7 999 123 45 67"
               />
               {validationMessages.phone && <small className="field-hint" id="phoneHint">{validationMessages.phone}</small>}
             </label>
@@ -1086,7 +1100,7 @@ function ClientRequestForm({
                 <select
                   value={form.contactChannel}
                   onChange={(event) =>
-                    setForm({ ...form, contactChannel: event.target.value as ContactChannel })
+                    patchForm({ contactChannel: event.target.value as ContactChannel })
                   }
                 >
                   <option value="telegram">Telegram</option>
@@ -1099,7 +1113,7 @@ function ClientRequestForm({
                 <input
                   aria-describedby="contactHandleHint"
                   value={form.contactHandle}
-                  onChange={(event) => setForm({ ...form, contactHandle: event.target.value })}
+                  onChange={(event) => patchForm({ contactHandle: event.target.value })}
                   placeholder={contactHandleRequired ? "@username или vk.com/..." : "Если захотите, можно оставить"}
                 />
                 {validationMessages.contactHandle && <small className="field-hint" id="contactHandleHint">{validationMessages.contactHandle}</small>}
@@ -1110,7 +1124,7 @@ function ClientRequestForm({
               <input
                 type="checkbox"
                 checked={form.isNewClient}
-                onChange={(event) => setForm({ ...form, isNewClient: event.target.checked })}
+                onChange={(event) => patchForm({ isNewClient: event.target.checked })}
               />
               <span className="checkbox-copy first-visit-copy">
                 <strong>Я первый раз у мастера</strong>
@@ -1144,7 +1158,7 @@ function ClientRequestForm({
                 Длина
                 <select
                   value={form.length}
-                  onChange={(event) => setForm({ ...form, length: event.target.value as NailLength })}
+                  onChange={(event) => patchForm({ length: event.target.value as NailLength })}
                 >
                   {Object.entries(lengthLabels).map(([value, label]) => (
                     <option key={value} value={value}>
@@ -1160,7 +1174,7 @@ function ClientRequestForm({
               <textarea
                 aria-describedby="desiredResultHint"
                 value={form.desiredResult}
-                onChange={(event) => setForm({ ...form, desiredResult: event.target.value })}
+                onChange={(event) => patchForm({ desiredResult: event.target.value })}
                 placeholder="Наращивание, коррекция, на свои, дизайн, ремонт, снятие..."
               />
               {validationMessages.desiredResult && <small className="field-hint" id="desiredResultHint">{validationMessages.desiredResult}</small>}
@@ -1291,7 +1305,7 @@ function ClientRequestForm({
                 Когда вам удобно
                 <input
                   value={form.customWindowText}
-                  onChange={(event) => setForm({ ...form, customWindowText: event.target.value })}
+                  onChange={(event) => patchForm({ customWindowText: event.target.value })}
                   placeholder="Например: после 18:00 в будни"
                 />
               </label>
@@ -1301,7 +1315,7 @@ function ClientRequestForm({
               Комментарий
               <textarea
                 value={form.comment}
-                onChange={(event) => setForm({ ...form, comment: event.target.value })}
+                onChange={(event) => patchForm({ comment: event.target.value })}
                 placeholder="Любые детали: сколы, аллергии, пожелания по цвету..."
               />
             </label>
@@ -1347,6 +1361,11 @@ function ClientRequestForm({
       <aside className="panel summary-panel">
         <Sparkles size={28} />
         <h2>{selectedService.title}</h2>
+        <div className="summary-badges">
+          <span>{lengthLabels[form.length]}</span>
+          <span>{form.optionIds.length ? `${form.optionIds.length} доп.` : "без допов"}</span>
+          <span>{needsCustomWindow ? "свое время" : "готовый слот"}</span>
+        </div>
         <p>
           Примерная длительность: <strong>{Math.floor(estimatedMinutes / 60)} ч {estimatedMinutes % 60} мин</strong>
         </p>
@@ -1354,6 +1373,10 @@ function ClientRequestForm({
           Примерная стоимость: <strong>от {estimatedPriceFrom.toLocaleString("ru-RU")} ₽</strong>
         </p>
         <p>Финальные время и стоимость мастер подтвердит после просмотра заявки.</p>
+        <div className="summary-story">
+          <span>Мой краткий бриф</span>
+          <strong>{form.desiredResult || normalizedDesiredResult}</strong>
+        </div>
         <div className="summary-progress">
           <span>Шаг {stepIndex + 1} из {steps.length}</span>
           <strong>{steps[stepIndex].label}</strong>
@@ -1867,16 +1890,19 @@ function ClientsWorkspace({
   clients,
   photos,
   requests,
+  deleteClient,
   updateClientNotes,
 }: {
   appointments: AppSnapshot["appointments"];
   clients: Client[];
   photos: PhotoAttachment[];
   requests: BookingRequest[];
+  deleteClient: (id: string) => void;
   updateClientNotes: (id: string, notes: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientStatusFilter>("all");
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
 
   const clientRows = useMemo(
@@ -1922,6 +1948,17 @@ function ClientsWorkspace({
   );
 
   const hasActiveFilters = Boolean(normalizedQuery) || statusFilter !== "all";
+  const handleDeleteClient = (client: Client) => {
+    const confirmed = window.confirm(
+      `Удалить клиента ${client.name} из истории? Вместе с ним удалятся заявки, записи и привязанные фото.`,
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    deleteClient(client.id);
+  };
 
   return (
     <section className="clients-layout">
@@ -1986,7 +2023,12 @@ function ClientsWorkspace({
                   <span className="status">{client.firstVisit ? "Первый визит" : "Постоянный клиент"}</span>
                   <h3>{client.name}</h3>
                 </div>
-                <span className="request-id">{client.id}</span>
+                <div className="client-card-actions">
+                  <span className="request-id">{client.id}</span>
+                  <button className="danger-button" onClick={() => handleDeleteClient(client)} type="button">
+                    <Trash2 size={16} /> Удалить
+                  </button>
+                </div>
               </div>
 
               <div className="info-grid">
@@ -2026,11 +2068,7 @@ function ClientsWorkspace({
                 {clientPhotos.length === 0 ? (
                   <p>Фото пока не приложены.</p>
                 ) : (
-                  <div className="photo-list">
-                    {clientPhotos.map((photo) => (
-                      <span key={photo.id}>{photo.kind === "hands" ? "Руки" : "Референс"}: {photo.fileName}</span>
-                    ))}
-                  </div>
+                  <PhotoGallery photos={clientPhotos} onOpen={setSelectedPhoto} />
                 )}
               </div>
               </article>
@@ -2038,6 +2076,7 @@ function ClientsWorkspace({
           })
         )}
       </div>
+      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
     </section>
   );
 }
@@ -2772,6 +2811,7 @@ function RequestCard({
   updateStatus: (id: string, status: RequestStatus) => void;
   updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void;
 }) {
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
   const selectedWindow = request.preferredWindowId
     ? windows.find((window) => window.id === request.preferredWindowId)
     : null;
@@ -2816,6 +2856,16 @@ function RequestCard({
         {!hasConcreteWindow && <span>Нельзя подтвердить без конкретного окошка.</span>}
       </div>
 
+      {photos.length > 0 && (
+        <div className="request-photo-section">
+          <div className="section-inline-title">
+            <strong>Фото клиента</strong>
+            <span>Нажми на фото, чтобы открыть его крупно.</span>
+          </div>
+          <PhotoGallery photos={photos} onOpen={setSelectedPhoto} />
+        </div>
+      )}
+
       <label className="move-window-field">
         Предложить другое окошко
         <select
@@ -2859,6 +2909,7 @@ function RequestCard({
           <X size={17} /> Отказать
         </button>
       </div>
+      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
     </article>
   );
 }
@@ -2876,6 +2927,98 @@ function Info({
     <div className="info-item">
       <span>{icon}{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+function photoKindLabel(kind: PhotoAttachment["kind"]) {
+  return kind === "hands" ? "Фото рук" : "Референс";
+}
+
+function PhotoGallery({
+  photos,
+  onOpen,
+}: {
+  photos: PhotoAttachment[];
+  onOpen: (photo: PhotoAttachment) => void;
+}) {
+  return (
+    <div className="photo-gallery" role="list">
+      {photos.map((photo) => {
+        const previewSrc = resolveApiUrl(photo.previewUrl);
+
+        return (
+          <button key={photo.id} className="photo-thumb" onClick={() => onOpen(photo)} type="button">
+            <span className="photo-thumb-media">
+              {previewSrc ? (
+                <img src={previewSrc} alt={photo.fileName} loading="lazy" />
+              ) : (
+                <span className="photo-thumb-fallback">{photoKindLabel(photo.kind)}</span>
+              )}
+            </span>
+            <span className="photo-thumb-meta">
+              <strong>{photoKindLabel(photo.kind)}</strong>
+              <small>{photo.fileName}</small>
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function PhotoLightbox({
+  photo,
+  onClose,
+}: {
+  photo: PhotoAttachment | null;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!photo) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, photo]);
+
+  if (!photo) {
+    return null;
+  }
+
+  const previewSrc = resolveApiUrl(photo.previewUrl);
+
+  return (
+    <div className="photo-lightbox" onClick={onClose} role="presentation">
+      <div
+        className="photo-lightbox-card"
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={photo.fileName}
+      >
+        <button className="photo-lightbox-close" onClick={onClose} type="button" aria-label="Закрыть фото">
+          <X size={18} />
+        </button>
+        <div className="photo-lightbox-media">
+          {previewSrc ? (
+            <img src={previewSrc} alt={photo.fileName} />
+          ) : (
+            <div className="photo-lightbox-fallback">{photoKindLabel(photo.kind)}</div>
+          )}
+        </div>
+        <div className="photo-lightbox-meta">
+          <span className="status">{photoKindLabel(photo.kind)}</span>
+          <strong>{photo.fileName}</strong>
+        </div>
+      </div>
     </div>
   );
 }
@@ -2956,3 +3099,4 @@ function windowStatusLabel(status: TimeWindowStatus) {
 
   return labels[status];
 }
+
