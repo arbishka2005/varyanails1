@@ -13,7 +13,7 @@ import type {
   TimeWindowStatus,
 } from "./types";
 
-export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "http://127.0.0.1:4000";
+export const API_BASE_URL = import.meta.env.VITE_API_URL ?? "";
 const DEV_TELEGRAM_ID = import.meta.env.VITE_DEV_TELEGRAM_ID;
 
 function getTelegramInitData() {
@@ -60,7 +60,7 @@ export function resolveApiUrl(url?: string) {
     return url;
   }
   if (url.startsWith("/")) {
-    return `${API_BASE_URL}${url}`;
+    return API_BASE_URL ? `${API_BASE_URL}${url}` : url;
   }
   return url;
 }
