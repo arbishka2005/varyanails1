@@ -2086,6 +2086,10 @@ textarea:focus {
     padding-bottom: 116px;
   }
 
+  .request-form {
+    padding-bottom: 132px;
+  }
+
   .topbar,
   .content-grid,
   .master-layout,
@@ -2225,6 +2229,10 @@ textarea:focus {
   .settings-panel,
   .client-card {
     padding: 18px 16px;
+  }
+
+  .request-form {
+    padding-bottom: 140px;
   }
 
   .mode-switch.three {
