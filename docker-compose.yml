@@ -31,14 +31,14 @@ services:
       - ./server/.data/uploads:/app/server/.data/uploads
 
   caddy:
-    image: caddy:2
+    build:
+      context: .
+      dockerfile: Dockerfile.web
     container_name: varyanails-caddy
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./dist:/srv:ro
       - caddy-data:/data
       - caddy-config:/config
     depends_on:

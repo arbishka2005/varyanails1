@@ -78,6 +78,28 @@ MASTER_TELEGRAM_IDS=telegram_id_мастера
 ALLOW_DEV_AUTH=false
 ```
 
+## Деплой через Docker Compose
+
+Фронтенд и API собираются контейнерами, поэтому для обновления сервера больше не нужна отдельная папка `dist`.
+
+1. Подтянуть код:
+
+```bash
+git pull
+```
+
+2. Пересобрать и поднять сервисы:
+
+```bash
+docker compose up -d --build
+```
+
+3. Проверить здоровье API:
+
+```bash
+curl https://vvrnailss.ru/health
+```
+
 ## Деплой на Render
 
 В репозитории уже есть `render.yaml`. Для деплоя:
