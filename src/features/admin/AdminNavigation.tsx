@@ -86,7 +86,7 @@ export function AdminHeader({
           {counts.newRequests > 0
             ? `${counts.newRequests} клиентки ждут твоего решения`
             : counts.scheduledAppointments > 0
-              ? `${counts.scheduledAppointments} записей стоят красиво`
+              ? `${counts.scheduledAppointments} записей на сегодня`
               : "Я - твоя помощница в nail-сервисе"}
         </p>
       </div>

@@ -117,7 +117,7 @@ export function AdminDashboard({
               </span>
             </div>
           ) : (
-            <p className="admin-focus-note">Чекни заявки или открой окошко</p>
+            <p className="admin-focus-note">Проверь заявки или открой окошко.</p>
           )}
         </div>
 
@@ -240,13 +240,13 @@ export function AdminDashboard({
 
         <article className="panel admin-preview-panel">
           <div className="section-inline-title">
-            <strong>Предупреждения</strong>
+            <strong>На заметку</strong>
             <span>{warnings.length > 0 ? "проверь" : "всё ровно"}</span>
           </div>
 
           <div className="admin-warning-list">
             {warnings.length === 0 ? (
-              <div className="empty-state">Критичных мелочей не видно.</div>
+              <div className="empty-state">Сейчас ничего не требует внимания.</div>
             ) : (
               warnings.map((warning) => (
                 <button className="admin-warning-item" key={warning.id} onClick={() => onNavigate(warning.action)} type="button">

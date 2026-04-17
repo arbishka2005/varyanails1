@@ -1,0 +1,459 @@
+/*
+  Product system layer.
+  This file intentionally sits after feature CSS and normalizes shared UI primitives
+  so client, booking, admin, and survey screens read as one product.
+*/
+
+:root {
+  --color-ink: #302b31;
+  --color-text: rgba(48, 43, 49, 0.9);
+  --color-muted: rgba(88, 80, 88, 0.78);
+  --color-soft: rgba(124, 116, 126, 0.78);
+  --color-bg: #f5f0f4;
+  --color-accent: #8e6f7a;
+  --color-accent-strong: #685661;
+  --color-accent-soft: rgba(228, 214, 221, 0.68);
+  --color-sage: #71877d;
+  --color-sage-soft: rgba(226, 234, 229, 0.76);
+  --color-warning: #8d756f;
+  --color-warning-soft: rgba(241, 232, 230, 0.78);
+  --color-danger: #986b78;
+  --color-danger-soft: rgba(244, 229, 233, 0.84);
+  --product-line: rgba(255, 255, 255, 0.58);
+  --product-line-strong: rgba(132, 114, 129, 0.2);
+  --product-surface:
+    radial-gradient(circle at 14% 16%, rgba(255, 255, 255, 0.34), transparent 32%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.58), rgba(247, 241, 246, 0.34) 48%, rgba(234, 239, 242, 0.28) 100%);
+  --product-surface-soft:
+    radial-gradient(circle at 16% 18%, rgba(255, 255, 255, 0.28), transparent 34%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.4), rgba(247, 241, 246, 0.22) 48%, rgba(234, 239, 242, 0.2) 100%);
+  --product-control:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.74), rgba(248, 243, 247, 0.54) 48%, rgba(236, 241, 244, 0.42) 100%);
+  --product-control-soft:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.5), rgba(248, 243, 247, 0.32) 48%, rgba(236, 241, 244, 0.26) 100%);
+  --product-accent:
+    linear-gradient(135deg, rgba(167, 119, 134, 0.94) 0%, rgba(137, 112, 133, 0.94) 58%, rgba(113, 135, 125, 0.92) 100%);
+  --product-shadow: 0 18px 42px rgba(92, 76, 91, 0.09), 0 6px 18px rgba(92, 76, 91, 0.05);
+  --product-shadow-lifted: 0 24px 58px rgba(92, 76, 91, 0.13), 0 8px 22px rgba(92, 76, 91, 0.06);
+  --product-inset: inset 0 1px 0 rgba(255, 255, 255, 0.34);
+  --product-blur: blur(18px) saturate(108%);
+  --space-screen: var(--space-5);
+  --space-card: var(--space-5);
+  --space-card-mobile: 18px;
+  --radius-pill: 999px;
+}
+
+body {
+  background: var(--color-bg);
+}
+
+.app-shell {
+  padding-bottom: 128px;
+}
+
+.client-portal,
+.admin-portal,
+.survey-layout,
+.admin-dashboard-stack,
+.admin-screen-stack,
+.requests-stack,
+.settings-list,
+.window-form,
+.window-list,
+.client-card-grid,
+.calendar-board {
+  gap: var(--space-screen);
+}
+
+.panel,
+.client-screen-header,
+.admin-screen-header,
+.admin-topbar,
+.client-home-entry,
+.request-form,
+.summary-panel,
+.calendar-panel,
+.settings-panel,
+.client-card,
+.client-filters,
+.admin-preview-panel,
+.client-focus-panel,
+.client-profile-card,
+.client-empty-state-panel,
+.client-status-panel,
+.survey-panel {
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-lg);
+  background: var(--product-surface);
+  box-shadow: var(--product-shadow);
+  backdrop-filter: var(--product-blur);
+}
+
+.panel::after {
+  opacity: 0.55;
+}
+
+.request-form,
+.request-card,
+.calendar-panel,
+.summary-panel,
+.settings-panel,
+.client-card,
+.admin-preview-panel,
+.client-screen-header,
+.admin-screen-header,
+.client-focus-panel,
+.client-profile-card,
+.client-empty-state-panel,
+.client-status-panel,
+.survey-panel {
+  padding: var(--space-card);
+}
+
+.client-home-entry {
+  background:
+    radial-gradient(circle at 16% 18%, rgba(218, 166, 181, 0.2), transparent 34%),
+    radial-gradient(circle at 84% 18%, rgba(164, 184, 189, 0.18), transparent 34%),
+    linear-gradient(145deg, rgba(255, 252, 254, 0.74), rgba(241, 235, 242, 0.58));
+}
+
+.client-home-entry.needs-confirmation,
+.client-home-entry.is-boarding-pass,
+.admin-today-hero {
+  background:
+    radial-gradient(circle at 16% 18%, rgba(218, 166, 181, 0.18), transparent 34%),
+    radial-gradient(circle at 84% 18%, rgba(164, 184, 189, 0.16), transparent 34%),
+    linear-gradient(145deg, rgba(255, 252, 254, 0.68), rgba(241, 235, 242, 0.52));
+}
+
+.admin-focus-card {
+  padding: var(--space-card);
+}
+
+.admin-dashboard-grid,
+.admin-today-grid,
+.content-grid,
+.settings-layout,
+.client-home-grid,
+.client-profile-grid {
+  gap: var(--space-screen);
+}
+
+.section-title,
+.section-inline-title,
+.settings-item-header,
+.card-header,
+.booking-subtitle-row,
+.booking-calendar-header {
+  gap: 12px;
+}
+
+.section-title {
+  margin-bottom: 18px;
+}
+
+.section-title p,
+.admin-screen-header p,
+.client-screen-header p,
+.admin-hero-status,
+.settings-meta,
+.hint,
+.field-hint,
+.calendar-hint,
+.slot-hint,
+.client-focus-panel p,
+.client-profile-card p,
+.client-empty-state-panel p,
+.client-status-panel p {
+  color: var(--color-muted);
+}
+
+.eyebrow,
+.section-inline-title span,
+.admin-preview-section-title span,
+.info-item-label,
+.admin-focus-stat span,
+.admin-focus-stat small,
+.client-boarding-pass-meta span,
+.summary-badges span {
+  color: var(--color-accent-strong);
+  letter-spacing: 0.06em;
+}
+
+.admin-preview-item,
+.admin-next-appointment-card,
+.admin-money-card,
+.admin-focus-stat,
+.admin-quick-message,
+.admin-warning-item,
+.admin-mini-stat,
+.settings-item,
+.window-item,
+.client-history,
+.client-memory-panel,
+.info-item,
+.booking-inline-card,
+.booking-review-card,
+.booking-upload-card,
+.booking-slot-button,
+.booking-day-pill,
+.service-option-card,
+.booking-pill-button,
+.booking-contact-choice,
+.calendar-slot,
+.admin-review-progress button,
+.admin-review-screen,
+.admin-review-window-list button,
+.admin-review-summary,
+.photo-list span,
+.summary-progress,
+.summary-story,
+.survey-panel .rating-button,
+.empty-state {
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-md);
+  background: var(--product-control-soft);
+  box-shadow: var(--product-inset);
+  backdrop-filter: blur(16px) saturate(104%);
+}
+
+.admin-preview-item,
+.admin-next-appointment-card,
+.admin-quick-message,
+.admin-warning-item,
+.booking-slot-button,
+.booking-day-pill,
+.service-option-card,
+.booking-pill-button,
+.booking-contact-choice,
+.admin-review-window-list button,
+.client-memory-tags button,
+.survey-panel .rating-button {
+  transition:
+    transform var(--motion-quick),
+    border-color var(--motion-quick),
+    box-shadow var(--motion-quick),
+    background var(--motion-quick),
+    color var(--motion-quick);
+}
+
+.admin-preview-item:hover,
+.admin-next-appointment-card:hover,
+.admin-quick-message:hover,
+.admin-warning-item:hover,
+.booking-slot-button:hover,
+.booking-day-pill:hover,
+.service-option-card:hover,
+.booking-pill-button:hover,
+.booking-contact-choice:hover,
+.admin-review-window-list button:hover,
+.client-memory-tags button:hover,
+.survey-panel .rating-button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.76);
+  box-shadow: var(--product-shadow);
+}
+
+.admin-review-progress button.is-active,
+.admin-review-window-list button.active,
+.booking-slot-button.active,
+.booking-day-pill.active,
+.service-option-card.active,
+.booking-pill-button.active,
+.booking-contact-choice.active,
+.client-memory-tags button.active,
+.survey-panel .rating-button.active {
+  color: #fff;
+  border-color: transparent;
+  background: var(--product-accent);
+  box-shadow: 0 16px 32px rgba(122, 94, 119, 0.16);
+}
+
+input,
+select,
+textarea,
+.calendar-toolbar input {
+  min-height: 52px;
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-md);
+  background: var(--product-control);
+  box-shadow: var(--product-inset);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: rgba(142, 111, 122, 0.42);
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(249, 245, 248, 0.68) 48%, rgba(239, 244, 246, 0.56) 100%);
+  box-shadow: 0 0 0 4px rgba(142, 111, 122, 0.12), var(--product-shadow);
+}
+
+.primary-button,
+.secondary-button,
+.success-button,
+.danger-button {
+  min-height: 50px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--product-inset);
+}
+
+.primary-button {
+  background: var(--product-accent);
+  box-shadow: 0 16px 32px rgba(122, 94, 119, 0.18);
+}
+
+.secondary-button {
+  color: var(--color-ink);
+  border: 1px solid var(--product-line);
+  background: var(--product-control-soft);
+}
+
+.success-button {
+  background: linear-gradient(135deg, rgba(113, 135, 125, 0.96), rgba(91, 116, 107, 0.94));
+}
+
+.danger-button {
+  background: linear-gradient(135deg, rgba(152, 107, 120, 0.96), rgba(128, 88, 101, 0.94));
+}
+
+.status,
+.request-id,
+.summary-badges span {
+  min-height: 32px;
+  padding: 7px 12px;
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.52);
+  color: var(--color-accent-strong);
+  box-shadow: var(--product-inset);
+}
+
+.status.new {
+  color: #fff;
+  background: var(--product-accent);
+}
+
+.status.confirmed {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(113, 135, 125, 0.96), rgba(91, 116, 107, 0.94));
+}
+
+.status.declined {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(152, 107, 120, 0.96), rgba(128, 88, 101, 0.94));
+}
+
+.status.waiting_client,
+.status.needs_clarification,
+.calendar-slot.offered,
+.slot-conflict-note {
+  color: var(--color-warning);
+  background: var(--color-warning-soft);
+}
+
+.calendar-slot.available {
+  background: var(--color-sage-soft);
+}
+
+.calendar-slot.reserved {
+  background: var(--color-accent-soft);
+}
+
+.calendar-slot.blocked {
+  color: var(--color-muted);
+  background: rgba(246, 242, 246, 0.72);
+}
+
+.empty-state {
+  min-height: 132px;
+  border-style: dashed;
+  color: var(--color-muted);
+}
+
+.client-text {
+  border-left: 0;
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-md);
+  background: var(--product-control-soft);
+}
+
+.client-bottom-nav,
+.admin-bottom-nav {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.14)),
+    var(--product-surface);
+  box-shadow: 0 18px 44px rgba(92, 76, 91, 0.12);
+  backdrop-filter: blur(20px) saturate(110%);
+}
+
+.client-bottom-nav button.active,
+.admin-bottom-nav button.active {
+  color: var(--color-ink);
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.46);
+  box-shadow: var(--product-inset), 0 8px 18px rgba(92, 76, 91, 0.08);
+}
+
+.admin-bottom-nav-badge,
+.client-bottom-nav-badge {
+  background: var(--color-accent-strong);
+}
+
+.booking-progress-shell,
+.form-navigation {
+  border: 1px solid var(--product-line);
+  border-radius: var(--radius-lg);
+  background: var(--product-surface);
+  box-shadow: var(--product-shadow);
+  backdrop-filter: var(--product-blur);
+}
+
+.admin-focus-stat,
+.admin-mini-stat,
+.info-item,
+.summary-progress,
+.summary-story,
+.client-boarding-pass-meta div {
+  min-height: 0;
+}
+
+.admin-focus-stat strong,
+.admin-money-card strong,
+.admin-next-client strong,
+.admin-next-appointment-card strong {
+  letter-spacing: 0;
+}
+
+@media (max-width: 560px) {
+  .request-form,
+  .request-card,
+  .calendar-panel,
+  .summary-panel,
+  .settings-panel,
+  .client-card,
+  .admin-preview-panel,
+  .client-screen-header,
+  .admin-screen-header,
+  .client-focus-panel,
+  .client-profile-card,
+  .client-empty-state-panel,
+  .client-status-panel,
+  .survey-panel {
+    padding: var(--space-card-mobile);
+  }
+
+  .client-portal,
+  .admin-portal,
+  .survey-layout,
+  .admin-dashboard-stack,
+  .admin-screen-stack,
+  .requests-stack,
+  .settings-list,
+  .window-form,
+  .window-list,
+  .client-card-grid,
+  .calendar-board {
+    gap: 16px;
+  }
+}

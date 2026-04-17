@@ -157,7 +157,7 @@ export function RequestCard({
               </div>
 
               <div className="client-text">
-                <strong>Что хочет красотка</strong>
+                <strong>Что хочет клиентка</strong>
                 <p>{request.desiredResult}</p>
                 {request.comment ? <p>{request.comment}</p> : null}
                 <span>Расчёт: {request.estimatedMinutes} мин</span>
@@ -309,7 +309,7 @@ function AdminRequestReviewFlow({
       <div className="admin-review-screen">
         {step === 0 ? (
           <>
-            <span className="status new">Что хочет красотка</span>
+            <span className="status new">Что хочет клиентка</span>
             <h3>{client?.name ?? "Клиентка"}</h3>
             <div className="client-text">
               <strong>{serviceTitle}</strong>

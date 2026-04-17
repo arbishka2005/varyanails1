@@ -208,7 +208,7 @@ export function SettingsWorkspace({
                 />
                 <span className="checkbox-copy">
                   <strong>Нужен референс</strong>
-                  <small>Чтобы точнее понять вайб дизайна.</small>
+                  <small>Чтобы точнее понять дизайн.</small>
                 </span>
               </label>
             </div>

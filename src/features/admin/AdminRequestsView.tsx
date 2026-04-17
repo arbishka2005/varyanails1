@@ -72,7 +72,7 @@ export function AdminRequestsView({
           </div>
 
           {inboxCount === 0 ? (
-            <div className="empty-state">Пока никто не ждёт. Спокойно, чисто, красиво.</div>
+            <div className="empty-state">Пока никто не ждёт ответа.</div>
           ) : (
             inboxGroups.map((group) =>
               group.requests.length > 0 ? (
@@ -168,7 +168,7 @@ function buildInboxGroups(requests: BookingRequest[], windows: TimeWindow[]): In
     { id: "new", title: "Новенькие", requests: [] },
     { id: "waiting", title: "Ждём клиентку", requests: [] },
     { id: "today", title: "Сегодня красим", requests: [] },
-    { id: "overdue", title: "Упс, просрочено", requests: [] },
+    { id: "overdue", title: "Просрочено", requests: [] },
   ];
   const byId = new Map(groups.map((group) => [group.id, group]));
 
