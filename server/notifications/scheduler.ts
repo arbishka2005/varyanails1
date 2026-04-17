@@ -1,4 +1,4 @@
-﻿import type { Client } from "../../src/types.js";
+import type { Client } from "../../src/types.js";
 import type { Repository } from "../repositories/types.js";
 import {
   buildReminder24hPayload,
@@ -72,8 +72,14 @@ export function startAppointmentScheduler(options: {
           await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
         }
 
-        if (!appointment.surveySentAt && !appointment.surveyRating && endAt < now - HOUR_MS && client?.telegramUserId) {
-          const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.id}`;
+        if (
+          !appointment.surveySentAt &&
+          !appointment.surveyRating &&
+          endAt < now - HOUR_MS &&
+          client?.telegramUserId &&
+          appointment.publicToken
+        ) {
+          const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.publicToken}`;
           await notifyClient(client, buildSurveyPayload(surveyUrl));
           await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
         }

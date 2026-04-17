@@ -1,4 +1,4 @@
-﻿import { config } from "../config.js";
+import { config } from "../config.js";
 import type { Client } from "../../src/types.js";
 import type { NotificationPayload } from "./templates.js";
 

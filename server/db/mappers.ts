@@ -64,6 +64,7 @@ export function toTimeWindow(row: Record<string, unknown>): TimeWindow {
 export function toBookingRequest(row: Record<string, unknown>): BookingRequest {
   return {
     id: String(row.id),
+    publicToken: row.public_token ? String(row.public_token) : undefined,
     clientId: String(row.client_id),
     service: row.service as BookingRequest["service"],
     optionIds: Array.isArray(row.option_ids) ? (row.option_ids as BookingRequest["optionIds"]) : [],
@@ -85,6 +86,7 @@ export function toBookingRequest(row: Record<string, unknown>): BookingRequest {
 export function toAppointment(row: Record<string, unknown>): Appointment {
   return {
     id: String(row.id),
+    publicToken: row.public_token ? String(row.public_token) : undefined,
     requestId: String(row.request_id),
     clientId: String(row.client_id),
     service: row.service as Appointment["service"],

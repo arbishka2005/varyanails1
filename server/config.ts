@@ -8,6 +8,7 @@ export const config = {
   port: Number(process.env.API_PORT ?? 4000),
   corsOrigin: process.env.CORS_ORIGIN ?? "http://127.0.0.1:5173",
   appBaseUrl: process.env.APP_BASE_URL ?? "http://127.0.0.1:5173",
+  appVersion: process.env.APP_VERSION ?? new Date().toISOString().replaceAll(/[-:.TZ]/g, ""),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   masterTelegramIds: (process.env.MASTER_TELEGRAM_IDS ?? "")
     .split(",")

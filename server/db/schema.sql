@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS time_windows (
 
 CREATE TABLE IF NOT EXISTS booking_requests (
   id TEXT PRIMARY KEY,
+  public_token TEXT NOT NULL,
   client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   service TEXT NOT NULL,
   option_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -63,6 +64,7 @@ CREATE TABLE IF NOT EXISTS booking_requests (
 
 CREATE TABLE IF NOT EXISTS appointments (
   id TEXT PRIMARY KEY,
+  public_token TEXT NOT NULL,
   request_id TEXT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
   client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
   service TEXT NOT NULL,
@@ -82,5 +84,7 @@ CREATE TABLE IF NOT EXISTS appointments (
 );
 
 CREATE INDEX IF NOT EXISTS booking_requests_client_id_idx ON booking_requests(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS booking_requests_public_token_idx ON booking_requests(public_token);
 CREATE INDEX IF NOT EXISTS appointments_client_id_idx ON appointments(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS appointments_public_token_idx ON appointments(public_token);
 CREATE INDEX IF NOT EXISTS time_windows_status_idx ON time_windows(status);

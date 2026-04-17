@@ -7,6 +7,10 @@ vvrnailss.ru, www.vvrnailss.ru {
     reverse_proxy api:4000
   }
 
+  handle /launch* {
+    reverse_proxy api:4000
+  }
+
   handle /uploads/* {
     reverse_proxy api:4000
   }
