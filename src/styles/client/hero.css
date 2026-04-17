@@ -1,0 +1,100 @@
+.client-hero {
+  position: relative;
+  min-height: 360px;
+  overflow: hidden;
+  align-items: stretch;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: var(--radius-lg);
+  padding: 40px 54px;
+  background:
+    radial-gradient(circle at 14% 20%, rgba(216, 167, 177, 0.12), transparent 30%),
+    radial-gradient(circle at 82% 18%, rgba(174, 190, 209, 0.1), transparent 32%),
+    radial-gradient(circle at 66% 82%, rgba(226, 212, 200, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08) 100%),
+    var(--gradient-beauty);
+  box-shadow: var(--shadow-soft);
+  backdrop-filter: blur(18px) saturate(104%);
+}
+
+.client-hero::before,
+.client-hero::after {
+  content: "✦";
+  position: absolute;
+  color: rgba(155, 128, 165, 0.18);
+  font-size: 22px;
+  line-height: 1;
+  text-shadow: 0 0 18px rgba(255, 255, 255, 0.8);
+}
+
+.client-hero::before {
+  top: 28px;
+  right: 28px;
+}
+
+.client-hero::after {
+  bottom: 28px;
+  left: 28px;
+  font-size: 18px;
+}
+
+.hero-copy {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 16px;
+  align-content: center;
+  max-width: 640px;
+}
+
+.hero-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.hero-stat {
+  display: grid;
+  gap: 6px;
+  padding: 14px 15px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: 8px;
+  background: var(--gradient-control-subtle);
+  backdrop-filter: blur(18px);
+}
+
+.hero-stat span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: var(--font-weight-strong);
+  text-transform: uppercase;
+}
+
+.hero-stat strong {
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.hero-text {
+  max-width: 620px;
+  margin: 14px 0 0;
+  color: var(--color-muted);
+  font-size: 15px;
+  line-height: 1.72;
+}
+
+.hero-visual {
+  position: relative;
+  flex: 0 1 380px;
+  min-height: 280px;
+}
+
+.hero-visual img {
+  width: 100%;
+  height: 100%;
+  min-height: 280px;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  box-shadow: var(--shadow-floating);
+  filter: saturate(0.92) contrast(0.96) brightness(1.02);
+}

@@ -1,0 +1,207 @@
+.clients-layout {
+  grid-template-columns: 1fr;
+}
+
+.client-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.client-card-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.client-filters {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(220px, 0.8fr) minmax(150px, auto);
+  gap: 14px;
+  align-items: end;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.38), transparent 34%),
+    linear-gradient(156deg, rgba(255, 255, 255, 0.64), rgba(247, 242, 237, 0.3) 46%, rgba(235, 239, 244, 0.24) 100%);
+}
+
+.filter-summary {
+  display: grid;
+  gap: 8px;
+  min-width: 150px;
+}
+
+.filter-summary span {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: var(--font-weight-strong);
+}
+
+.client-card-grid > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.client-card {
+  display: grid;
+  gap: 16px;
+  background:
+    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.6), rgba(255, 246, 250, 0.32));
+}
+
+.admin-overview-grid-compact {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.client-card textarea {
+  min-height: 88px;
+}
+
+.client-memory-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  border-radius: var(--radius-lg);
+  background:
+    radial-gradient(circle at 14% 10%, rgba(216, 167, 177, 0.16), transparent 32%),
+    radial-gradient(circle at 90% 10%, rgba(174, 190, 209, 0.14), transparent 30%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(247, 242, 237, 0.24));
+  box-shadow:
+    0 16px 34px rgba(112, 97, 122, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.client-memory-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-memory-tags button {
+  min-height: 36px;
+  padding: 8px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: var(--radius-pill);
+  background:
+    radial-gradient(circle at top left, rgba(255, 255, 255, 0.28), transparent 42%),
+    rgba(255, 255, 255, 0.2);
+  color: var(--color-soft);
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
+  transition:
+    transform var(--motion-soft),
+    background var(--motion-soft),
+    border-color var(--motion-soft),
+    color var(--motion-soft);
+}
+
+.client-memory-tags button:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.74);
+}
+
+.client-memory-tags button.active {
+  border-color: rgba(196, 138, 150, 0.34);
+  background:
+    radial-gradient(circle at 16% 14%, rgba(255, 255, 255, 0.42), transparent 42%),
+    linear-gradient(135deg, rgba(216, 167, 177, 0.24), rgba(174, 190, 209, 0.18));
+  color: var(--color-text);
+}
+
+.client-history {
+  display: grid;
+  gap: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.56);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  background: linear-gradient(156deg, rgba(255, 255, 255, 0.5), rgba(247, 242, 237, 0.24) 46%, rgba(235, 239, 244, 0.18) 100%);
+}
+
+.client-history strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-history p {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.history-item {
+  display: grid;
+  gap: 3px;
+  border-top: 1px solid var(--color-line);
+  padding-top: 10px;
+}
+
+.history-item-with-action {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.history-item-copy {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.history-item-button {
+  min-height: 42px;
+  padding: 10px 12px;
+  white-space: normal;
+}
+
+.history-item span {
+  font-weight: var(--font-weight-strong);
+  line-height: 1.4;
+}
+
+.history-item small,
+.photo-list span {
+  color: var(--color-muted);
+}
+
+.photo-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.photo-list span {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.76);
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+.request-photo-section {
+  display: grid;
+  gap: 12px;
+}
+
+.section-inline-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.section-inline-title strong {
+  font-size: 15px;
+}
+
+.section-inline-title span {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+

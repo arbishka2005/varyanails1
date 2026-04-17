@@ -1,0 +1,299 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Manrope:wght@500;600;700;800&display=swap");
+
+:root {
+  --color-ink: #2f2833;
+  --color-text: rgba(47, 42, 45, 0.88);
+  --color-muted: rgba(92, 83, 88, 0.85);
+  --color-soft: rgba(140, 130, 136, 0.8);
+  --color-bg: #f3ede7;
+  --color-surface: rgba(255, 252, 249, 0.34);
+  --color-surface-strong: rgba(251, 247, 244, 0.8);
+  --color-line: rgba(255, 255, 255, 0.34);
+  --color-line-strong: rgba(106, 93, 117, 0.18);
+  --color-accent: #857584;
+  --color-accent-strong: #625865;
+  --color-accent-soft: rgba(226, 220, 228, 0.58);
+  --color-peach-soft: rgba(212, 180, 159, 0.46);
+  --color-lavender-soft: rgba(190, 182, 209, 0.52);
+  --color-sky-soft: rgba(187, 198, 211, 0.5);
+  --color-mint-soft: rgba(189, 204, 193, 0.48);
+  --color-butter-soft: rgba(220, 210, 191, 0.34);
+  --color-sage: #75857d;
+  --color-sage-soft: rgba(223, 230, 225, 0.72);
+  --color-warning: #9e7d6d;
+  --color-warning-soft: rgba(244, 232, 222, 0.8);
+  --color-danger: #9b6d78;
+  --color-danger-soft: rgba(244, 229, 233, 0.82);
+  --gradient-beauty:
+    radial-gradient(circle at 18% 22%, rgba(216, 167, 177, 0.18) 0%, transparent 38%),
+    radial-gradient(circle at 78% 16%, rgba(174, 190, 209, 0.16) 0%, transparent 38%),
+    radial-gradient(circle at 52% 76%, rgba(226, 212, 200, 0.18) 0%, transparent 46%),
+    radial-gradient(circle at 10% 88%, rgba(184, 178, 200, 0.1) 0%, transparent 32%),
+    linear-gradient(180deg, #f6f2f4 0%, #f3edf0 50%, #eee7ec 100%);
+  --gradient-accent: linear-gradient(
+    135deg,
+    rgba(216, 167, 177, 0.82) 0%,
+    rgba(196, 138, 150, 0.75) 30%,
+    rgba(184, 178, 200, 0.8) 65%,
+    rgba(174, 190, 209, 0.8) 100%
+  );
+  --gradient-accent-soft: linear-gradient(156deg, rgba(183, 143, 126, 0.32), rgba(143, 116, 141, 0.24) 48%, rgba(115, 136, 151, 0.22) 100%);
+  --gradient-luxe: linear-gradient(160deg, rgba(255, 255, 255, 0.46), rgba(244, 237, 232, 0.24) 44%, rgba(225, 230, 236, 0.18) 100%);
+  --gradient-card: linear-gradient(160deg, rgba(255, 255, 255, 0.54), rgba(246, 239, 234, 0.3) 42%, rgba(226, 232, 238, 0.24) 100%);
+  --gradient-control: linear-gradient(160deg, rgba(255, 255, 255, 0.64), rgba(245, 239, 234, 0.44) 42%, rgba(229, 235, 241, 0.38) 100%);
+  --gradient-control-subtle: linear-gradient(160deg, rgba(255, 255, 255, 0.4), rgba(243, 236, 231, 0.22) 44%, rgba(224, 230, 236, 0.18) 100%);
+  --glow-pink: 0 0 0 1px rgba(255, 255, 255, 0.22), 0 30px 84px rgba(88, 76, 95, 0.12);
+  --shadow-soft: 0 32px 96px rgba(83, 71, 79, 0.1);
+  --shadow-card: 0 16px 40px rgba(111, 92, 104, 0.08), 0 6px 18px rgba(111, 92, 104, 0.05);
+  --shadow-floating: 0 30px 74px rgba(70, 59, 79, 0.14);
+  --motion-quick: 280ms cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-soft: 420ms cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-slow: 720ms cubic-bezier(0.16, 1, 0.3, 1);
+  --radius-sm: 8px;
+  --radius-md: 8px;
+  --radius-lg: 8px;
+  --font-body: "Manrope", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Cormorant Garamond", Georgia, serif;
+  --font-weight-regular: 500;
+  --font-weight-medium: 600;
+  --font-weight-strong: 700;
+  --font-weight-heavy: 800;
+  --space-1: 6px;
+  --space-2: 10px;
+  --space-3: 14px;
+  --space-4: 18px;
+  --space-5: 24px;
+  --space-6: 32px;
+  color: var(--color-ink);
+  background: var(--color-bg);
+  font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  max-width: 100%;
+  overflow-x: clip;
+}
+
+:where(img, svg, canvas, video) {
+  max-width: 100%;
+}
+
+.app-shell,
+:where(
+  .panel,
+  .topbar > *,
+  .content-grid > *,
+  .settings-layout > *,
+  .clients-layout > *,
+  .client-home-grid > *,
+  .client-profile-grid > *,
+  .client-service-preview-grid > *,
+  .client-filters > *,
+  .card-header > *,
+  .settings-item-header > *,
+  .history-item-with-action > *,
+  .section-inline-title > *,
+  .slot-header > *,
+  .window-item > *,
+  .client-screen-header > *,
+  .form-navigation > *,
+  .action-row > *,
+  .summary-badges > *,
+  .client-bottom-nav > *,
+  .admin-bottom-nav > *,
+  .info-grid > *,
+  .photo-gallery > *,
+  .service-picker > *,
+  .booking-slot-grid > *,
+  .field-row > *,
+  .settings-options-grid > *,
+  .admin-overview-grid > *,
+  .admin-mini-stats > *,
+  .admin-screen-header > *,
+  .admin-preview-list > *
+) {
+  min-width: 0;
+}
+
+.app-shell :where(h1, h2, h3, p, strong, small, label, button, .hint, .field-hint, .success-text, .error-text) {
+  max-inline-size: 100%;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.app-shell :where(h1, h2, h3, .request-id, .status, .summary-badges span) {
+  text-wrap: balance;
+}
+
+.app-shell :where(p, small, .hint, .field-hint, .success-text, .error-text, .settings-meta, .calendar-hint, .slot-hint, .notice-details) {
+  text-wrap: pretty;
+}
+
+.app-shell :where(
+  .client-service-preview-card span,
+  .client-service-preview-card small,
+  .status,
+  .request-id,
+  .summary-badges span,
+  .info-item-label-text,
+  .history-item span,
+  .history-item small,
+  .window-item strong,
+  .window-item span,
+  .slot-body,
+  .slot-hint,
+  .photo-list span,
+  .photo-thumb-meta strong,
+  .photo-thumb-meta small,
+  .client-text span,
+  .booking-day-pill span,
+  .booking-day-pill small,
+  .client-bottom-nav button > span:last-child,
+  .admin-preview-item strong,
+  .admin-preview-item small,
+  .admin-bottom-nav button > span:last-child,
+  .admin-mini-stat span,
+  .admin-mini-stat strong
+) {
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+body {
+  position: relative;
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--gradient-beauty);
+}
+
+body::before,
+body::after {
+  content: "";
+  position: fixed;
+  inset: auto;
+  width: 42vw;
+  height: 42vw;
+  min-width: 240px;
+  min-height: 240px;
+  max-width: 560px;
+  max-height: 560px;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(80px);
+  z-index: 0;
+  animation: ambient-float 30s ease-in-out infinite alternate;
+}
+
+body::before {
+  top: -10vw;
+  left: -8vw;
+  background: radial-gradient(circle, rgba(216, 167, 177, 0.22) 0%, rgba(216, 167, 177, 0) 72%);
+  opacity: 0.18;
+}
+
+body::after {
+  right: -10vw;
+  bottom: -8vw;
+  background: radial-gradient(circle, rgba(174, 190, 209, 0.24) 0%, rgba(174, 190, 209, 0) 74%);
+  opacity: 0.4;
+  animation-duration: 36s;
+}
+
+@keyframes ambient-float {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(1.25vw, -0.8vw, 0) scale(1.03);
+  }
+}
+
+@keyframes soft-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.996);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes glow-sweep {
+  0% {
+    transform: translateX(-130%) rotate(10deg);
+    opacity: 0;
+  }
+  35% {
+    opacity: 0.12;
+  }
+  100% {
+    transform: translateX(160%) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.app-shell {
+  position: relative;
+  z-index: 1;
+  width: min(1220px, calc(100% - 32px));
+  min-height: var(--tg-viewport-height, auto);
+  margin: 0 auto;
+  padding: 26px 0 88px;
+}
+
+.app-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.45), rgba(255, 255, 255, 0.45)),
+    repeating-linear-gradient(
+      0deg,
+      rgba(72, 61, 69, 0.08) 0,
+      rgba(72, 61, 69, 0.08) 1px,
+      transparent 1px,
+      transparent 3px
+    ),
+    repeating-linear-gradient(
+      90deg,
+      rgba(72, 61, 69, 0.05) 0,
+      rgba(72, 61, 69, 0.05) 1px,
+      transparent 1px,
+      transparent 4px
+    );
+  opacity: 0.012;
+  z-index: -1;
+}
+
+

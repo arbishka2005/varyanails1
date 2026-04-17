@@ -62,6 +62,7 @@ export type ServicePreset = {
 
 export type BookingRequest = {
   id: string;
+  publicToken?: string;
   clientId: string;
   service: ServiceKind;
   optionIds: ServiceOptionKind[];
@@ -81,6 +82,7 @@ export type BookingRequest = {
 
 export type Appointment = {
   id: string;
+  publicToken?: string;
   requestId: string;
   clientId: string;
   service: ServiceKind;
@@ -106,6 +108,13 @@ export type AppSnapshot = {
   windows: TimeWindow[];
   services: ServicePreset[];
   serviceOptions: ServiceOption[];
+};
+
+export type PublicBookingConfig = Pick<AppSnapshot, "services" | "windows" | "serviceOptions">;
+
+export type PublicBookingAccess = {
+  requestId: string;
+  publicToken: string;
 };
 
 export type PublicBookingRequest = {

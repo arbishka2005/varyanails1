@@ -1,0 +1,98 @@
+.primary-button,
+.secondary-button,
+.success-button,
+.danger-button {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 50px;
+  border-radius: var(--radius-md);
+  padding: 13px 20px;
+  font-weight: var(--font-weight-strong);
+  line-height: 1.2;
+  text-align: center;
+  transition: transform var(--motion-quick), box-shadow var(--motion-quick), background var(--motion-quick),
+    border-color var(--motion-quick), filter var(--motion-quick);
+}
+
+.primary-button svg,
+.secondary-button svg,
+.success-button svg,
+.danger-button svg {
+  flex: 0 0 auto;
+}
+
+.primary-button::after,
+.secondary-button::after,
+.success-button::after,
+.danger-button::after {
+  content: "";
+  position: absolute;
+  inset: -30% auto -30% -20%;
+  width: 38%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.48), transparent);
+  transform: translateX(-180%) rotate(14deg);
+  pointer-events: none;
+}
+
+.primary-button:hover:not(:disabled),
+.secondary-button:hover:not(:disabled),
+.success-button:hover:not(:disabled),
+.danger-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: saturate(1.015);
+}
+
+.primary-button:hover:not(:disabled)::after,
+.secondary-button:hover:not(:disabled)::after,
+.success-button:hover:not(:disabled)::after,
+.danger-button:hover:not(:disabled)::after {
+  animation: glow-sweep 1.8s ease;
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.success-button:active:not(:disabled),
+.danger-button:active:not(:disabled) {
+  transform: translateY(0) scale(0.995);
+}
+
+.primary-button {
+  color: #fff;
+  background: var(--gradient-accent);
+  box-shadow: 0 18px 34px rgba(118, 101, 128, 0.22);
+}
+
+.secondary-button {
+  color: var(--color-ink);
+  background: var(--gradient-control-subtle);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+}
+
+.success-button {
+  color: #fff;
+  background: linear-gradient(135deg, #8ca596 0%, #73887b 100%);
+}
+
+.danger-button {
+  color: #fff;
+  background: linear-gradient(135deg, #bf8279 0%, #9f6c7a 100%);
+}
+
+.hint {
+  color: var(--color-soft);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.error-text {
+  color: var(--color-danger);
+  font-size: 13px;
+  line-height: 1.45;
+}
+

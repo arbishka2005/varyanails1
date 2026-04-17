@@ -1,0 +1,402 @@
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@media (max-width: 860px) {
+  .app-shell {
+    width: min(100% - 20px, 760px);
+    padding-top: 14px;
+    padding-bottom: 116px;
+  }
+
+  .request-form {
+    padding-bottom: 136px;
+  }
+
+  .topbar,
+  .content-grid,
+  .settings-layout,
+  .clients-layout,
+  .admin-dashboard-grid,
+  .admin-focus-card,
+  .admin-overview-grid,
+  .client-home-grid,
+  .client-profile-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar {
+    display: grid;
+  }
+
+  .settings-item-header,
+  .settings-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .settings-options-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-hero {
+    min-height: 0;
+    padding: 24px 20px;
+  }
+
+  .client-screen-header {
+    display: grid;
+  }
+
+  .client-service-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-home-entry {
+    min-height: min(580px, calc(100vh - 150px));
+  }
+
+  .client-home-entry-main h1 {
+    max-width: 10ch;
+  }
+
+  .admin-focus-stats {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .admin-inbox-card-summary {
+    grid-template-columns: 1fr auto;
+  }
+
+  .admin-inbox-card-summary .status,
+  .admin-inbox-card-summary .request-id {
+    grid-column: 1 / -1;
+  }
+
+  .admin-inbox-primary-action {
+    justify-content: stretch;
+  }
+
+  .admin-inbox-primary-action > button {
+    width: 100%;
+  }
+
+  .admin-review-progress {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-review-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .hero-visual {
+    min-height: 220px;
+  }
+
+  .hero-visual img {
+    min-height: 220px;
+  }
+
+  .admin-topbar {
+    padding: 20px;
+  }
+
+  .admin-topbar h1 {
+    font-size: 42px;
+  }
+
+  .field-row,
+  .info-grid,
+  .booking-slot-grid,
+  .service-picker,
+  .booking-progress-list,
+  .booking-pill-group-split,
+  .format-answer-grid,
+  .format-service-picker,
+  .booking-upload-grid,
+  .booking-review-grid,
+  .booking-summary-grid,
+  .client-filters,
+  .client-card-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .client-bottom-nav {
+    width: calc(100% - 16px);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    padding: 6px;
+  }
+
+  .admin-bottom-nav {
+    left: 50%;
+    right: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    transform: translateX(-50%);
+    gap: 6px;
+    width: calc(100% - 16px);
+    padding: 6px;
+  }
+
+  .admin-bottom-nav button {
+    min-height: 54px;
+    padding: 8px 4px;
+    font-size: 9px;
+    font-weight: var(--font-weight-strong);
+    line-height: 1.12;
+  }
+
+  .client-bottom-nav button {
+    min-height: 54px;
+    padding: 8px 6px;
+    font-size: 10px;
+    line-height: 1.15;
+  }
+
+  .admin-screen-header,
+  .client-screen-header {
+    display: grid;
+  }
+
+  .history-item-with-action {
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .history-item-button {
+    width: 100%;
+  }
+
+  .window-item {
+    grid-template-columns: 1fr;
+  }
+
+  .card-header {
+    align-items: stretch;
+  }
+
+  .photo-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .photo-lightbox {
+    padding: 14px;
+  }
+
+  .photo-lightbox-card {
+    padding: 14px;
+  }
+
+  .photo-lightbox-media {
+    min-height: min(62vh, 520px);
+  }
+
+  .form-navigation {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: max(12px, env(safe-area-inset-bottom));
+    z-index: 40;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+    background: linear-gradient(156deg, rgba(255, 255, 255, 0.8), rgba(247, 242, 237, 0.54) 46%, rgba(235, 239, 244, 0.42) 100%);
+    box-shadow: 0 20px 42px rgba(112, 97, 122, 0.18);
+    backdrop-filter: blur(24px) saturate(118%);
+  }
+
+  .form-navigation.single-action {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-panel,
+  .calendar-panel {
+    position: static;
+  }
+
+  .summary-panel {
+    display: none;
+  }
+
+  h1 {
+    font-size: 42px;
+  }
+
+  h2 {
+    font-size: 24px;
+  }
+
+  h3 {
+    font-size: 22px;
+  }
+
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(100% - 14px, 520px);
+  }
+
+  .client-hero,
+  .panel,
+  .admin-topbar {
+    border-radius: var(--radius-md);
+  }
+
+  .calendar-custom-button {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .booking-day-pill {
+    min-width: 112px;
+  }
+
+  .request-form,
+  .request-card,
+  .calendar-panel,
+  .summary-panel,
+  .settings-panel,
+  .client-card,
+  .admin-preview-panel {
+    padding: 18px 16px;
+  }
+
+  .client-screen-header,
+  .client-service-preview-card,
+  .client-services-preview,
+  .client-focus-panel,
+  .client-profile-card,
+  .client-empty-state-panel,
+  .client-status-panel {
+    padding: 20px 18px;
+  }
+
+  .client-screen-header p,
+  .section-title p,
+  .client-focus-panel p,
+  .client-profile-card p,
+  .client-empty-state-panel p,
+  .client-status-panel p,
+  .admin-focus-note,
+  .admin-hero-status {
+    max-width: 100%;
+  }
+
+  .admin-focus-card {
+    padding: 20px 18px;
+  }
+
+  .admin-focus-number {
+    font-size: 64px;
+  }
+
+  .admin-focus-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-focus-stat {
+    min-height: 0;
+  }
+
+  .request-form {
+    padding-bottom: 146px;
+  }
+
+  .format-question-shell {
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .format-question-topline {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .topbar {
+    gap: 16px;
+  }
+
+  .admin-screen-header {
+    padding: 18px 16px;
+  }
+
+  .admin-topbar h1 {
+    font-size: 36px;
+  }
+
+  h1 {
+    font-size: 34px;
+    line-height: 1.08;
+  }
+
+  h2 {
+    font-size: 21px;
+  }
+
+  h3 {
+    font-size: 19px;
+  }
+
+  .hero-text {
+    font-size: 15px;
+    line-height: 1.65;
+  }
+
+  .booking-progress-item {
+    min-height: 68px;
+  }
+
+  .service-option-card {
+    min-height: 148px;
+  }
+
+  .summary-panel {
+    gap: 14px;
+  }
+
+  .hero-meta {
+    grid-template-columns: 1fr;
+  }
+
+  .summary-badges {
+    gap: 6px;
+  }
+
+  .form-navigation {
+    left: 8px;
+    right: 8px;
+    bottom: max(8px, env(safe-area-inset-bottom));
+    grid-template-columns: 0.9fr 1.1fr;
+  }
+
+  .form-navigation.single-action {
+    grid-template-columns: 1fr;
+  }
+
+  .photo-gallery {
+    grid-template-columns: 1fr;
+  }
+
+  .client-bottom-nav button {
+    font-size: 9px;
+    line-height: 1.15;
+  }
+
+  .admin-bottom-nav button {
+    font-size: 8px;
+    line-height: 1.08;
+  }
+}
+
+
+
