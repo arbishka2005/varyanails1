@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from "react";
-import { AlertCircle, Clock3, MessageCircle, MoveRight, Wallet } from "lucide-react";
+import { AlertCircle, Clock3, MessageCircle, Sparkles, Wallet } from "lucide-react";
 import {
   contactLabels,
   formatDateTime,
@@ -241,7 +241,7 @@ export function AdminDashboard({
         <article className="panel admin-preview-panel">
           <div className="section-inline-title">
             <strong>На заметку</strong>
-            <span>{warnings.length > 0 ? "проверь" : "всё ровно"}</span>
+            <span>{warnings.length > 0 ? "проверь" : "спокойно"}</span>
           </div>
 
           <div className="admin-warning-list">
@@ -255,7 +255,7 @@ export function AdminDashboard({
                     <strong>{warning.title}</strong>
                     <small>{warning.detail}</small>
                   </span>
-                  <MoveRight size={16} />
+                  <Sparkles size={16} />
                 </button>
               ))
             )}

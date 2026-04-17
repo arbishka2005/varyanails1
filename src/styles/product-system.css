@@ -5,40 +5,81 @@
 */
 
 :root {
-  --color-ink: #302b31;
-  --color-text: rgba(48, 43, 49, 0.9);
-  --color-muted: rgba(82, 76, 82, 0.72);
-  --color-soft: rgba(112, 104, 112, 0.72);
-  --color-bg: #f7f3f6;
-  --color-accent: #9b7382;
-  --color-accent-strong: #6f5964;
-  --color-accent-soft: rgba(236, 224, 230, 0.82);
-  --color-sage: #6f857d;
-  --color-sage-soft: rgba(230, 237, 233, 0.82);
-  --color-warning: #8b7069;
-  --color-warning-soft: rgba(244, 236, 233, 0.82);
-  --color-danger: #976878;
-  --color-danger-soft: rgba(245, 229, 235, 0.86);
-  --product-line: rgba(107, 91, 103, 0.1);
-  --product-line-strong: rgba(107, 91, 103, 0.18);
-  --product-surface: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(252, 249, 252, 0.66));
-  --product-surface-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(252, 249, 252, 0.48));
-  --product-control: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(250, 247, 250, 0.76));
-  --product-control-soft: linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(251, 248, 251, 0.56));
-  --product-accent: #8f6a78;
-  --product-accent-hover: #7d5f6b;
-  --product-shadow: 0 12px 28px rgba(73, 60, 70, 0.07);
-  --product-shadow-lifted: 0 16px 34px rgba(73, 60, 70, 0.1);
-  --product-inset: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-  --product-blur: blur(12px) saturate(104%);
+  --color-ink: #34303a;
+  --color-text: rgba(52, 48, 58, 0.9);
+  --color-muted: rgba(92, 83, 96, 0.72);
+  --color-soft: rgba(117, 108, 122, 0.74);
+  --color-bg: #f6f2f4;
+  --color-accent: #cc8288;
+  --color-accent-strong: #5c3358;
+  --color-accent-soft: rgba(239, 122, 173, 0.15);
+  --color-sage: #738981;
+  --color-sage-soft: rgba(230, 239, 235, 0.74);
+  --color-warning: #8d6875;
+  --color-warning-soft: rgba(244, 231, 238, 0.82);
+  --color-danger: #9a5f76;
+  --color-danger-soft: rgba(245, 225, 234, 0.88);
+  --product-line: rgba(255, 255, 255, 0.48);
+  --product-line-strong: rgba(92, 51, 88, 0.18);
+  --product-surface:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(248, 244, 250, 0.5) 48%, rgba(232, 237, 248, 0.38)),
+    radial-gradient(circle at 18% 16%, rgba(239, 122, 173, 0.12), transparent 40%),
+    radial-gradient(circle at 88% 22%, rgba(168, 178, 203, 0.18), transparent 44%);
+  --product-surface-soft:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.64), rgba(249, 244, 250, 0.42) 52%, rgba(230, 221, 242, 0.22)),
+    radial-gradient(circle at 10% 10%, rgba(255, 242, 222, 0.24), transparent 36%),
+    radial-gradient(circle at 100% 0%, rgba(168, 178, 203, 0.14), transparent 42%);
+  --product-control:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.82), rgba(250, 245, 251, 0.58) 48%, rgba(232, 237, 248, 0.42)),
+    radial-gradient(circle at 20% 0%, rgba(239, 122, 173, 0.08), transparent 38%);
+  --product-control-soft:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.68), rgba(250, 245, 251, 0.44) 48%, rgba(232, 237, 248, 0.32)),
+    radial-gradient(circle at 100% 0%, rgba(168, 178, 203, 0.1), transparent 42%);
+  --product-accent:
+    linear-gradient(132deg, rgba(239, 122, 173, 0.68) 0%, rgba(196, 138, 169, 0.7) 43%, rgba(168, 178, 203, 0.76) 100%),
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.6), transparent 36%);
+  --product-accent-hover:
+    linear-gradient(132deg, rgba(239, 122, 173, 0.78) 0%, rgba(204, 130, 136, 0.74) 43%, rgba(168, 178, 203, 0.82) 100%),
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.62), transparent 36%);
+  --product-shadow: 0 18px 48px rgba(86, 72, 96, 0.08), 0 4px 14px rgba(86, 72, 96, 0.035);
+  --product-shadow-lifted: 0 24px 62px rgba(86, 72, 96, 0.11), 0 8px 20px rgba(86, 72, 96, 0.055);
+  --product-glow: 0 0 0 1px rgba(255, 255, 255, 0.58), 0 22px 54px rgba(204, 130, 136, 0.11), 0 12px 34px rgba(168, 178, 203, 0.1);
+  --product-inset: inset 0 1px 0 rgba(255, 255, 255, 0.78), inset 0 -18px 34px rgba(92, 51, 88, 0.04);
+  --product-blur: blur(18px) saturate(116%);
   --space-screen: var(--space-5);
   --space-card: var(--space-5);
   --space-card-mobile: 18px;
-  --radius-pill: 999px;
+  --radius-pill: var(--radius-md);
 }
 
 body {
-  background: var(--color-bg);
+  background:
+    radial-gradient(circle at 9% 10%, rgba(239, 122, 173, 0.12), transparent 34%),
+    radial-gradient(circle at 82% 6%, rgba(168, 178, 203, 0.2), transparent 40%),
+    radial-gradient(circle at 90% 70%, rgba(239, 231, 180, 0.16), transparent 36%),
+    linear-gradient(135deg, #f6f2f4 0%, #f7f4f7 46%, #e6dde2 100%);
+}
+
+body::before {
+  background:
+    radial-gradient(circle at 20% 20%, rgba(239, 122, 173, 0.18), transparent 58%),
+    radial-gradient(circle at 82% 12%, rgba(168, 178, 203, 0.16), transparent 54%);
+  opacity: 0.26;
+}
+
+body::after {
+  background:
+    radial-gradient(circle at 20% 82%, rgba(98, 47, 95, 0.08), transparent 52%),
+    radial-gradient(circle at 74% 20%, rgba(232, 221, 210, 0.2), transparent 56%);
+  opacity: 0.32;
+}
+
+.app-shell::before {
+  background:
+    linear-gradient(125deg, rgba(255, 255, 255, 0.22), transparent 42%, rgba(255, 255, 255, 0.16) 68%, transparent),
+    radial-gradient(circle at 1px 1px, rgba(92, 83, 96, 0.13) 0, rgba(92, 83, 96, 0.13) 0.7px, transparent 1.1px);
+  background-size: auto, 7px 7px;
+  opacity: 0.045;
 }
 
 .app-shell {
@@ -79,13 +120,56 @@ body {
   border: 1px solid var(--product-line);
   border-radius: var(--radius-lg);
   background: var(--product-surface);
-  box-shadow: var(--product-shadow);
+  box-shadow: var(--product-shadow), var(--product-inset);
   backdrop-filter: var(--product-blur);
 }
 
-.panel::after,
+.panel,
+.client-home-entry,
+.summary-panel,
+.request-form,
+.calendar-panel,
+.settings-panel,
+.survey-panel {
+  position: relative;
+  overflow: hidden;
+}
+
+.panel > *,
+.client-home-entry > *,
+.summary-panel > *,
+.request-form > *,
+.calendar-panel > *,
+.settings-panel > *,
+.survey-panel > * {
+  position: relative;
+  z-index: 1;
+}
+
+.panel::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.42), transparent 30%, rgba(255, 255, 255, 0.22) 68%, transparent),
+    radial-gradient(circle at 18% 18%, rgba(239, 122, 173, 0.08), transparent 38%),
+    radial-gradient(circle at 90% 10%, rgba(168, 178, 203, 0.1), transparent 40%);
+  opacity: 0.82;
+}
+
 .client-home-entry-glow {
-  display: none;
+  display: block;
+  position: absolute;
+  inset: auto -12% -34% 28%;
+  height: 54%;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 26% 50%, rgba(239, 122, 173, 0.18), transparent 48%),
+    radial-gradient(circle at 70% 44%, rgba(168, 178, 203, 0.18), transparent 50%);
+  filter: blur(34px);
+  opacity: 0.68;
 }
 
 .request-form,
@@ -108,15 +192,22 @@ body {
 .client-home-entry {
   min-height: 0;
   align-content: start;
-  gap: 18px;
-  padding: 28px 24px;
-  background: var(--product-surface);
+  gap: 20px;
+  padding: 30px 24px;
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.68), rgba(249, 244, 250, 0.42) 52%, rgba(226, 233, 247, 0.34)),
+    radial-gradient(circle at 12% 18%, rgba(239, 122, 173, 0.13), transparent 44%),
+    radial-gradient(circle at 92% 12%, rgba(168, 178, 203, 0.17), transparent 44%);
+  box-shadow: var(--product-glow);
 }
 
 .client-home-entry.needs-confirmation,
 .client-home-entry.is-boarding-pass,
 .admin-today-hero {
-  background: var(--product-surface);
+  background:
+    linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(249, 244, 250, 0.46) 52%, rgba(226, 233, 247, 0.36)),
+    radial-gradient(circle at 12% 18%, rgba(239, 122, 173, 0.14), transparent 42%),
+    radial-gradient(circle at 92% 12%, rgba(168, 178, 203, 0.17), transparent 44%);
 }
 
 .client-home-entry-main {
@@ -125,9 +216,32 @@ body {
 
 .client-home-entry-main h1 {
   max-width: 14ch;
+  font-family: var(--font-display);
   font-size: clamp(36px, 8vw, 68px);
+  font-weight: 700;
   line-height: 0.98;
   letter-spacing: 0;
+}
+
+.app-shell :where(h1, h2, h3) {
+  letter-spacing: 0;
+}
+
+.app-shell :where(
+  .hero-copy h1,
+  .client-home-entry-main h1,
+  .admin-focus-copy h2,
+  .admin-topbar h1,
+  .client-screen-header h2,
+  .admin-screen-header h2,
+  .summary-panel h2
+) {
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
+.app-shell :where(button, input, select, textarea, small, p, label, span, strong) {
+  font-family: var(--font-body);
 }
 
 .client-home-entry-main p:not(.eyebrow) {
@@ -222,7 +336,7 @@ body {
   border: 1px solid var(--product-line);
   border-radius: var(--radius-md);
   background: var(--product-control-soft);
-  box-shadow: var(--product-inset);
+  box-shadow: var(--product-inset), 0 10px 26px rgba(86, 72, 96, 0.06);
   backdrop-filter: blur(16px) saturate(104%);
 }
 
@@ -260,7 +374,7 @@ body {
 .survey-panel .rating-button:hover {
   transform: translateY(-1px);
   border-color: rgba(255, 255, 255, 0.76);
-  box-shadow: var(--product-shadow-lifted);
+  box-shadow: var(--product-shadow-lifted), var(--product-inset);
 }
 
 .admin-review-progress button.is-active,
@@ -275,7 +389,7 @@ body {
   color: #fff;
   border-color: transparent;
   background: var(--product-accent);
-  box-shadow: 0 12px 24px rgba(105, 78, 94, 0.16);
+  box-shadow: var(--product-glow);
 }
 
 .service-option-card.active,
@@ -284,9 +398,11 @@ body {
 .booking-slot-button.active,
 .booking-day-pill.active {
   color: var(--color-ink);
-  border-color: rgba(143, 106, 120, 0.34);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(249, 244, 247, 0.8));
-  box-shadow: 0 0 0 2px rgba(143, 106, 120, 0.08), var(--product-inset);
+  border-color: rgba(255, 255, 255, 0.7);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(250, 243, 249, 0.52) 48%, rgba(226, 236, 248, 0.46)),
+    radial-gradient(circle at 18% 14%, rgba(239, 122, 173, 0.2), transparent 36%);
+  box-shadow: 0 0 0 2px rgba(239, 122, 173, 0.08), 0 14px 30px rgba(168, 178, 203, 0.12), var(--product-inset);
 }
 
 input,
@@ -308,46 +424,196 @@ textarea:focus {
   box-shadow: 0 0 0 4px rgba(142, 111, 122, 0.12), var(--product-shadow);
 }
 
+.checkbox-line {
+  align-items: center;
+  gap: 14px;
+  min-height: 58px;
+  padding: 14px 16px;
+  border-color: rgba(255, 255, 255, 0.58);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(249, 244, 250, 0.48) 52%, rgba(232, 237, 248, 0.36)),
+    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.09), transparent 42%);
+  box-shadow: var(--product-inset), 0 12px 28px rgba(86, 72, 96, 0.055);
+  backdrop-filter: blur(16px) saturate(112%);
+}
+
+.checkbox-line input[type="checkbox"] {
+  width: 28px;
+  height: 28px;
+  flex: 0 0 28px;
+  border: 1px solid rgba(92, 51, 88, 0.16);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(250, 245, 251, 0.62) 58%, rgba(232, 237, 248, 0.42)),
+    radial-gradient(circle at 20% 14%, rgba(255, 255, 255, 0.72), transparent 42%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    inset 0 -10px 18px rgba(92, 51, 88, 0.025),
+    0 8px 18px rgba(86, 72, 96, 0.055);
+  transition:
+    transform var(--motion-quick),
+    box-shadow var(--motion-quick),
+    border-color var(--motion-quick),
+    background var(--motion-quick);
+}
+
+.checkbox-line input[type="checkbox"]::after {
+  inset: 6px 5px 7px 8px;
+  border-right: 2px solid rgba(92, 51, 88, 0);
+  border-bottom: 2px solid rgba(92, 51, 88, 0);
+  border-radius: 0;
+  background: transparent;
+  transform: rotate(45deg) scale(0.68);
+  transform-origin: center;
+  opacity: 0;
+  transition:
+    transform var(--motion-quick),
+    opacity var(--motion-quick),
+    border-color var(--motion-quick);
+}
+
+.checkbox-line input[type="checkbox"]:checked {
+  border-color: rgba(196, 138, 169, 0.42);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(250, 244, 250, 0.62) 58%, rgba(235, 239, 248, 0.48)),
+    radial-gradient(circle at 16% 12%, rgba(239, 122, 173, 0.18), transparent 42%),
+    radial-gradient(circle at 90% 88%, rgba(168, 178, 203, 0.16), transparent 44%);
+  box-shadow:
+    0 0 0 3px rgba(239, 122, 173, 0.065),
+    0 10px 22px rgba(168, 178, 203, 0.085),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 -10px 18px rgba(92, 51, 88, 0.025);
+}
+
+.checkbox-line input[type="checkbox"]:checked::after {
+  border-color: rgba(92, 51, 88, 0.72);
+  transform: rotate(45deg) scale(1);
+  opacity: 1;
+}
+
+.checkbox-line:hover {
+  border-color: rgba(255, 255, 255, 0.76);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(250, 245, 251, 0.54) 52%, rgba(232, 237, 248, 0.42)),
+    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.12), transparent 42%);
+  box-shadow: var(--product-shadow), var(--product-inset);
+}
+
+.checkbox-line:hover input[type="checkbox"] {
+  transform: translateY(-1px);
+}
+
+.checkbox-copy {
+  gap: 3px;
+}
+
+.checkbox-copy strong {
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+.checkbox-copy small {
+  color: var(--color-muted);
+  font-size: 13px;
+}
+
 .primary-button,
 .secondary-button,
 .success-button,
 .danger-button {
   min-height: 48px;
   border-radius: var(--radius-md);
-  box-shadow: var(--product-inset);
+  border: 1px solid rgba(255, 255, 255, 0.58);
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transform: translateZ(0);
+  transition:
+    transform var(--motion-quick),
+    box-shadow var(--motion-quick),
+    border-color var(--motion-quick),
+    background var(--motion-quick),
+    color var(--motion-quick);
 }
 
 .primary-button::after,
 .secondary-button::after,
 .success-button::after,
 .danger-button::after {
-  display: none;
+  content: "";
+  display: block;
+  position: absolute;
+  inset: 1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(105deg, rgba(255, 255, 255, 0.5), transparent 34%, rgba(255, 255, 255, 0.24) 72%, transparent),
+    radial-gradient(circle at 18% 12%, rgba(255, 255, 255, 0.44), transparent 34%);
+  opacity: 0.44;
+}
+
+.primary-button :where(svg, span, strong, small),
+.secondary-button :where(svg, span, strong, small),
+.success-button :where(svg, span, strong, small),
+.danger-button :where(svg, span, strong, small) {
+  position: relative;
+  z-index: 1;
 }
 
 .primary-button {
+  color: #fff;
   background: var(--product-accent);
-  box-shadow: 0 12px 24px rgba(105, 78, 94, 0.16);
+  box-shadow:
+    0 18px 38px rgba(204, 130, 136, 0.15),
+    0 10px 26px rgba(168, 178, 203, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.66),
+    inset 0 -18px 30px rgba(92, 51, 88, 0.08);
+  text-shadow: 0 1px 12px rgba(92, 51, 88, 0.18);
 }
 
 .primary-button:hover:not(:disabled) {
   background: var(--product-accent-hover);
+  box-shadow:
+    0 22px 46px rgba(204, 130, 136, 0.18),
+    0 12px 30px rgba(168, 178, 203, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -18px 30px rgba(92, 51, 88, 0.08);
+  transform: translateY(-1px);
 }
 
 .secondary-button {
   color: var(--color-ink);
-  border: 1px solid var(--product-line);
-  background: var(--product-control-soft);
-  box-shadow: var(--product-inset);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.78), rgba(249, 244, 250, 0.52) 52%, rgba(232, 237, 248, 0.42)),
+    radial-gradient(circle at 12% 12%, rgba(239, 122, 173, 0.1), transparent 40%),
+    radial-gradient(circle at 92% 20%, rgba(168, 178, 203, 0.12), transparent 44%);
+  box-shadow:
+    0 14px 32px rgba(86, 72, 96, 0.075),
+    inset 0 1px 0 rgba(255, 255, 255, 0.78),
+    inset 0 -16px 28px rgba(92, 51, 88, 0.04);
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.76);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(250, 245, 251, 0.58) 52%, rgba(232, 237, 248, 0.48)),
+    radial-gradient(circle at 12% 12%, rgba(239, 122, 173, 0.13), transparent 40%),
+    radial-gradient(circle at 92% 20%, rgba(168, 178, 203, 0.14), transparent 44%);
+  box-shadow: var(--product-glow);
+  transform: translateY(-1px);
 }
 
 .client-screen-header .secondary-button,
 .admin-screen-header .secondary-button {
   justify-self: start;
-  min-height: 42px;
-  padding: 10px 14px;
+  min-height: 44px;
+  padding: 11px 15px;
   color: var(--color-accent-strong);
   font-size: 14px;
-  background: rgba(255, 255, 255, 0.5);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(250, 243, 249, 0.5) 52%, rgba(232, 238, 248, 0.42)),
+    radial-gradient(circle at 12% 10%, rgba(239, 122, 173, 0.16), transparent 38%);
 }
 
 .client-home-entry-action {
@@ -359,11 +625,25 @@ textarea:focus {
 }
 
 .success-button {
-  background: linear-gradient(135deg, rgba(113, 135, 125, 0.96), rgba(91, 116, 107, 0.94));
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(129, 154, 142, 0.94), rgba(105, 132, 122, 0.94)),
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.5), transparent 34%);
+  box-shadow:
+    0 18px 38px rgba(105, 132, 122, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -18px 30px rgba(52, 70, 62, 0.08);
 }
 
 .danger-button {
-  background: linear-gradient(135deg, rgba(152, 107, 120, 0.96), rgba(128, 88, 101, 0.94));
+  color: #fff;
+  background:
+    linear-gradient(135deg, rgba(198, 122, 150, 0.94), rgba(154, 95, 118, 0.94)),
+    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.48), transparent 34%);
+  box-shadow:
+    0 18px 38px rgba(154, 95, 118, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    inset 0 -18px 30px rgba(92, 51, 88, 0.08);
 }
 
 .status,
@@ -373,24 +653,27 @@ textarea:focus {
   padding: 7px 12px;
   border: 1px solid var(--product-line);
   border-radius: var(--radius-md);
-  background: rgba(255, 255, 255, 0.52);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(249, 244, 250, 0.42)),
+    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.1), transparent 42%);
   color: var(--color-accent-strong);
-  box-shadow: var(--product-inset);
+  box-shadow: var(--product-inset), 0 8px 18px rgba(86, 72, 96, 0.06);
 }
 
 .status.new {
   color: #fff;
   background: var(--product-accent);
+  box-shadow: var(--product-glow);
 }
 
 .status.confirmed {
   color: #fff;
-  background: linear-gradient(135deg, rgba(113, 135, 125, 0.96), rgba(91, 116, 107, 0.94));
+  background: linear-gradient(135deg, rgba(129, 154, 142, 0.94), rgba(105, 132, 122, 0.94));
 }
 
 .status.declined {
   color: #fff;
-  background: linear-gradient(135deg, rgba(152, 107, 120, 0.96), rgba(128, 88, 101, 0.94));
+  background: linear-gradient(135deg, rgba(198, 122, 150, 0.94), rgba(154, 95, 118, 0.94));
 }
 
 .status.waiting_client,
@@ -429,23 +712,28 @@ textarea:focus {
 
 .client-bottom-nav,
 .admin-bottom-nav {
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 12px 30px rgba(73, 60, 70, 0.1);
-  backdrop-filter: blur(14px) saturate(104%);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.76), rgba(248, 242, 249, 0.54) 52%, rgba(231, 236, 247, 0.48)),
+    radial-gradient(circle at 12% 0%, rgba(239, 122, 173, 0.14), transparent 38%),
+    radial-gradient(circle at 88% 0%, rgba(168, 178, 203, 0.16), transparent 42%);
+  box-shadow: 0 18px 42px rgba(73, 60, 70, 0.13), var(--product-inset);
+  backdrop-filter: blur(18px) saturate(116%);
 }
 
 .client-bottom-nav button.active,
 .admin-bottom-nav button.active {
   color: var(--color-ink);
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.46);
-  box-shadow: var(--product-inset), 0 8px 18px rgba(92, 76, 91, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(249, 243, 250, 0.58)),
+    radial-gradient(circle at 12% 0%, rgba(239, 122, 173, 0.16), transparent 40%);
+  box-shadow: var(--product-inset), 0 10px 22px rgba(92, 76, 91, 0.11);
 }
 
 .admin-bottom-nav-badge,
 .client-bottom-nav-badge {
-  background: var(--color-accent-strong);
+  background: linear-gradient(135deg, #cc8288, #5c3358);
 }
 
 .booking-progress-shell,
@@ -453,8 +741,21 @@ textarea:focus {
   border: 1px solid var(--product-line);
   border-radius: var(--radius-lg);
   background: var(--product-surface);
-  box-shadow: var(--product-shadow);
+  box-shadow: var(--product-shadow), var(--product-inset);
   backdrop-filter: var(--product-blur);
+}
+
+.booking-progress-shell {
+  gap: 18px;
+  padding: 22px 24px 20px;
+}
+
+.booking-progress-copy {
+  gap: 10px;
+}
+
+.booking-progress-copy .eyebrow {
+  margin-bottom: 2px;
 }
 
 .admin-focus-stat,
@@ -503,5 +804,20 @@ textarea:focus {
   .client-card-grid,
   .calendar-board {
     gap: 16px;
+  }
+
+  .booking-progress-shell {
+    padding: 20px 18px 18px;
+  }
+
+  .checkbox-line {
+    min-height: 56px;
+    padding: 14px 15px;
+  }
+
+  .checkbox-line input[type="checkbox"] {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
   }
 }

@@ -126,7 +126,6 @@ export function SettingsWorkspace({
       <AdminScreenHeader
         eyebrow="прайс"
         title="Прайс и окошки"
-        description="Настраиваем красоту так, чтобы запись шла сама."
       />
 
       <div className="panel settings-panel">
@@ -141,7 +140,6 @@ export function SettingsWorkspace({
           <div className="settings-item-header">
             <div>
               <h3>Новая услужка</h3>
-              <p className="settings-meta">Добавь позицию в прайс и сразу настрой, что клиентка выбирает при записи.</p>
             </div>
             <button className="primary-button" onClick={submitCreateService} type="button">
               <Plus size={17} /> Добавить услугу
@@ -277,7 +275,6 @@ export function SettingsWorkspace({
                   />
                   <span className="checkbox-copy">
                     <strong>Обязательно фото рук</strong>
-                    <small>Заранее видно состояние ногтей, меньше сюрпризов перед записью.</small>
                   </span>
                 </label>
 
@@ -289,7 +286,6 @@ export function SettingsWorkspace({
                   />
                   <span className="checkbox-copy">
                     <strong>Обязательно фото референса</strong>
-                    <small>Так проще поймать форму, длину и настроение дизайна.</small>
                   </span>
                 </label>
               </div>

@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Check,
   ChevronLeft,
-  ChevronRight,
   Clock3,
   ImagePlus,
   MessageCircle,
@@ -857,7 +856,7 @@ export function ClientRequestForm({
               </>
             ) : (
               <>
-                {primaryActionLabel} <ChevronRight size={18} />
+                {primaryActionLabel} <Sparkles size={18} />
               </>
             )}
           </button>

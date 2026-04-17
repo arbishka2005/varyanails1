@@ -1,5 +1,5 @@
 ﻿import type { ReactNode } from "react";
-import { CalendarClock, ClipboardList, MoveRight, Settings, Sparkles, UserRound } from "lucide-react";
+import { CalendarClock, ClipboardList, Settings, Sparkles, UserRound } from "lucide-react";
 import type { AdminSection } from "../../app/navigation";
 
 function getAdminNavItems(newRequestsCount: number) {
@@ -116,7 +116,7 @@ export function AdminScreenHeader({
       </div>
       {actionLabel && onAction ? (
         <button className="secondary-button" onClick={onAction} type="button">
-          <MoveRight size={17} /> {actionLabel}
+          <Sparkles size={17} /> {actionLabel}
         </button>
       ) : null}
     </section>

@@ -17,8 +17,6 @@ export function AdminScheduleView({
   clients,
   addTimeWindow,
   deleteAppointment,
-  onNavigate,
-  requests,
   services,
   moveAppointment,
   updateAppointmentStatus,
@@ -30,8 +28,6 @@ export function AdminScheduleView({
   | "clients"
   | "addTimeWindow"
   | "deleteAppointment"
-  | "onNavigate"
-  | "requests"
   | "services"
   | "moveAppointment"
   | "updateAppointmentStatus"
@@ -51,7 +47,6 @@ export function AdminScheduleView({
 
   const windowsByDate = useMemo(() => groupWindowsByDate(windows), [windows]);
   const hasWindowsThisWeek = useMemo(() => windows.some((window) => isWithinNextDays(window.startAt, 7)), [windows]);
-  const newRequestsCount = requests.filter((request) => request.status === "new").length;
   const upcomingAppointments = useMemo(
     () =>
       [...appointments]
@@ -164,8 +159,6 @@ export function AdminScheduleView({
       <AdminScreenHeader
         eyebrow="окошки"
         title="Работаем, Варвара Александровна"
-        actionLabel={newRequestsCount > 0 ? `К клиенткам (${newRequestsCount})` : "К клиенткам"}
-        onAction={() => onNavigate("requests")}
       />
 
       <section className="admin-screen-stack">

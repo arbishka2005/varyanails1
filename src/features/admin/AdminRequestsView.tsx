@@ -56,10 +56,8 @@ export function AdminRequestsView({
   return (
     <>
       <AdminScreenHeader
-        eyebrow="клиентки"
+        eyebrow="заявки"
         title="Кто ждёт ответа"
-        actionLabel="К окошкам"
-        onAction={() => onNavigate("schedule")}
       />
 
       <section className="admin-screen-stack">

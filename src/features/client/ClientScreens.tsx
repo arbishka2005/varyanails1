@@ -4,7 +4,6 @@ import {
   Check,
   History,
   MessageCircle,
-  MoveRight,
   Phone,
   Send,
   Sparkles,
@@ -54,7 +53,7 @@ export function ClientScreenHeader({
       </div>
       {actionLabel && onAction ? (
         <button className="secondary-button" onClick={onAction} type="button">
-          <MoveRight size={17} /> {actionLabel}
+          <Sparkles size={17} /> {actionLabel}
         </button>
       ) : null}
     </section>
@@ -119,8 +118,7 @@ export function ClientHomeScreen({
           {!hasRequest ? (
             <>
               <p className="eyebrow">vvrnailss</p>
-              <h1>Начать запись</h1>
-              <p>Выберите формат, время и контакт. Без лишних шагов.</p>
+              <h1>Привет, хочешь записаться?</h1>
             </>
           ) : canConfirmWindow ? (
             <>

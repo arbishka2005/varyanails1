@@ -1,5 +1,5 @@
 ﻿import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, Clock3, MessageCircle, MoveRight, Phone, Send, X } from "lucide-react";
+import { Check, ChevronDown, Clock3, MessageCircle, Phone, Send, Sparkles, X } from "lucide-react";
 import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import { contactLabels, getServiceTitle, lengthLabels, statusLabels } from "../../lib/bookingPresentation";
@@ -105,7 +105,7 @@ export function RequestCard({
 
       <div className="admin-inbox-primary-action">
         <button className={mainAction.kind === "decline" ? "danger-button" : "primary-button"} onClick={handleMainAction} type="button">
-          {mainAction.kind === "review" ? <Send size={17} /> : mainAction.kind === "accept" ? <Check size={17} /> : mainAction.kind === "offer" ? <MoveRight size={17} /> : mainAction.kind === "clarify" ? <ChevronRight size={17} /> : <X size={17} />}
+          {mainAction.kind === "review" ? <Sparkles size={17} /> : mainAction.kind === "accept" ? <Check size={17} /> : mainAction.kind === "offer" ? <Clock3 size={17} /> : mainAction.kind === "clarify" ? <MessageCircle size={17} /> : <X size={17} />}
           {mainAction.label}
         </button>
       </div>
@@ -201,10 +201,10 @@ export function RequestCard({
                   <Check size={17} /> Записать
                 </button>
                 <button onClick={() => runAction(offerFirstWindow)} className="secondary-button" type="button">
-                  <MoveRight size={17} /> Предложить окошко
+                  <Clock3 size={17} /> Предложить окошко
                 </button>
                 <button onClick={() => runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
-                  <ChevronRight size={17} /> Спросить ещё
+                  <MessageCircle size={17} /> Спросить ещё
                 </button>
                 <button onClick={() => runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
                   <X size={17} /> Не брать
@@ -235,7 +235,7 @@ function getNextAction({
   request: BookingRequest;
 }): NextAction {
   if (request.status === "new" || request.status === "needs_clarification") {
-    return { kind: "review", label: "Разобрать красотку" };
+    return { kind: "review", label: "Разобрать заявку" };
   }
 
   if (request.status === "confirmed") {
@@ -393,7 +393,7 @@ function AdminRequestReviewFlow({
             </>
           ) : (
             <>
-              Далее <ChevronRight size={17} />
+              Далее <Sparkles size={17} />
             </>
           )}
         </button>
