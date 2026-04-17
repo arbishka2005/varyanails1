@@ -4,6 +4,7 @@ import type {
   Appointment,
   BookingRequest,
   Client,
+  PublicBookingAccess,
   RequestStatus,
   ServiceOption,
   ServicePreset,
@@ -13,6 +14,7 @@ import type {
 import { seedClients, seedPhotos, seedRequests, serviceOptions, servicePresets, timeWindows } from "../../src/data.js";
 import { config } from "../config.js";
 import type { AppSnapshot, PublicBookingConfig, Repository } from "./types.js";
+import { generatePublicToken } from "../lib/publicTokens.js";
 
 const emptySnapshot: AppSnapshot = {
   clients: [],
@@ -24,11 +26,55 @@ const emptySnapshot: AppSnapshot = {
   serviceOptions: [],
 };
 
+function ensureRequestPublicToken(request: BookingRequest): BookingRequest {
+  return request.publicToken ? request : { ...request, publicToken: generatePublicToken() };
+}
+
+function ensureAppointmentPublicToken(appointment: Appointment): Appointment {
+  return appointment.publicToken ? appointment : { ...appointment, publicToken: generatePublicToken() };
+}
+
+function normalizeSnapshot(snapshot: AppSnapshot) {
+  let changed = false;
+
+  const requests = snapshot.requests.map((request) => {
+    const normalized = ensureRequestPublicToken(request);
+    if (normalized !== request) {
+      changed = true;
+    }
+    return normalized;
+  });
+
+  const appointments = snapshot.appointments.map((appointment) => {
+    const normalized = ensureAppointmentPublicToken(appointment);
+    if (normalized !== appointment) {
+      changed = true;
+    }
+    return normalized;
+  });
+
+  return {
+    changed,
+    snapshot: {
+      ...snapshot,
+      requests,
+      appointments,
+    },
+  };
+}
+
 async function readSnapshot(): Promise<AppSnapshot> {
   try {
     const raw = await readFile(config.fileStoragePath, "utf8");
     const parsed = JSON.parse(raw) as AppSnapshot;
-    return { ...emptySnapshot, ...parsed };
+    const merged = { ...emptySnapshot, ...parsed };
+    const normalized = normalizeSnapshot(merged);
+
+    if (normalized.changed) {
+      await writeSnapshot(normalized.snapshot);
+    }
+
+    return normalized.snapshot;
   } catch {
     return { ...emptySnapshot };
   }
@@ -104,9 +150,19 @@ export const fileRepository: Repository = {
     return snapshot.requests.find((request) => request.id === id) ?? null;
   },
 
+  async getBookingRequestByPublicToken(token: string) {
+    const snapshot = await readSnapshot();
+    return snapshot.requests.find((request) => request.publicToken === token) ?? null;
+  },
+
   async getAppointment(id: string) {
     const snapshot = await readSnapshot();
     return snapshot.appointments.find((appointment) => appointment.id === id) ?? null;
+  },
+
+  async getAppointmentByPublicToken(token: string) {
+    const snapshot = await readSnapshot();
+    return snapshot.appointments.find((appointment) => appointment.publicToken === token) ?? null;
   },
 
   async getTimeWindow(id: string) {
@@ -120,14 +176,20 @@ export const fileRepository: Repository = {
   },
 
   async createBookingRequest(payload) {
-    await mutateSnapshot((snapshot) => {
+    return mutateSnapshot((snapshot): PublicBookingAccess => {
+      const request = ensureRequestPublicToken(payload.request);
       snapshot.clients = [payload.client, ...snapshot.clients.filter((client) => client.id !== payload.client.id)];
       snapshot.photos = [
         ...payload.photos,
         ...snapshot.photos.filter((photo) => !payload.photos.some((item) => item.id === photo.id)),
       ];
-      snapshot.requests = [payload.request, ...snapshot.requests];
-      markWindowOffered(snapshot, payload.request.preferredWindowId);
+      snapshot.requests = [request, ...snapshot.requests];
+      markWindowOffered(snapshot, request.preferredWindowId);
+
+      return {
+        requestId: request.id,
+        publicToken: request.publicToken as string,
+      };
     });
   },
 
@@ -389,6 +451,36 @@ export const fileRepository: Repository = {
     });
   },
 
+  async deleteAppointment(id: string) {
+    return mutateSnapshot((snapshot) => {
+      const appointment = snapshot.appointments.find((item) => item.id === id);
+
+      if (!appointment) {
+        return false;
+      }
+
+      snapshot.appointments = snapshot.appointments.filter((item) => item.id !== id);
+      snapshot.windows = snapshot.windows.map((window) => {
+        if (
+          window.status === "reserved" &&
+          window.startAt === appointment.startAt &&
+          window.endAt === appointment.endAt
+        ) {
+          return { ...window, status: "available" };
+        }
+
+        return window;
+      });
+      snapshot.requests = snapshot.requests.map((request) =>
+        request.id === appointment.requestId && request.status === "confirmed"
+          ? { ...request, status: "declined", preferredWindowId: null }
+          : request,
+      );
+
+      return true;
+    });
+  },
+
   async markAppointmentReminder(id: string, kind: "24h" | "3h", sentAt: string) {
     return mutateSnapshot((snapshot) => {
       let updated: Appointment | null = null;
@@ -439,6 +531,24 @@ export const fileRepository: Repository = {
     });
   },
 
+  async submitAppointmentSurveyByPublicToken(token: string, payload: { rating: number; text?: string }) {
+    return mutateSnapshot((snapshot) => {
+      let updated: Appointment | null = null;
+      snapshot.appointments = snapshot.appointments.map((appointment) => {
+        if (appointment.publicToken !== token) {
+          return appointment;
+        }
+        updated = {
+          ...appointment,
+          surveyRating: payload.rating,
+          surveyText: payload.text,
+        };
+        return updated;
+      });
+      return updated;
+    });
+  },
+
   async confirmBookingRequest(requestId: string) {
     return mutateSnapshot((snapshot) => {
       const request = snapshot.requests.find((item) => item.id === requestId);
@@ -450,7 +560,7 @@ export const fileRepository: Repository = {
         return null;
       }
 
-      const appointment: Appointment = {
+      const appointment: Appointment = ensureAppointmentPublicToken({
         id: `APT-${Date.now()}`,
         requestId: request.id,
         clientId: request.clientId,
@@ -460,7 +570,7 @@ export const fileRepository: Repository = {
         endAt: window.endAt,
         durationMinutes: request.estimatedMinutes,
         status: "scheduled",
-      };
+      });
 
       snapshot.appointments = [appointment, ...snapshot.appointments];
       snapshot.requests = snapshot.requests.map((item) =>
@@ -488,7 +598,7 @@ export const fileRepository: Repository = {
         return null;
       }
 
-      const appointment: Appointment = {
+      const appointment: Appointment = ensureAppointmentPublicToken({
         id: `APT-${Date.now()}`,
         requestId: request.id,
         clientId: request.clientId,
@@ -498,7 +608,7 @@ export const fileRepository: Repository = {
         endAt: window.endAt,
         durationMinutes: request.estimatedMinutes,
         status: "scheduled",
-      };
+      });
 
       snapshot.appointments = [appointment, ...snapshot.appointments];
       snapshot.requests = snapshot.requests.map((item) =>
@@ -510,5 +620,16 @@ export const fileRepository: Repository = {
 
       return appointment;
     });
+  },
+
+  async confirmBookingRequestByPublicToken(token: string) {
+    const snapshot = await readSnapshot();
+    const request = snapshot.requests.find((item) => item.publicToken === token) ?? null;
+
+    if (!request) {
+      return null;
+    }
+
+    return fileRepository.confirmBookingRequestByClient(request.id);
   },
 };

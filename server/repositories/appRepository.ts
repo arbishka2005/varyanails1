@@ -1,9 +1,12 @@
 import type { PoolClient } from "pg";
 import type {
   Appointment,
+  AppSnapshot,
   BookingRequest,
   Client,
   PhotoAttachment,
+  PublicBookingAccess,
+  PublicBookingConfig,
   RequestStatus,
   ServiceOption,
   ServicePreset,
@@ -21,22 +24,7 @@ import {
   toServiceOption,
   toTimeWindow,
 } from "../db/mappers.js";
-
-export type AppSnapshot = {
-  clients: Client[];
-  photos: PhotoAttachment[];
-  requests: BookingRequest[];
-  appointments: Appointment[];
-  windows: TimeWindow[];
-  services: ServicePreset[];
-  serviceOptions: ServiceOption[];
-};
-
-export type PublicBookingConfig = {
-  services: ServicePreset[];
-  windows: TimeWindow[];
-  serviceOptions: ServiceOption[];
-};
+import { generatePublicToken } from "../lib/publicTokens.js";
 
 export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
   const [services, windows, options] = await Promise.all([
@@ -81,8 +69,18 @@ export async function getBookingRequest(id: string) {
   return result.rows[0] ? toBookingRequest(result.rows[0]) : null;
 }
 
+export async function getBookingRequestByPublicToken(token: string) {
+  const result = await pool.query("SELECT * FROM booking_requests WHERE public_token = $1", [token]);
+  return result.rows[0] ? toBookingRequest(result.rows[0]) : null;
+}
+
 export async function getAppointment(id: string) {
   const result = await pool.query("SELECT * FROM appointments WHERE id = $1", [id]);
+  return result.rows[0] ? toAppointment(result.rows[0]) : null;
+}
+
+export async function getAppointmentByPublicToken(token: string) {
+  const result = await pool.query("SELECT * FROM appointments WHERE public_token = $1", [token]);
   return result.rows[0] ? toAppointment(result.rows[0]) : null;
 }
 
@@ -169,20 +167,25 @@ export async function createBookingRequest(payload: {
   photos: PhotoAttachment[];
   request: BookingRequest;
 }) {
-  await withTransaction(async (client) => {
+  return withTransaction(async (client): Promise<PublicBookingAccess> => {
     await insertClient(client, payload.client);
 
     for (const photo of payload.photos) {
       await insertPhoto(client, photo);
     }
 
-    await insertRequest(client, payload.request);
-    if (payload.request.preferredWindowId) {
+    const createdRequest = await insertRequest(client, payload.request);
+    if (createdRequest.preferredWindowId) {
       await client.query(
         "UPDATE time_windows SET status = 'offered' WHERE id = $1 AND status = 'available'",
-        [payload.request.preferredWindowId],
+        [createdRequest.preferredWindowId],
       );
     }
+
+    return {
+      requestId: createdRequest.id,
+      publicToken: createdRequest.publicToken as string,
+    };
   });
 }
 
@@ -489,6 +492,34 @@ export async function updateAppointmentStatus(id: string, status: Appointment["s
   });
 }
 
+export async function deleteAppointment(id: string) {
+  return withTransaction(async (client) => {
+    const current = await client.query("SELECT * FROM appointments WHERE id = $1 FOR UPDATE", [id]);
+    const appointment = current.rows[0] ? toAppointment(current.rows[0]) : null;
+
+    if (!appointment) {
+      return false;
+    }
+
+    await client.query("DELETE FROM appointments WHERE id = $1", [id]);
+    await client.query(
+      `UPDATE time_windows
+          SET status = 'available'
+        WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
+      [appointment.startAt, appointment.endAt],
+    );
+    await client.query(
+      `UPDATE booking_requests
+          SET status = 'declined',
+              preferred_window_id = NULL
+        WHERE id = $1 AND status = 'confirmed'`,
+      [appointment.requestId],
+    );
+
+    return true;
+  });
+}
+
 export async function markAppointmentReminder(id: string, kind: "24h" | "3h", sentAt: string) {
   const column = kind === "24h" ? "reminder_24h_sent_at" : "reminder_3h_sent_at";
   const result = await pool.query(
@@ -530,6 +561,22 @@ export async function submitAppointmentSurvey(
   return result.rows[0] ? toAppointment(result.rows[0]) : null;
 }
 
+export async function submitAppointmentSurveyByPublicToken(
+  token: string,
+  payload: { rating: number; text?: string },
+) {
+  const result = await pool.query(
+    `UPDATE appointments
+      SET survey_rating = $2,
+          survey_text = $3
+    WHERE public_token = $1
+    RETURNING *`,
+    [token, payload.rating, payload.text ?? null],
+  );
+
+  return result.rows[0] ? toAppointment(result.rows[0]) : null;
+}
+
 export async function confirmBookingRequest(requestId: string) {
   return withTransaction(async (client) => {
     const requestResult = await client.query(
@@ -554,6 +601,7 @@ export async function confirmBookingRequest(requestId: string) {
 
     const appointment: Appointment = {
       id: `APT-${Date.now()}`,
+      publicToken: generatePublicToken(),
       requestId: request.id,
       clientId: request.clientId,
       service: request.service,
@@ -568,11 +616,12 @@ export async function confirmBookingRequest(requestId: string) {
     await client.query("UPDATE booking_requests SET status = 'confirmed' WHERE id = $1", [request.id]);
     await client.query(
       `INSERT INTO appointments
-        (id, request_id, client_id, service, option_ids, start_at, end_at, duration_minutes, status, master_note)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        (id, public_token, request_id, client_id, service, option_ids, start_at, end_at, duration_minutes, status, master_note)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
         appointment.id,
+        appointment.publicToken,
         appointment.requestId,
         appointment.clientId,
         appointment.service,
@@ -613,6 +662,7 @@ export async function confirmBookingRequestByClient(requestId: string) {
 
     const appointment: Appointment = {
       id: `APT-${Date.now()}`,
+      publicToken: generatePublicToken(),
       requestId: request.id,
       clientId: request.clientId,
       service: request.service,
@@ -627,11 +677,12 @@ export async function confirmBookingRequestByClient(requestId: string) {
     await client.query("UPDATE booking_requests SET status = 'confirmed' WHERE id = $1", [request.id]);
     await client.query(
       `INSERT INTO appointments
-        (id, request_id, client_id, service, option_ids, start_at, end_at, duration_minutes, status, master_note)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        (id, public_token, request_id, client_id, service, option_ids, start_at, end_at, duration_minutes, status, master_note)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
         appointment.id,
+        appointment.publicToken,
         appointment.requestId,
         appointment.clientId,
         appointment.service,
@@ -646,6 +697,16 @@ export async function confirmBookingRequestByClient(requestId: string) {
 
     return appointment;
   });
+}
+
+export async function confirmBookingRequestByPublicToken(token: string) {
+  const request = await getBookingRequestByPublicToken(token);
+
+  if (!request) {
+    return null;
+  }
+
+  return confirmBookingRequestByClient(request.id);
 }
 
 async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) {
@@ -717,32 +778,40 @@ async function releaseWindowIfUnused(client: PoolClient, windowId: string) {
 }
 
 async function insertRequest(client: PoolClient, item: BookingRequest) {
+  const request = {
+    ...item,
+    publicToken: item.publicToken ?? generatePublicToken(),
+  };
+
   await client.query(
     `INSERT INTO booking_requests
       (
-        id, client_id, service, option_ids, length, desired_result, photo_ids,
+        id, public_token, client_id, service, option_ids, length, desired_result, photo_ids,
         preferred_window_id, custom_window_text, comment, estimated_minutes,
         estimated_price_from, status, created_at, master_note, clarification_question
       )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
     ON CONFLICT (id) DO NOTHING`,
     [
-      item.id,
-      item.clientId,
-      item.service,
-      JSON.stringify(item.optionIds),
-      item.length,
-      item.desiredResult,
-      JSON.stringify(item.photoIds),
-      item.preferredWindowId,
-      item.customWindowText ?? null,
-      item.comment,
-      item.estimatedMinutes,
-      item.estimatedPriceFrom ?? null,
-      item.status,
-      item.createdAt,
-      item.masterNote ?? null,
-      item.clarificationQuestion ?? null,
+      request.id,
+      request.publicToken,
+      request.clientId,
+      request.service,
+      JSON.stringify(request.optionIds),
+      request.length,
+      request.desiredResult,
+      JSON.stringify(request.photoIds),
+      request.preferredWindowId,
+      request.customWindowText ?? null,
+      request.comment,
+      request.estimatedMinutes,
+      request.estimatedPriceFrom ?? null,
+      request.status,
+      request.createdAt,
+      request.masterNote ?? null,
+      request.clarificationQuestion ?? null,
     ],
   );
+
+  return request;
 }

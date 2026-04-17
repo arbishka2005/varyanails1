@@ -4,6 +4,8 @@ import type {
   BookingRequest,
   Client,
   PhotoAttachment,
+  PublicBookingAccess,
+  PublicBookingConfig,
   PublicBookingRequest,
   RequestStatus,
   ServiceKind,
@@ -68,8 +70,7 @@ export function resolveApiUrl(url?: string) {
 export const api = {
   getSnapshot: () => request<AppSnapshot>("/api/snapshot"),
 
-  getPublicBookingConfig: () =>
-    request<Pick<AppSnapshot, "services" | "windows" | "serviceOptions">>("/api/public/booking-config"),
+  getPublicBookingConfig: () => request<PublicBookingConfig>("/api/public/booking-config"),
 
   getPublicBookingRequest: (id: string) =>
     request<PublicBookingRequest>(`/api/public/booking-requests/${id}`),
@@ -82,7 +83,7 @@ export const api = {
     photos: PhotoAttachment[];
     request: BookingRequest;
   }) =>
-    request<{ ok: true }>("/api/booking-requests", {
+    request<{ ok: true } & PublicBookingAccess>("/api/booking-requests", {
       method: "POST",
       body: JSON.stringify(payload),
     }),
@@ -176,6 +177,11 @@ export const api = {
     request<Appointment>(`/api/appointments/${id}/status`, {
       method: "PATCH",
       body: JSON.stringify({ status }),
+    }),
+
+  deleteAppointment: (id: string) =>
+    request<void>(`/api/appointments/${id}`, {
+      method: "DELETE",
     }),
 
   submitAppointmentSurvey: (id: string, payload: { rating: number; text?: string }) =>

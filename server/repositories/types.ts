@@ -1,8 +1,11 @@
 import type {
   Appointment,
+  AppSnapshot,
   BookingRequest,
   Client,
   PhotoAttachment,
+  PublicBookingAccess,
+  PublicBookingConfig,
   RequestStatus,
   ServiceOption,
   ServicePreset,
@@ -10,35 +13,23 @@ import type {
   TimeWindowStatus,
 } from "../../src/types.js";
 
-export type AppSnapshot = {
-  clients: Client[];
-  photos: PhotoAttachment[];
-  requests: BookingRequest[];
-  appointments: Appointment[];
-  windows: TimeWindow[];
-  services: ServicePreset[];
-  serviceOptions: ServiceOption[];
-};
-
-export type PublicBookingConfig = {
-  services: ServicePreset[];
-  windows: TimeWindow[];
-  serviceOptions: ServiceOption[];
-};
+export type { AppSnapshot, PublicBookingConfig } from "../../src/types.js";
 
 export type Repository = {
   bootstrapSeedData: () => Promise<void>;
   getSnapshot: () => Promise<AppSnapshot>;
   getPublicBookingConfig: () => Promise<PublicBookingConfig>;
   getBookingRequest: (id: string) => Promise<BookingRequest | null>;
+  getBookingRequestByPublicToken: (token: string) => Promise<BookingRequest | null>;
   getAppointment: (id: string) => Promise<Appointment | null>;
+  getAppointmentByPublicToken: (token: string) => Promise<Appointment | null>;
   getTimeWindow: (id: string) => Promise<TimeWindow | null>;
   getClient: (id: string) => Promise<Client | null>;
   createBookingRequest: (payload: {
     client: Client;
     photos: PhotoAttachment[];
     request: BookingRequest;
-  }) => Promise<void>;
+  }) => Promise<PublicBookingAccess>;
   updateRequestStatus: (id: string, status: RequestStatus) => Promise<BookingRequest | null>;
   updateRequestWindow: (
     id: string,
@@ -57,12 +48,18 @@ export type Repository = {
   updateTimeWindowStatus: (id: string, status: TimeWindowStatus) => Promise<TimeWindow | null>;
   moveAppointment: (appointmentId: string, windowId: string) => Promise<Appointment | null>;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => Promise<Appointment | null>;
+  deleteAppointment: (id: string) => Promise<boolean>;
   markAppointmentReminder: (id: string, kind: "24h" | "3h", sentAt: string) => Promise<Appointment | null>;
   markAppointmentSurveySent: (id: string, sentAt: string) => Promise<Appointment | null>;
   submitAppointmentSurvey: (
     id: string,
     payload: { rating: number; text?: string },
   ) => Promise<Appointment | null>;
+  submitAppointmentSurveyByPublicToken: (
+    token: string,
+    payload: { rating: number; text?: string },
+  ) => Promise<Appointment | null>;
   confirmBookingRequest: (requestId: string) => Promise<Appointment | null>;
   confirmBookingRequestByClient: (requestId: string) => Promise<Appointment | null>;
+  confirmBookingRequestByPublicToken: (token: string) => Promise<Appointment | null>;
 };
