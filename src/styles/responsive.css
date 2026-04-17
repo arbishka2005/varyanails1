@@ -60,11 +60,15 @@
   }
 
   .client-home-entry {
-    min-height: min(580px, calc(100vh - 150px));
+    min-height: 0;
+    align-content: start;
+    padding: 24px 20px;
   }
 
   .client-home-entry-main h1 {
-    max-width: 10ch;
+    max-width: 14ch;
+    font-size: 40px;
+    line-height: 1;
   }
 
   .admin-focus-stats {
