@@ -14,7 +14,7 @@ export function getCommandName(text: string) {
   }
 
   const trimmed = raw.replace(/^\/+/, "");
-  return trimmed.split("@")[0] ?? "";
+  return (trimmed.split("@")[0] ?? "").toLowerCase();
 }
 
 function getLaunchUrl(mode?: "admin") {
@@ -24,7 +24,9 @@ function getLaunchUrl(mode?: "admin") {
 
 export function buildLaunchReplyMarkup(mode?: "admin") {
   return {
-    inline_keyboard: [[{ text: mode === "admin" ? "Открыть админку" : "Открыть приложение", web_app: { url: getLaunchUrl(mode) } }]],
+    inline_keyboard: [
+      [{ text: mode === "admin" ? "Открыть админ-панель" : "Открыть запись", web_app: { url: getLaunchUrl(mode) } }],
+    ],
   };
 }
 

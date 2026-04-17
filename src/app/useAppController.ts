@@ -37,6 +37,12 @@ type LastRequestAccess = PublicBookingAccess;
 const clientFormSteps: ClientFormStep[] = ["service", "time", "photos", "contact"];
 const clientFormatQuestions: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
 
+function scrollToPageTop() {
+  window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -308,6 +314,16 @@ export function useAppController() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+
+    scrollToPageTop();
+    window.requestAnimationFrame(scrollToPageTop);
+    window.setTimeout(scrollToPageTop, 250);
+  }, [route.portal, "section" in route ? route.section : route.appointmentToken]);
 
   useEffect(() => {
     if (window.location.hash) {
