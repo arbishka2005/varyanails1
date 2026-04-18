@@ -426,7 +426,7 @@ export function ClientRequestForm({
                 className={`booking-progress-item${index < stepIndex ? " is-complete" : ""}${step.id === currentStep ? " is-active" : ""}`}
                 key={step.id}
               >
-                <span>{index + 1}</span>
+                <span>{index < stepIndex ? "✓" : index + 1}</span>
                 <small>{step.label}</small>
               </div>
             ))}

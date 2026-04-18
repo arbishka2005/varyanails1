@@ -154,7 +154,6 @@ export function SettingsWorkspace({
       <AdminScreenHeader
         eyebrow="прайс"
         title="Услуги и правила записи"
-        description="Что клиентка выбирает при записи, сколько это длится и какие фото нужны"
       />
 
       <div className="panel settings-panel">
@@ -162,7 +161,6 @@ export function SettingsWorkspace({
           <Settings size={22} />
           <div>
             <h2>Прайс</h2>
-            <p>Окошки теперь на экране расписания, здесь только услуги.</p>
           </div>
         </div>
 
@@ -170,7 +168,6 @@ export function SettingsWorkspace({
           <div className="settings-item-header">
             <div>
               <h3>Новая услуга</h3>
-              <p>Добавьте позицию, которую клиентка увидит при записи.</p>
             </div>
             <button className="primary-button" onClick={submitCreateService} type="button">
               <Plus size={17} /> Добавить

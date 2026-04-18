@@ -206,7 +206,6 @@ export function ClientsWorkspace({
       <AdminScreenHeader
         eyebrow="клиентки"
         title="База клиенток"
-        description="Контакты, история, фото и память мастера"
       />
 
       <div className="panel client-filters">

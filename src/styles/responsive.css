@@ -120,7 +120,6 @@
   .info-grid,
   .booking-slot-grid,
   .service-picker,
-  .booking-progress-list,
   .booking-pill-group-split,
   .format-answer-grid,
   .format-service-picker,
@@ -357,7 +356,7 @@
   }
 
   .booking-progress-item {
-    min-height: 68px;
+    min-height: 0;
   }
 
   .service-option-card {

@@ -88,7 +88,7 @@ export function ClientHomeScreen({
     ? statusLabels[request.status]
     : isCheckingStoredRequest
       ? "Проверяю заявку"
-      : "Новая запись";
+      : "Запись";
   const windowLabel =
     lastRequestInfo?.window?.label ?? request?.customWindowText ?? (isConfirmed ? "Время уточняется" : "");
   const mainActionLabel = !hasRequest
@@ -198,8 +198,6 @@ export function ClientRequestsScreen({
       <ClientScreenHeader
         eyebrow="мои записи"
         title="Статус заявки"
-        actionLabel="Новая запись"
-        onAction={openBookingFlow}
       />
 
       <ClientStatusPanel
@@ -236,7 +234,6 @@ export function ClientProfileScreen({
       <ClientScreenHeader
         eyebrow="данные"
         title="Контакты для записи"
-        description="Это не аккаунт. Берём данные из Telegram и черновика записи."
         actionLabel="Статус"
         onAction={openRequests}
       />
@@ -252,12 +249,10 @@ export function ClientProfileScreen({
               value={profileHandle ? `${contactLabels[form.contactChannel]} ${profileHandle}` : "Добавите при записи"}
             />
             <Info label="Telegram" value={telegramUser?.username ? `@${telegramUser.username}` : "не подключён"} />
-            <Info label="Источник" value={telegramUser ? "Telegram + черновик" : "Черновик записи"} />
           </div>
         </div>
 
         <div className="panel client-focus-panel">
-          <h3>Новая запись</h3>
           <button className="primary-button" onClick={openBookingFlow} type="button">
             <Send size={17} /> Открыть запись
           </button>
@@ -305,9 +300,6 @@ export function ClientStatusPanel({
     return (
       <div className="panel client-empty-state-panel">
         <h3>{lastRequestLookupStatus === "stale" ? "Старая заявка уже недоступна" : "Записей пока нет"}</h3>
-        <button className="primary-button" onClick={onBookAgain} type="button">
-          <Send size={17} /> Перейти к записи
-        </button>
       </div>
     );
   }
