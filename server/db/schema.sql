@@ -8,7 +8,8 @@ CREATE TABLE IF NOT EXISTS clients (
   contact_handle TEXT NOT NULL,
   first_visit BOOLEAN NOT NULL DEFAULT TRUE,
   telegram_user_id TEXT,
-  notes TEXT
+  notes TEXT,
+  archived_at TIMESTAMPTZ
 );
 
 CREATE TABLE IF NOT EXISTS photo_attachments (
@@ -47,7 +48,7 @@ CREATE TABLE IF NOT EXISTS time_windows (
 CREATE TABLE IF NOT EXISTS booking_requests (
   id TEXT PRIMARY KEY,
   public_token TEXT NOT NULL,
-  client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
   service TEXT NOT NULL,
   option_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
   length TEXT NOT NULL CHECK (length IN ('short', 'medium', 'long', 'extra')),
@@ -61,14 +62,15 @@ CREATE TABLE IF NOT EXISTS booking_requests (
   status TEXT NOT NULL CHECK (status IN ('new', 'needs_clarification', 'waiting_client', 'confirmed', 'declined')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   master_note TEXT,
-  clarification_question TEXT
+  clarification_question TEXT,
+  CHECK (status NOT IN ('new', 'waiting_client', 'confirmed') OR preferred_window_id IS NOT NULL)
 );
 
 CREATE TABLE IF NOT EXISTS appointments (
   id TEXT PRIMARY KEY,
   public_token TEXT NOT NULL,
-  request_id TEXT NOT NULL REFERENCES booking_requests(id) ON DELETE CASCADE,
-  client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE CASCADE,
+  request_id TEXT NOT NULL REFERENCES booking_requests(id) ON DELETE RESTRICT,
+  client_id TEXT NOT NULL REFERENCES clients(id) ON DELETE RESTRICT,
   service TEXT NOT NULL,
   option_ids JSONB NOT NULL DEFAULT '[]'::jsonb,
   start_at TIMESTAMPTZ NOT NULL,
@@ -82,11 +84,14 @@ CREATE TABLE IF NOT EXISTS appointments (
   survey_rating INTEGER CHECK (survey_rating BETWEEN 1 AND 5),
   survey_text TEXT,
   cancelled_at TIMESTAMPTZ,
-  CHECK (end_at > start_at)
+  CHECK (end_at > start_at),
+  CHECK (status <> 'cancelled' OR cancelled_at IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS booking_requests_client_id_idx ON booking_requests(client_id);
 CREATE UNIQUE INDEX IF NOT EXISTS booking_requests_public_token_idx ON booking_requests(public_token);
+CREATE UNIQUE INDEX IF NOT EXISTS booking_requests_active_window_idx ON booking_requests(preferred_window_id)
+  WHERE preferred_window_id IS NOT NULL AND status IN ('new', 'waiting_client', 'confirmed');
 CREATE INDEX IF NOT EXISTS appointments_client_id_idx ON appointments(client_id);
 CREATE UNIQUE INDEX IF NOT EXISTS appointments_scheduled_request_id_idx ON appointments(request_id)
   WHERE status = 'scheduled';
@@ -104,5 +109,19 @@ BEGIN
     ALTER TABLE time_windows
       ADD CONSTRAINT time_windows_no_overlap
       EXCLUDE USING gist (tstzrange(start_at, end_at, '[)') WITH &&);
+  END IF;
+END $$;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'appointments_scheduled_no_overlap'
+  ) THEN
+    ALTER TABLE appointments
+      ADD CONSTRAINT appointments_scheduled_no_overlap
+      EXCLUDE USING gist (tstzrange(start_at, end_at, '[)') WITH &&)
+      WHERE (status = 'scheduled');
   END IF;
 END $$;

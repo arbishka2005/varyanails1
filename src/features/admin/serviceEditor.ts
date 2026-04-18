@@ -1,4 +1,4 @@
-import type { ServicePreset } from "../../types";
+﻿import type { ServicePreset } from "../../types";
 
 export type ServiceEditorState = {
   title: string;
@@ -7,6 +7,15 @@ export type ServiceEditorState = {
   requiresHandPhoto: boolean;
   requiresReference: boolean;
 };
+
+export type ServiceEditorResult = {
+  service: Omit<ServicePreset, "priceFrom"> & { priceFrom?: number | null };
+  warning?: string;
+};
+
+const minDurationMinutes = 15;
+const maxDurationMinutes = 600;
+const maxPriceFrom = 1_000_000;
 
 export function toServiceEditorState(service: ServicePreset): ServiceEditorState {
   return {
@@ -18,31 +27,42 @@ export function toServiceEditorState(service: ServicePreset): ServiceEditorState
   };
 }
 
-export function parseServiceEditor(state: ServiceEditorState | undefined, id: string): ServicePreset | null {
+export function parseServiceEditor(state: ServiceEditorState | undefined, id: string): ServiceEditorResult | null {
   if (!state) {
     return null;
   }
 
-  const title = state.title.trim();
+  const title = state.title.trim().replace(/\s+/g, " ");
   const durationMinutes = Number(state.durationMinutes);
-  const priceFrom = state.priceFrom.trim() ? Number(state.priceFrom) : undefined;
+  const priceFrom = state.priceFrom.trim() ? Number(state.priceFrom) : null;
 
-  if (!title || Number.isNaN(durationMinutes) || durationMinutes < 0) {
+  if (!title || title.length > 80) {
     return null;
   }
 
-  if (priceFrom !== undefined && (Number.isNaN(priceFrom) || priceFrom < 0)) {
+  if (
+    !Number.isInteger(durationMinutes) ||
+    durationMinutes < minDurationMinutes ||
+    durationMinutes > maxDurationMinutes
+  ) {
+    return null;
+  }
+
+  if (priceFrom !== null && (!Number.isInteger(priceFrom) || priceFrom < 0 || priceFrom > maxPriceFrom)) {
     return null;
   }
 
   return {
-    id,
-    title,
-    durationMinutes,
-    priceFrom,
-    requiresHandPhoto: state.requiresHandPhoto,
-    requiresReference: state.requiresReference,
-    options: [],
+    service: {
+      id,
+      title,
+      durationMinutes,
+      priceFrom,
+      requiresHandPhoto: state.requiresHandPhoto,
+      requiresReference: state.requiresReference,
+      options: [],
+    },
+    warning: durationMinutes >= 300 ? "Проверьте длительность: услуга длиннее 5 часов." : undefined,
   };
 }
 

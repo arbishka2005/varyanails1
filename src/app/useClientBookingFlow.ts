@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
-import { api } from "../api";
+import { ApiError, api, getApiErrorMessage } from "../api";
 import { servicePresets } from "../data";
 import {
   BOOKING_DRAFT_STORAGE_KEY,
@@ -33,6 +33,7 @@ const clientFormSteps: ClientFormStep[] = ["service", "time", "photos", "contact
 const clientFormatQuestions: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
 
 type LastRequestAccess = PublicBookingAccess;
+type LastRequestLookupStatus = "idle" | "loading" | "stale";
 
 type UseClientBookingFlowOptions = {
   route: AppRoute;
@@ -41,6 +42,11 @@ type UseClientBookingFlowOptions = {
   refreshPublicConfig: () => Promise<PublicBookingConfig | null>;
   setApiError: Dispatch<SetStateAction<string | null>>;
 };
+
+function makeClientScopedId(prefix: "CLI" | "REQ") {
+  const randomPart = globalThis.crypto?.randomUUID?.().slice(0, 8) ?? Math.random().toString(36).slice(2, 10);
+  return `${prefix}-${Date.now()}-${randomPart}`;
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
@@ -120,6 +126,18 @@ function clearBookingDraftStorage() {
   }
 }
 
+function clearLastRequestAccessStorage() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(LAST_REQUEST_STORAGE_KEY);
+  } catch {
+    // Local storage can be unavailable in strict browser modes.
+  }
+}
+
 function readBookingDraft() {
   if (typeof window === "undefined") {
     return null;
@@ -183,21 +201,22 @@ function readLastRequestAccess() {
   try {
     const parsed = JSON.parse(raw) as Partial<LastRequestAccess>;
 
-    if (typeof parsed.requestId === "string" && typeof parsed.publicToken === "string") {
+    if (
+      typeof parsed.requestId === "string" &&
+      parsed.requestId.trim() &&
+      typeof parsed.publicToken === "string" &&
+      parsed.publicToken.trim()
+    ) {
       return {
-        requestId: parsed.requestId,
-        publicToken: parsed.publicToken,
+        requestId: parsed.requestId.trim(),
+        publicToken: parsed.publicToken.trim(),
       } satisfies LastRequestAccess;
     }
   } catch {
     // Ignore stale value from older builds and clear it below.
   }
 
-  try {
-    window.localStorage.removeItem(LAST_REQUEST_STORAGE_KEY);
-  } catch {
-    // Local storage can be unavailable in strict browser modes.
-  }
+  clearLastRequestAccessStorage();
 
   return null;
 }
@@ -211,6 +230,7 @@ export function useClientBookingFlow({
 }: UseClientBookingFlowOptions) {
   const [lastRequestAccess, setLastRequestAccess] = useState<LastRequestAccess | null>(() => readLastRequestAccess());
   const [lastRequestInfo, setLastRequestInfo] = useState<PublicBookingRequest | null>(null);
+  const [lastRequestLookupStatus, setLastRequestLookupStatus] = useState<LastRequestLookupStatus>("idle");
   const [initialBookingDraft] = useState(() => readBookingDraft());
   const [form, setForm] = useState<FormState>(() => initialBookingDraft?.form ?? initialForm);
   const [bookingDraftUi, setBookingDraftUi] = useState<BookingDraftUiState>(
@@ -219,6 +239,8 @@ export function useClientBookingFlow({
   const [uploading, setUploading] = useState({ hands: false, reference: false });
   const [uploadError, setUploadError] = useState({ hands: "", reference: "" });
   const submitInFlightRef = useRef(false);
+  const clientConfirmInFlightRef = useRef(new Set<string>());
+  const uploadSequenceRef = useRef<Record<"hands" | "reference", number>>({ hands: 0, reference: 0 });
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   const selectedService = useMemo(
@@ -267,6 +289,8 @@ export function useClientBookingFlow({
   };
 
   const refreshLastRequest = async (publicToken: string) => {
+    setLastRequestLookupStatus("loading");
+
     try {
       const info = await api.getPublicBookingRequest(publicToken);
       setLastRequestInfo(info);
@@ -276,9 +300,19 @@ export function useClientBookingFlow({
           publicToken: info.request.publicToken,
         });
       }
+      setLastRequestLookupStatus("idle");
       return info;
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "Не удалось обновить статус заявки");
+      if (error instanceof ApiError && error.status === 404) {
+        setLastRequestInfo(null);
+        setLastRequestAccess(null);
+        clearLastRequestAccessStorage();
+        setLastRequestLookupStatus("stale");
+        return null;
+      }
+
+      setLastRequestLookupStatus("idle");
+      setApiError(getApiErrorMessage(error, "Не удалось обновить статус заявки"));
       return null;
     }
   };
@@ -404,7 +438,7 @@ export function useClientBookingFlow({
     }
 
     const client: Client = {
-      id: `CLI-${Date.now()}`,
+      id: makeClientScopedId("CLI"),
       name: form.clientName.trim(),
       phone: toStoredPhone(form.phone),
       preferredContactChannel: form.contactChannel,
@@ -415,7 +449,7 @@ export function useClientBookingFlow({
       (photo): photo is PhotoAttachment => Boolean(photo),
     );
     const request: BookingRequest = {
-      id: `REQ-${Math.floor(1000 + Math.random() * 9000)}`,
+      id: makeClientScopedId("REQ"),
       clientId: client.id,
       service: form.service,
       optionIds: form.optionIds,
@@ -442,7 +476,7 @@ export function useClientBookingFlow({
       navigateToClientSection("requests");
       return true;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Не удалось отправить заявку";
+      const message = getApiErrorMessage(error, "Не удалось отправить заявку");
       const refreshedConfig = await refreshPublicConfig();
       const refreshedWindows = refreshedConfig?.windows ?? [];
       const stillAvailable = refreshedWindows.some(
@@ -465,17 +499,29 @@ export function useClientBookingFlow({
   };
 
   const confirmClientWindow = async (requestToken: string) => {
+    if (clientConfirmInFlightRef.current.has(requestToken)) {
+      return;
+    }
+
+    clientConfirmInFlightRef.current.add(requestToken);
     try {
       setApiError(null);
       await api.confirmPublicBookingRequest(requestToken);
       await refreshLastRequest(requestToken);
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "Не удалось подтвердить время");
+      setApiError(getApiErrorMessage(error, "Не удалось подтвердить время"));
+      await refreshLastRequest(requestToken);
+    } finally {
+      clientConfirmInFlightRef.current.delete(requestToken);
     }
   };
 
   const uploadPhoto = async (kind: PhotoAttachment["kind"], file: File) => {
     const key = kind === "hands" ? "hands" : "reference";
+    const uploadId = uploadSequenceRef.current[key] + 1;
+    uploadSequenceRef.current[key] = uploadId;
+    const isLatestUpload = () => uploadSequenceRef.current[key] === uploadId;
+
     setUploading((current) => ({ ...current, [key]: true }));
     setUploadError((current) => ({ ...current, [key]: "" }));
 
@@ -486,6 +532,10 @@ export function useClientBookingFlow({
         fileName: file.name,
         dataUrl,
       });
+      if (!isLatestUpload()) {
+        return null;
+      }
+
       setForm((current) => ({
         ...current,
         handPhoto: kind === "hands" ? uploaded : current.handPhoto,
@@ -493,11 +543,17 @@ export function useClientBookingFlow({
       }));
       return uploaded;
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Не удалось загрузить фото";
+      if (!isLatestUpload()) {
+        return null;
+      }
+
+      const message = getApiErrorMessage(error, "Не удалось загрузить фото");
       setUploadError((current) => ({ ...current, [key]: message }));
       return null;
     } finally {
-      setUploading((current) => ({ ...current, [key]: false }));
+      if (isLatestUpload()) {
+        setUploading((current) => ({ ...current, [key]: false }));
+      }
     }
   };
 
@@ -518,6 +574,7 @@ export function useClientBookingFlow({
     availableBookingWindows,
     lastRequestInfo,
     lastSubmittedRequestId,
+    lastRequestLookupStatus,
     hasClientRequest,
     uploading,
     uploadError,

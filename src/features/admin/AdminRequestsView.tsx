@@ -41,7 +41,7 @@ export function AdminRequestsView({
   const newRequestsCount = requests.filter((request) => request.status === "new").length;
   const scheduledCount = appointments.filter((appointment) => appointment.status === "scheduled").length;
   const availableWindowsCount = windows.filter((window) => window.status === "available").length;
-  const activeClientsCount = clients.length;
+  const activeClientsCount = clients.filter((client) => !client.archivedAt).length;
 
   const nextAvailableDays = useMemo(
     () =>
@@ -150,7 +150,7 @@ export function AdminRequestsView({
                     type="button"
                   >
                     <strong>{day.label}</strong>
-                    <small>{day.availableCount} свободных местечек</small>
+                    <small>{day.availableCount} свободных слотов</small>
                   </button>
                 ))
               )}

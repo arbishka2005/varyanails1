@@ -20,10 +20,18 @@ export const clientSchema = z.object({
   name: z.string().min(1),
   phone: z.string().min(1),
   preferredContactChannel: contactChannelSchema,
-  contactHandle: z.string().min(1),
+  contactHandle: z.string(),
   firstVisit: z.boolean(),
   telegramUserId: z.string().min(1).optional(),
   notes: z.string().optional(),
+}).superRefine((value, context) => {
+  if (value.preferredContactChannel !== "phone" && !value.contactHandle.trim()) {
+    context.addIssue({
+      code: "custom",
+      message: "Contact handle is required for Telegram or VK",
+      path: ["contactHandle"],
+    });
+  }
 });
 
 export const photoSchema = z.object({
@@ -76,23 +84,23 @@ export const updateRequestWindowSchema = z.object({
 });
 
 export const updateClientNotesSchema = z.object({
-  notes: z.string(),
+  notes: z.string().max(2500),
 });
 
 export const updateServiceSchema = z.object({
-  title: z.string().min(1).optional(),
-  durationMinutes: z.number().int().nonnegative().optional(),
-  priceFrom: z.number().int().nonnegative().optional(),
+  title: z.string().trim().min(1).max(80).optional(),
+  durationMinutes: z.number().int().min(15).max(600).optional(),
+  priceFrom: z.number().int().min(0).max(1_000_000).nullable().optional(),
   requiresHandPhoto: z.boolean().optional(),
   requiresReference: z.boolean().optional(),
   options: z.array(serviceOptionKindSchema).optional(),
 });
 
 export const createServiceSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  durationMinutes: z.number().int().nonnegative(),
-  priceFrom: z.number().int().nonnegative().optional(),
+  id: z.string().trim().min(1).max(80),
+  title: z.string().trim().min(1).max(80),
+  durationMinutes: z.number().int().min(15).max(600),
+  priceFrom: z.number().int().min(0).max(1_000_000).optional(),
   requiresHandPhoto: z.boolean(),
   requiresReference: z.boolean(),
   options: z.array(serviceOptionKindSchema),

@@ -12,10 +12,11 @@ import type {
   TimeWindowStatus,
 } from "../../src/types.js";
 import { seedClients, seedPhotos, seedRequests, serviceOptions, servicePresets, timeWindows } from "../../src/data.js";
-import { makeWindowLabel } from "../../src/lib/bookingPresentation.js";
-import { getWindowConflict, isFutureDateTime } from "../../src/lib/dateTime.js";
+import { makeWindowLabel } from "../../src/lib/displayTime.js";
+import { doWindowRangesOverlap, getWindowConflict, isFutureDateTime } from "../../src/lib/dateTime.js";
 import { config } from "../config.js";
 import { DomainError } from "../lib/domainErrors.js";
+import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
 import type { AppSnapshot, PublicBookingConfig, Repository } from "./types.js";
 import { generatePublicToken } from "../lib/publicTokens.js";
 
@@ -37,22 +38,90 @@ function ensureAppointmentPublicToken(appointment: Appointment): Appointment {
   return appointment.publicToken ? appointment : { ...appointment, publicToken: generatePublicToken() };
 }
 
+function isActiveWindowRequestStatus(status: RequestStatus) {
+  return status === "new" || status === "waiting_client" || status === "confirmed";
+}
+
+function getActiveRequestPriority(status: RequestStatus) {
+  if (status === "confirmed") {
+    return 0;
+  }
+
+  if (status === "new") {
+    return 1;
+  }
+
+  if (status === "waiting_client") {
+    return 2;
+  }
+
+  return 3;
+}
+
 function normalizeSnapshot(snapshot: AppSnapshot) {
   let changed = false;
+  const activeWindowOwners = new Map<string, BookingRequest>();
+
+  for (const request of snapshot.requests) {
+    if (!request.preferredWindowId || !isActiveWindowRequestStatus(request.status)) {
+      continue;
+    }
+
+    const currentOwner = activeWindowOwners.get(request.preferredWindowId);
+    if (!currentOwner || getActiveRequestPriority(request.status) < getActiveRequestPriority(currentOwner.status)) {
+      activeWindowOwners.set(request.preferredWindowId, request);
+    }
+  }
 
   const requests = snapshot.requests.map((request) => {
-    const normalized = ensureRequestPublicToken(request);
+    let normalized = ensureRequestPublicToken(request);
     if (normalized !== request) {
       changed = true;
     }
+
+    if (isActiveWindowRequestStatus(normalized.status) && !normalized.preferredWindowId) {
+      changed = true;
+      normalized = {
+        ...normalized,
+        status: "needs_clarification",
+        customWindowText: undefined,
+        clarificationQuestion:
+          normalized.clarificationQuestion ??
+          "Заявка была в активном статусе без конкретного окошка. Нужно выбрать время заново.",
+      };
+    }
+
+    if (
+      normalized.preferredWindowId &&
+      isActiveWindowRequestStatus(normalized.status) &&
+      activeWindowOwners.get(normalized.preferredWindowId)?.id !== normalized.id
+    ) {
+      changed = true;
+      normalized = {
+        ...normalized,
+        status: "needs_clarification",
+        preferredWindowId: null,
+        customWindowText: undefined,
+        clarificationQuestion:
+          normalized.clarificationQuestion ??
+          "Окошко уже занято другой заявкой. Нужно выбрать новое время.",
+      };
+    }
+
     return normalized;
   });
 
   const appointments = snapshot.appointments.map((appointment) => {
-    const normalized = ensureAppointmentPublicToken(appointment);
+    let normalized = ensureAppointmentPublicToken(appointment);
     if (normalized !== appointment) {
       changed = true;
     }
+
+    if (normalized.status === "cancelled" && !normalized.cancelledAt) {
+      changed = true;
+      normalized = { ...normalized, cancelledAt: new Date().toISOString() };
+    }
+
     return normalized;
   });
 
@@ -131,7 +200,7 @@ function releaseWindowIfUnused(snapshot: AppSnapshot, windowId: string | null) {
     return;
   }
   const stillUsed = snapshot.requests.some(
-    (request) => request.preferredWindowId === windowId && request.status !== "declined",
+    (request) => request.preferredWindowId === windowId && isActiveWindowRequestStatus(request.status),
   );
   if (!stillUsed) {
     snapshot.windows = snapshot.windows.map((window) =>
@@ -154,7 +223,7 @@ function getWindowStatusError(snapshot: AppSnapshot, window: TimeWindow, nextSta
   }
 
   const hasActiveRequest = snapshot.requests.some(
-    (request) => request.preferredWindowId === window.id && request.status !== "declined",
+    (request) => request.preferredWindowId === window.id && isActiveWindowRequestStatus(request.status),
   );
 
   if (hasActiveRequest) {
@@ -184,11 +253,28 @@ function assertWindowIsNotOwnedByAnotherActiveRequest(
     (request) =>
       request.preferredWindowId === windowId &&
       request.id !== requestId &&
-      request.status !== "declined",
+      isActiveWindowRequestStatus(request.status),
   );
 
   if (owner) {
     throw new DomainError("Это окошко уже привязано к другой заявке.");
+  }
+}
+
+function assertNoScheduledAppointmentInRange(
+  snapshot: AppSnapshot,
+  range: Pick<TimeWindow, "startAt" | "endAt">,
+  ignoredAppointmentId?: string,
+) {
+  const appointment = snapshot.appointments.find(
+    (item) =>
+      item.status === "scheduled" &&
+      item.id !== ignoredAppointmentId &&
+      doWindowRangesOverlap(item, range),
+  );
+
+  if (appointment) {
+    throw new DomainError("This time is already occupied by another appointment.", 409);
   }
 }
 
@@ -215,6 +301,25 @@ function getRequestStatusTransitionError(request: BookingRequest, nextStatus: Re
 
   if (nextStatus !== "needs_clarification" && nextStatus !== "declined") {
     return "Недопустимый переход статуса заявки.";
+  }
+
+  return "";
+}
+
+function getAppointmentStatusTransitionError(
+  appointment: Appointment,
+  nextStatus: Appointment["status"],
+) {
+  if (appointment.status === nextStatus) {
+    return "";
+  }
+
+  if (appointment.status !== "scheduled") {
+    return "Closed appointment status cannot be changed.";
+  }
+
+  if (nextStatus === "scheduled") {
+    return "Cancelled or finished appointment cannot be reopened.";
   }
 
   return "";
@@ -288,6 +393,12 @@ export const fileRepository: Repository = {
         throw new DomainError("Новая заявка должна начинаться в статусе new.");
       }
 
+      assertBookingRequestMatchesService(
+        request,
+        payload.photos,
+        snapshot.services.find((service) => service.id === request.service),
+      );
+
       const selectedWindow = request.preferredWindowId
         ? snapshot.windows.find((window) => window.id === request.preferredWindowId)
         : null;
@@ -295,6 +406,12 @@ export const fileRepository: Repository = {
       if (!selectedWindow || selectedWindow.status !== "available" || !isFutureDateTime(selectedWindow.startAt)) {
         throw new DomainError("Выберите свободное окошко из списка.");
       }
+
+      if (snapshot.requests.some((item) => item.id === request.id)) {
+        throw new DomainError("Booking request with this id already exists", 409);
+      }
+
+      assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, selectedWindow.id, request.id);
 
       snapshot.clients = [payload.client, ...snapshot.clients.filter((client) => client.id !== payload.client.id)];
       snapshot.photos = [
@@ -315,11 +432,13 @@ export const fileRepository: Repository = {
     return mutateSnapshot((snapshot) => {
       let updated: BookingRequest | null = null;
       let previousWindowId: string | null = null;
+      let changed = false;
       snapshot.requests = snapshot.requests.map((request) => {
         if (request.id !== id) {
           return request;
         }
 
+        changed = request.status !== status;
         previousWindowId = request.preferredWindowId;
         updated =
           status === "declined" || status === "needs_clarification"
@@ -364,6 +483,7 @@ export const fileRepository: Repository = {
 
         if (
           !selectedWindow ||
+          !isFutureDateTime(selectedWindow.startAt) ||
           (selectedWindow.status !== "available" && preferredWindowId !== currentRequest.preferredWindowId)
         ) {
           throw new DomainError("Это окошко уже занято. Выберите другое.");
@@ -375,6 +495,8 @@ export const fileRepository: Repository = {
         ) {
           throw new DomainError("Это окошко уже недоступно.");
         }
+
+        assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, preferredWindowId, currentRequest.id);
       }
 
       snapshot.requests = snapshot.requests.map((request) => {
@@ -416,36 +538,19 @@ export const fileRepository: Repository = {
 
   async deleteClient(id: string) {
     return mutateSnapshot((snapshot) => {
-      const clientRequests = snapshot.requests.filter((request) => request.clientId === id);
-      if (!snapshot.clients.some((client) => client.id === id)) {
-        return false;
-      }
-
-      const removedPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds));
-      const affectedWindowIds = new Set(
-        clientRequests
-          .map((request) => request.preferredWindowId)
-          .filter((windowId): windowId is string => Boolean(windowId)),
-      );
-
-      snapshot.clients = snapshot.clients.filter((client) => client.id !== id);
-      snapshot.requests = snapshot.requests.filter((request) => request.clientId !== id);
-      snapshot.appointments = snapshot.appointments.filter((appointment) => appointment.clientId !== id);
-      snapshot.photos = snapshot.photos.filter((photo) => !removedPhotoIds.has(photo.id));
-
-      snapshot.windows = snapshot.windows.map((window) => {
-        if (!affectedWindowIds.has(window.id)) {
-          return window;
+      let found = false;
+      snapshot.clients = snapshot.clients.map((client) => {
+        if (client.id !== id) {
+          return client;
         }
 
-        const stillOffered = snapshot.requests.some(
-          (request) => request.preferredWindowId === window.id && request.status !== "declined",
-        );
-
-        return !stillOffered && window.status === "offered"
-          ? { ...window, status: "available" }
-          : window;
+        found = true;
+        return { ...client, archivedAt: client.archivedAt ?? new Date().toISOString() };
       });
+
+      if (!found) {
+        return false;
+      }
 
       return true;
     });
@@ -453,6 +558,10 @@ export const fileRepository: Repository = {
 
   async createServiceOption(option: ServiceOption) {
     await mutateSnapshot((snapshot) => {
+      if (snapshot.serviceOptions.some((item) => item.id === option.id)) {
+        throw new DomainError("Service option with this id already exists", 409);
+      }
+
       snapshot.serviceOptions = [...snapshot.serviceOptions, option].sort((a, b) => a.title.localeCompare(b.title));
     });
     return option;
@@ -487,12 +596,16 @@ export const fileRepository: Repository = {
 
   async createService(service: ServicePreset) {
     await mutateSnapshot((snapshot) => {
+      if (snapshot.services.some((item) => item.id === service.id)) {
+        throw new DomainError("Service with this id already exists", 409);
+      }
+
       snapshot.services = [...snapshot.services, service].sort((a, b) => a.title.localeCompare(b.title));
     });
     return service;
   },
 
-  async updateService(id: string, patch: Partial<ServicePreset>) {
+  async updateService(id: string, patch: Omit<Partial<ServicePreset>, "priceFrom"> & { priceFrom?: number | null }) {
     return mutateSnapshot((snapshot) => {
       let updated: ServicePreset | null = null;
       snapshot.services = snapshot.services.map((service) => {
@@ -500,7 +613,13 @@ export const fileRepository: Repository = {
           return service;
         }
 
-        updated = { ...service, ...patch };
+        updated = {
+          ...service,
+          ...patch,
+          priceFrom: Object.prototype.hasOwnProperty.call(patch, "priceFrom")
+            ? patch.priceFrom ?? undefined
+            : service.priceFrom,
+        };
         return updated;
       });
       return updated;
@@ -509,6 +628,13 @@ export const fileRepository: Repository = {
 
   async deleteService(id: string) {
     return mutateSnapshot((snapshot) => {
+      const isUsed = snapshot.requests.some((request) => request.service === id) ||
+        snapshot.appointments.some((appointment) => appointment.service === id);
+
+      if (isUsed) {
+        throw new DomainError("Service is already used in booking history", 409);
+      }
+
       const before = snapshot.services.length;
       snapshot.services = snapshot.services.filter((service) => service.id !== id);
       return snapshot.services.length !== before;
@@ -525,6 +651,14 @@ export const fileRepository: Repository = {
     await mutateSnapshot((snapshot) => {
       if (window.status !== "available") {
         throw new DomainError("Новое окошко можно создать только свободным.");
+      }
+
+      if (!isFutureDateTime(window.startAt)) {
+        throw new DomainError("Окошко должно начинаться в будущем.");
+      }
+
+      if (snapshot.windows.some((item) => item.id === window.id)) {
+        throw new DomainError("Time window with this id already exists", 409);
       }
 
       const conflict = getWindowConflict(window, snapshot.windows);
@@ -589,12 +723,14 @@ export const fileRepository: Repository = {
       }
 
       if (targetWindow.id === oldWindow.id) {
-        return appointment;
+        return { item: appointment, changed: false };
       }
 
       if (targetWindow.status !== "available") {
         throw new DomainError("Перенести можно только в свободное окошко.");
       }
+
+      assertNoScheduledAppointmentInRange(snapshot, targetWindow, appointment.id);
 
       snapshot.windows = snapshot.windows.map((window) => {
         if (window.id === oldWindow.id) {
@@ -619,17 +755,25 @@ export const fileRepository: Repository = {
         request.id === appointment.requestId ? { ...request, preferredWindowId: targetWindow.id } : request,
       );
 
-      return updated;
+      return { item: updated, changed: true };
     });
   },
 
   async updateAppointmentStatus(id: string, status: Appointment["status"]) {
     return mutateSnapshot((snapshot) => {
       let updated: Appointment | null = null;
+      let changed = false;
       snapshot.appointments = snapshot.appointments.map((appointment) => {
         if (appointment.id !== id) {
           return appointment;
         }
+        changed = appointment.status !== status;
+        const transitionError = getAppointmentStatusTransitionError(appointment, status);
+
+        if (transitionError) {
+          throw new DomainError(transitionError);
+        }
+
         updated = {
           ...appointment,
           status,
@@ -656,7 +800,7 @@ export const fileRepository: Repository = {
         );
       }
 
-      return updated;
+      return updated ? { item: updated, changed } : null;
     });
   },
 
@@ -665,28 +809,46 @@ export const fileRepository: Repository = {
       const appointment = snapshot.appointments.find((item) => item.id === id);
 
       if (!appointment) {
-        return false;
+        return null;
       }
 
-      snapshot.appointments = snapshot.appointments.filter((item) => item.id !== id);
-      snapshot.windows = snapshot.windows.map((window) => {
-        if (
-          window.status === "reserved" &&
-          window.startAt === appointment.startAt &&
-          window.endAt === appointment.endAt
-        ) {
-          return { ...window, status: "available" };
-        }
+      const changed = appointment.status !== "cancelled";
+      let cancelledAppointment = appointment;
 
-        return window;
-      });
-      snapshot.requests = snapshot.requests.map((request) =>
-        request.id === appointment.requestId && request.status === "confirmed"
-          ? { ...request, status: "declined", preferredWindowId: null }
-          : request,
-      );
+      if (changed) {
+        snapshot.appointments = snapshot.appointments.map((item) =>
+          item.id === id
+            ? {
+              ...item,
+              status: "cancelled",
+              cancelledAt: item.cancelledAt ?? new Date().toISOString(),
+            }
+            : item,
+        );
+        cancelledAppointment = {
+          ...appointment,
+          status: "cancelled",
+          cancelledAt: appointment.cancelledAt ?? new Date().toISOString(),
+        };
+        snapshot.windows = snapshot.windows.map((window) => {
+          if (
+            window.status === "reserved" &&
+            window.startAt === appointment.startAt &&
+            window.endAt === appointment.endAt
+          ) {
+            return { ...window, status: "available" };
+          }
 
-      return true;
+          return window;
+        });
+        snapshot.requests = snapshot.requests.map((request) =>
+          request.id === appointment.requestId && request.status === "confirmed"
+            ? { ...request, status: "declined", preferredWindowId: null }
+            : request,
+        );
+      }
+
+      return { item: cancelledAppointment, changed };
     });
   },
 
@@ -729,6 +891,9 @@ export const fileRepository: Repository = {
         if (appointment.id !== id) {
           return appointment;
         }
+        if (appointment.surveyRating) {
+          return appointment;
+        }
         updated = {
           ...appointment,
           surveyRating: payload.rating,
@@ -745,6 +910,9 @@ export const fileRepository: Repository = {
       let updated: Appointment | null = null;
       snapshot.appointments = snapshot.appointments.map((appointment) => {
         if (appointment.publicToken !== token) {
+          return appointment;
+        }
+        if (appointment.surveyRating) {
           return appointment;
         }
         updated = {
@@ -766,21 +934,29 @@ export const fileRepository: Repository = {
       );
 
       if (existingAppointment) {
-        return existingAppointment;
+        return { appointment: existingAppointment, created: false };
       }
 
       const window = request?.preferredWindowId
         ? snapshot.windows.find((item) => item.id === request.preferredWindowId)
         : null;
 
-      if (!request || request.status === "declined" || !window || window.status === "reserved" || window.status === "blocked") {
+      if (
+        !request ||
+        (request.status !== "new" && request.status !== "waiting_client") ||
+        !window ||
+        !isFutureDateTime(window.startAt) ||
+        window.status === "reserved" ||
+        window.status === "blocked"
+      ) {
         return null;
       }
 
       assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, window.id, request.id);
+      assertNoScheduledAppointmentInRange(snapshot, window);
 
       const appointment: Appointment = ensureAppointmentPublicToken({
-        id: `APT-${Date.now()}`,
+        id: `APT-${request.id}`,
         requestId: request.id,
         clientId: request.clientId,
         service: request.service,
@@ -799,7 +975,7 @@ export const fileRepository: Repository = {
         item.id === window.id ? { ...item, status: "reserved" } : item,
       );
 
-      return appointment;
+      return { appointment, created: true };
     });
   },
 
@@ -811,7 +987,7 @@ export const fileRepository: Repository = {
       );
 
       if (existingAppointment) {
-        return existingAppointment;
+        return { appointment: existingAppointment, created: false };
       }
 
       if (!request || request.status !== "waiting_client") {
@@ -821,14 +997,15 @@ export const fileRepository: Repository = {
         ? snapshot.windows.find((item) => item.id === request.preferredWindowId)
         : null;
 
-      if (!window || window.status === "reserved" || window.status === "blocked") {
+      if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
         return null;
       }
 
       assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, window.id, request.id);
+      assertNoScheduledAppointmentInRange(snapshot, window);
 
       const appointment: Appointment = ensureAppointmentPublicToken({
-        id: `APT-${Date.now()}`,
+        id: `APT-${request.id}`,
         requestId: request.id,
         clientId: request.clientId,
         service: request.service,
@@ -847,7 +1024,7 @@ export const fileRepository: Repository = {
         item.id === window.id ? { ...item, status: "reserved" } : item,
       );
 
-      return appointment;
+      return { appointment, created: true };
     });
   },
 

@@ -7,7 +7,7 @@ import type {
   ServicePreset,
   TimeWindow,
 } from "../../src/types.js";
-import { makeWindowLabel } from "../../src/lib/bookingPresentation.js";
+import { makeWindowLabel } from "../../src/lib/displayTime.js";
 
 export function toClient(row: Record<string, unknown>): Client {
   return {
@@ -19,6 +19,7 @@ export function toClient(row: Record<string, unknown>): Client {
     firstVisit: Boolean(row.first_visit),
     telegramUserId: row.telegram_user_id ? String(row.telegram_user_id) : undefined,
     notes: row.notes ? String(row.notes) : undefined,
+    archivedAt: row.archived_at ? new Date(String(row.archived_at)).toISOString() : undefined,
   };
 }
 

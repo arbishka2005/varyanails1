@@ -1,5 +1,6 @@
 import type { Client } from "../../src/types.js";
-import { APP_TIME_ZONE, getTimestamp } from "../../src/lib/dateTime.js";
+import { getTimestamp } from "../../src/lib/dateTime.js";
+import { formatDateTimeRange } from "../../src/lib/displayTime.js";
 import type { Repository } from "../repositories/types.js";
 import {
   buildReminder24hPayload,
@@ -12,22 +13,6 @@ const HOUR_MS = 60 * 60 * 1000;
 const REMINDER_WINDOW_MS = 60 * 60 * 1000;
 
 type NotifyClient = (client: Client | null | undefined, payload: NotificationPayload) => Promise<boolean>;
-
-function formatTimeRange(startAt: string, endAt: string) {
-  const start = new Intl.DateTimeFormat("ru-RU", {
-    day: "numeric",
-    month: "long",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: APP_TIME_ZONE,
-  }).format(new Date(startAt));
-  const end = new Intl.DateTimeFormat("ru-RU", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: APP_TIME_ZONE,
-  }).format(new Date(endAt));
-  return `${start} - ${end}`;
-}
 
 function isWithinWindow(diffMs: number, targetHours: number) {
   const upper = targetHours * HOUR_MS;
@@ -63,7 +48,7 @@ export function startAppointmentScheduler(options: {
         const endAt = getTimestamp(appointment.endAt);
         const diffMs = startAt - now;
         const client = clientsById.get(appointment.clientId);
-        const timeLabel = formatTimeRange(appointment.startAt, appointment.endAt);
+        const timeLabel = formatDateTimeRange(appointment.startAt, appointment.endAt);
 
         if (!appointment.reminder24hSentAt && isWithinWindow(diffMs, 24) && client?.telegramUserId) {
           const sent = await notifyClient(client, buildReminder24hPayload(timeLabel, client.name));

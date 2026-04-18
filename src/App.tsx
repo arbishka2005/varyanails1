@@ -42,6 +42,7 @@ export function App() {
               hasRequest={client.hasClientRequest}
               lastRequestInfo={client.lastRequestInfo}
               lastSubmittedRequestId={client.lastSubmittedRequestId}
+              lastRequestLookupStatus={client.lastRequestLookupStatus}
               confirmClientWindow={client.confirmClientWindow}
               openRequests={() => openClientSection("requests")}
               openBookingFlow={() => client.openBookingFlow()}
@@ -83,6 +84,7 @@ export function App() {
             <ClientRequestsScreen
               lastRequestInfo={client.lastRequestInfo}
               lastSubmittedRequestId={client.lastSubmittedRequestId}
+              lastRequestLookupStatus={client.lastRequestLookupStatus}
               confirmClientWindow={client.confirmClientWindow}
               refreshLastRequest={client.refreshLastRequest}
               openBookingFlow={() => client.openBookingFlow()}
@@ -147,7 +149,6 @@ export function App() {
                   updateWindowStatus={adminActions.updateWindowStatus}
                   moveAppointment={adminActions.moveAppointment}
                   updateAppointmentStatus={adminActions.updateAppointmentStatus}
-                  deleteAppointment={adminActions.deleteAppointment}
                   addTimeWindow={adminActions.addTimeWindow}
                 />
               ) : null}
@@ -160,20 +161,18 @@ export function App() {
                   requests={requests}
                   services={services}
                   deleteClient={adminActions.deleteClient}
-                  deleteAppointment={adminActions.deleteAppointment}
                   updateClientNotes={adminActions.updateClientNotes}
                 />
               ) : null}
 
               {route.section === "settings" ? (
                 <SettingsWorkspace
+                  appointments={appointments}
+                  requests={requests}
                   services={services}
-                  windows={windows}
-                  addTimeWindow={adminActions.addTimeWindow}
                   createService={adminActions.createService}
                   updateService={adminActions.updateService}
                   deleteService={adminActions.deleteService}
-                  updateWindowStatus={adminActions.updateWindowStatus}
                 />
               ) : null}
 

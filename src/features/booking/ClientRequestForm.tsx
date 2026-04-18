@@ -353,7 +353,7 @@ export function ClientRequestForm({
     }
 
     if (file.type && !file.type.startsWith("image/")) {
-      setFileValidationError((current) => ({ ...current, [key]: "Загрузите изображение: JPG, PNG или HEIC." }));
+      setFileValidationError((current) => ({ ...current, [key]: "Загрузите изображение: JPG, PNG или WEBP." }));
       return;
     }
 
@@ -604,11 +604,11 @@ export function ClientRequestForm({
                                   className={`booking-slot-button${isActive ? " active" : ""}`}
                                   key={window.id}
                                   onClick={() =>
-                                    setForm({
-                                      ...form,
+                                    setForm((current) => ({
+                                      ...current,
                                       preferredWindowId: window.id,
                                       customWindowText: "",
-                                    })
+                                    }))
                                   }
                                   type="button"
                                 >
@@ -863,7 +863,7 @@ function UploadCard({
   return (
     <div className={`booking-upload-card${file ? " is-filled" : ""}${error ? " is-invalid" : ""}${!isRequired ? " is-optional" : ""}`}>
       <input
-        accept="image/*"
+        accept="image/jpeg,image/png,image/webp"
         className="booking-upload-input"
         ref={inputRef}
         type="file"

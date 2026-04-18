@@ -2,11 +2,14 @@ import express from "express";
 import { requireMaster } from "../auth/telegram.js";
 import { repository } from "../repositories/index.js";
 import {
-  notifyAppointmentCancelled,
-  notifyAppointmentMoved,
-  notifyBookingConfirmed,
-  notifyRequestStatusChanged,
-} from "./bookingEvents.js";
+  confirmRequestByMasterCommand,
+  deleteAppointmentCommand,
+  moveAppointmentCommand,
+  updateAppointmentStatusCommand,
+  updateRequestStatusCommand,
+  updateRequestWindowCommand,
+} from "../services/bookingCommands.js";
+import { sendCommandResult, sendError } from "./respond.js";
 import {
   createServiceSchema,
   createServiceOptionSchema,
@@ -35,97 +38,33 @@ adminRoutes.get("/api/snapshot", requireMaster, async (_request, response) => {
 
 adminRoutes.patch("/api/booking-requests/:id/status", requireMaster, async (request, response) => {
   const payload = updateRequestStatusSchema.parse(request.body);
-  const before = await repository.getBookingRequest(getParamId(request));
-  const updated = await repository.updateRequestStatus(getParamId(request), payload.status);
-
-  if (!updated) {
-    response.status(404).json({ error: "Booking request not found" });
-    return;
-  }
-
-  if (before?.status !== updated.status) {
-    void notifyRequestStatusChanged(updated);
-  }
-  response.json(updated);
+  sendCommandResult(response, await updateRequestStatusCommand(getParamId(request), payload.status));
 });
 
 adminRoutes.patch("/api/booking-requests/:id/window", requireMaster, async (request, response) => {
   const payload = updateRequestWindowSchema.parse(request.body);
-  const updated = await repository.updateRequestWindow(
-    getParamId(request),
-    payload.preferredWindowId,
-    payload.customWindowText,
+  sendCommandResult(
+    response,
+    await updateRequestWindowCommand(getParamId(request), payload.preferredWindowId, payload.customWindowText),
   );
-
-  if (!updated) {
-    response.status(404).json({ error: "Booking request not found" });
-    return;
-  }
-
-  response.json(updated);
 });
 
 adminRoutes.post("/api/booking-requests/:id/confirm", requireMaster, async (request, response) => {
-  const before = await repository.getBookingRequest(getParamId(request));
-  const appointment = await repository.confirmBookingRequest(getParamId(request));
-
-  if (!appointment) {
-    response.status(409).json({ error: "Request cannot be confirmed" });
-    return;
-  }
-
-  if (before?.status !== "confirmed") {
-    void notifyBookingConfirmed(appointment, "master");
-  }
-  response.status(201).json(appointment);
+  sendCommandResult(response, await confirmRequestByMasterCommand(getParamId(request)));
 });
 
 adminRoutes.patch("/api/appointments/:id/status", requireMaster, async (request, response) => {
   const payload = updateAppointmentStatusSchema.parse(request.body);
-  const before = await repository.getAppointment(getParamId(request));
-  const updated = await repository.updateAppointmentStatus(getParamId(request), payload.status);
-
-  if (!updated) {
-    response.status(404).json({ error: "Appointment not found" });
-    return;
-  }
-
-  if (before?.status !== "cancelled" && updated.status === "cancelled") {
-    void notifyAppointmentCancelled(updated);
-  }
-
-  response.json(updated);
+  sendCommandResult(response, await updateAppointmentStatusCommand(getParamId(request), payload.status));
 });
 
 adminRoutes.patch("/api/appointments/:id/window", requireMaster, async (request, response) => {
   const payload = moveAppointmentSchema.parse(request.body);
-  const before = await repository.getAppointment(getParamId(request));
-  const updated = await repository.moveAppointment(getParamId(request), payload.windowId);
-
-  if (!updated) {
-    response.status(409).json({ error: "Appointment cannot be moved" });
-    return;
-  }
-
-  if (!before || before.startAt !== updated.startAt || before.endAt !== updated.endAt) {
-    void notifyAppointmentMoved(updated, payload.windowId);
-  }
-  response.json(updated);
+  sendCommandResult(response, await moveAppointmentCommand(getParamId(request), payload.windowId));
 });
 
 adminRoutes.delete("/api/appointments/:id", requireMaster, async (request, response) => {
-  const before = await repository.getAppointment(getParamId(request));
-  const deleted = await repository.deleteAppointment(getParamId(request));
-
-  if (!deleted) {
-    response.status(404).json({ error: "Appointment not found" });
-    return;
-  }
-
-  if (before && before.status !== "cancelled") {
-    void notifyAppointmentCancelled(before);
-  }
-  response.status(204).end();
+  sendCommandResult(response, await deleteAppointmentCommand(getParamId(request)));
 });
 
 adminRoutes.patch("/api/clients/:id/notes", requireMaster, async (request, response) => {
@@ -133,7 +72,7 @@ adminRoutes.patch("/api/clients/:id/notes", requireMaster, async (request, respo
   const updated = await repository.updateClientNotes(getParamId(request), payload.notes);
 
   if (!updated) {
-    response.status(404).json({ error: "Client not found" });
+    sendError(response, 404, "Client not found");
     return;
   }
 
@@ -144,7 +83,7 @@ adminRoutes.delete("/api/clients/:id", requireMaster, async (request, response) 
   const deleted = await repository.deleteClient(getParamId(request));
 
   if (!deleted) {
-    response.status(404).json({ error: "Client not found" });
+    sendError(response, 404, "Client not found");
     return;
   }
 
@@ -162,7 +101,7 @@ adminRoutes.patch("/api/services/:id", requireMaster, async (request, response) 
   const updated = await repository.updateService(getParamId(request), payload);
 
   if (!updated) {
-    response.status(404).json({ error: "Service not found" });
+    sendError(response, 404, "Service not found");
     return;
   }
 
@@ -173,7 +112,7 @@ adminRoutes.delete("/api/services/:id", requireMaster, async (request, response)
   const deleted = await repository.deleteService(getParamId(request));
 
   if (!deleted) {
-    response.status(404).json({ error: "Service not found" });
+    sendError(response, 404, "Service not found");
     return;
   }
 
@@ -191,7 +130,7 @@ adminRoutes.patch("/api/service-options/:id", requireMaster, async (request, res
   const updated = await repository.updateServiceOption(getParamId(request), payload);
 
   if (!updated) {
-    response.status(404).json({ error: "Service option not found" });
+    sendError(response, 404, "Service option not found");
     return;
   }
 
@@ -202,7 +141,7 @@ adminRoutes.delete("/api/service-options/:id", requireMaster, async (request, re
   const deleted = await repository.deleteServiceOption(getParamId(request));
 
   if (!deleted) {
-    response.status(404).json({ error: "Service option not found" });
+    sendError(response, 404, "Service option not found");
     return;
   }
 
@@ -219,7 +158,7 @@ adminRoutes.patch("/api/time-windows/:id/status", requireMaster, async (request,
   const updated = await repository.updateTimeWindowStatus(getParamId(request), payload.status);
 
   if (!updated) {
-    response.status(404).json({ error: "Time window not found" });
+    sendError(response, 404, "Time window not found");
     return;
   }
 

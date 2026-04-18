@@ -26,8 +26,9 @@ import {
 } from "../db/mappers.js";
 import { generatePublicToken } from "../lib/publicTokens.js";
 import { DomainError } from "../lib/domainErrors.js";
-import { makeWindowLabel } from "../../src/lib/bookingPresentation.js";
+import { makeWindowLabel } from "../../src/lib/displayTime.js";
 import { isFutureDateTime } from "../../src/lib/dateTime.js";
+import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
 
 export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
   const [services, windows, options] = await Promise.all([
@@ -179,6 +180,16 @@ export async function createBookingRequest(payload: {
       throw new DomainError("Выберите свободное окошко из списка.");
     }
 
+    const serviceResult = await client.query(
+      "SELECT * FROM service_presets WHERE id = $1",
+      [payload.request.service],
+    );
+    assertBookingRequestMatchesService(
+      payload.request,
+      payload.photos,
+      serviceResult.rows[0] ? toService(serviceResult.rows[0]) : null,
+    );
+
     const windowResult = await client.query(
       "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
       [payload.request.preferredWindowId],
@@ -188,6 +199,8 @@ export async function createBookingRequest(payload: {
     if (!selectedWindow || selectedWindow.status !== "available" || !isFutureDateTime(selectedWindow.startAt)) {
       throw new DomainError("Это окошко уже занято. Выберите другое.");
     }
+
+    await assertWindowIsNotOwnedByAnotherActiveRequest(client, selectedWindow.id, payload.request.id);
 
     await insertClient(client, payload.client);
 
@@ -214,12 +227,12 @@ export async function updateRequestStatus(id: string, status: RequestStatus) {
       return null;
     }
 
+    const changed = request.status !== status;
     const transitionError = getRequestStatusTransitionError(request, status);
 
     if (transitionError) {
       throw new DomainError(transitionError);
     }
-
     const result = await client.query(
       `UPDATE booking_requests
         SET status = $2,
@@ -234,7 +247,7 @@ export async function updateRequestStatus(id: string, status: RequestStatus) {
       await releaseWindowIfUnused(client, request.preferredWindowId);
     }
 
-    return result.rows[0] ? toBookingRequest(result.rows[0]) : null;
+    return result.rows[0] ? { item: toBookingRequest(result.rows[0]), changed } : null;
   });
 }
 
@@ -268,6 +281,7 @@ export async function updateRequestWindow(
 
       if (
         !selectedWindow ||
+        !isFutureDateTime(selectedWindow.startAt) ||
         (selectedWindow.status !== "available" && preferredWindowId !== request.preferredWindowId)
       ) {
         throw new DomainError("Это окошко уже занято. Выберите другое.");
@@ -279,6 +293,8 @@ export async function updateRequestWindow(
       ) {
         throw new DomainError("Это окошко уже недоступно.");
       }
+
+      await assertWindowIsNotOwnedByAnotherActiveRequest(client, preferredWindowId, request.id);
     }
 
     const result = await client.query(
@@ -316,39 +332,16 @@ export async function updateClientNotes(id: string, notes: string) {
 }
 
 export async function deleteClient(id: string) {
-  return withTransaction(async (client) => {
-    const requestsResult = await client.query(
-      "SELECT preferred_window_id, photo_ids FROM booking_requests WHERE client_id = $1 FOR UPDATE",
-      [id],
-    );
-    const requestRows = requestsResult.rows as { preferred_window_id: string | null; photo_ids: string[] }[];
-    const affectedWindowIds = [
-      ...new Set(requestRows.map((row) => row.preferred_window_id).filter((value): value is string => Boolean(value))),
-    ];
-    const photoIds = [
-      ...new Set(
-        requestRows.flatMap((row) =>
-          Array.isArray(row.photo_ids) ? row.photo_ids.map((photoId) => String(photoId)) : [],
-        ),
-      ),
-    ];
+  const result = await pool.query(
+    `
+      UPDATE clients
+      SET archived_at = COALESCE(archived_at, NOW())
+      WHERE id = $1
+    `,
+    [id],
+  );
 
-    if (photoIds.length > 0) {
-      await client.query("DELETE FROM photo_attachments WHERE id = ANY($1::text[])", [photoIds]);
-    }
-
-    const result = await client.query("DELETE FROM clients WHERE id = $1", [id]);
-
-    if (result.rowCount === 0) {
-      return false;
-    }
-
-    for (const windowId of affectedWindowIds) {
-      await releaseWindowIfUnused(client, windowId);
-    }
-
-    return true;
-  });
+  return (result.rowCount ?? 0) > 0;
 }
 
 export async function createService(service: ServicePreset) {
@@ -356,6 +349,7 @@ export async function createService(service: ServicePreset) {
     `INSERT INTO service_presets
       (id, title, duration_minutes, price_from, requires_hand_photo, requires_reference, options)
     VALUES ($1, $2, $3, $4, $5, $6, $7)
+    ON CONFLICT (id) DO NOTHING
     RETURNING *`,
     [
       service.id,
@@ -368,6 +362,10 @@ export async function createService(service: ServicePreset) {
     ],
   );
 
+  if (!result.rows[0]) {
+    throw new DomainError("Service with this id already exists", 409);
+  }
+
   return toService(result.rows[0]);
 }
 
@@ -376,9 +374,14 @@ export async function createServiceOption(option: ServiceOption) {
     `INSERT INTO service_options
       (id, title, duration_minutes, price_from)
     VALUES ($1, $2, $3, $4)
+    ON CONFLICT (id) DO NOTHING
     RETURNING *`,
     [option.id, option.title, option.durationMinutes, option.priceFrom ?? null],
   );
+
+  if (!result.rows[0]) {
+    throw new DomainError("Service option with this id already exists", 409);
+  }
 
   return toServiceOption(result.rows[0]);
 }
@@ -415,13 +418,16 @@ export async function deleteServiceOption(id: string) {
   });
 }
 
-export async function updateService(id: string, patch: Partial<ServicePreset>) {
+export async function updateService(
+  id: string,
+  patch: Omit<Partial<ServicePreset>, "priceFrom"> & { priceFrom?: number | null },
+) {
   const result = await pool.query(
     `UPDATE service_presets
     SET
       title = COALESCE($2, title),
       duration_minutes = COALESCE($3, duration_minutes),
-      price_from = COALESCE($4, price_from),
+      price_from = CASE WHEN $8::boolean THEN $4 ELSE price_from END,
       requires_hand_photo = COALESCE($5, requires_hand_photo),
       requires_reference = COALESCE($6, requires_reference),
       options = COALESCE($7, options)
@@ -435,6 +441,7 @@ export async function updateService(id: string, patch: Partial<ServicePreset>) {
       patch.requiresHandPhoto ?? null,
       patch.requiresReference ?? null,
       patch.options ? JSON.stringify(patch.options) : null,
+      Object.prototype.hasOwnProperty.call(patch, "priceFrom"),
     ],
   );
 
@@ -442,6 +449,20 @@ export async function updateService(id: string, patch: Partial<ServicePreset>) {
 }
 
 export async function deleteService(id: string) {
+  const usage = await pool.query(
+    `
+      SELECT 1 FROM booking_requests WHERE service = $1
+      UNION
+      SELECT 1 FROM appointments WHERE service = $1
+      LIMIT 1
+    `,
+    [id],
+  );
+
+  if ((usage.rowCount ?? 0) > 0) {
+    throw new DomainError("Service is already used in booking history", 409);
+  }
+
   const result = await pool.query("DELETE FROM service_presets WHERE id = $1", [id]);
   return (result.rowCount ?? 0) > 0;
 }
@@ -451,8 +472,18 @@ export async function createTimeWindow(window: TimeWindow) {
     throw new DomainError("Новое окошко можно создать только свободным.");
   }
 
+  if (!isFutureDateTime(window.startAt)) {
+    throw new DomainError("Окошко должно начинаться в будущем.");
+  }
+
   return withTransaction(async (client) => {
     await client.query("SELECT pg_advisory_xact_lock(hashtext('time_windows:create'))");
+
+    const duplicateId = await client.query("SELECT id FROM time_windows WHERE id = $1 LIMIT 1", [window.id]);
+
+    if (duplicateId.rows[0]) {
+      throw new DomainError("Time window with this id already exists", 409);
+    }
 
     const duplicate = await client.query(
       "SELECT id FROM time_windows WHERE start_at = $1 AND end_at = $2 LIMIT 1",
@@ -549,12 +580,14 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
     }
 
     if (targetWindow.id === oldWindow.id) {
-      return appointment;
+      return { item: appointment, changed: false };
     }
 
     if (targetWindow.status !== "available") {
       throw new DomainError("Перенести можно только в свободное окошко.");
     }
+
+    await assertNoScheduledAppointmentInRange(client, targetWindow.startAt, targetWindow.endAt, appointment.id);
 
     await client.query("UPDATE time_windows SET status = 'available' WHERE id = $1", [oldWindow.id]);
     await client.query("UPDATE time_windows SET status = 'reserved' WHERE id = $1", [targetWindow.id]);
@@ -571,7 +604,7 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
       [appointment.id, targetWindow.startAt, targetWindow.endAt],
     );
 
-    return updated.rows[0] ? toAppointment(updated.rows[0]) : null;
+    return updated.rows[0] ? { item: toAppointment(updated.rows[0]), changed: true } : null;
   });
 }
 
@@ -582,6 +615,13 @@ export async function updateAppointmentStatus(id: string, status: Appointment["s
 
     if (!appointment) {
       return null;
+    }
+
+    const changed = appointment.status !== status;
+    const transitionError = getAppointmentStatusTransitionError(appointment, status);
+
+    if (transitionError) {
+      throw new DomainError(transitionError);
     }
 
     const cancelledAt = status === "cancelled" ? new Date().toISOString() : null;
@@ -610,7 +650,7 @@ export async function updateAppointmentStatus(id: string, status: Appointment["s
       );
     }
 
-    return updated.rows[0] ? toAppointment(updated.rows[0]) : null;
+    return updated.rows[0] ? { item: toAppointment(updated.rows[0]), changed } : null;
   });
 }
 
@@ -620,25 +660,38 @@ export async function deleteAppointment(id: string) {
     const appointment = current.rows[0] ? toAppointment(current.rows[0]) : null;
 
     if (!appointment) {
-      return false;
+      return null;
     }
 
-    await client.query("DELETE FROM appointments WHERE id = $1", [id]);
-    await client.query(
-      `UPDATE time_windows
-          SET status = 'available'
-        WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
-      [appointment.startAt, appointment.endAt],
-    );
-    await client.query(
-      `UPDATE booking_requests
-          SET status = 'declined',
-              preferred_window_id = NULL
-        WHERE id = $1 AND status = 'confirmed'`,
-      [appointment.requestId],
-    );
+    const changed = appointment.status !== "cancelled";
+    let cancelledAppointment = appointment;
 
-    return true;
+    if (changed) {
+      const cancelledAt = new Date().toISOString();
+      await client.query(
+        `UPDATE appointments
+          SET status = 'cancelled',
+              cancelled_at = COALESCE(cancelled_at, $2)
+        WHERE id = $1`,
+        [id, cancelledAt],
+      );
+      await client.query(
+        `UPDATE time_windows
+            SET status = 'available'
+          WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
+        [appointment.startAt, appointment.endAt],
+      );
+      await client.query(
+        `UPDATE booking_requests
+            SET status = 'declined',
+                preferred_window_id = NULL
+          WHERE id = $1 AND status = 'confirmed'`,
+        [appointment.requestId],
+      );
+      cancelledAppointment = { ...appointment, status: "cancelled", cancelledAt: appointment.cancelledAt ?? cancelledAt };
+    }
+
+    return { item: cancelledAppointment, changed };
   });
 }
 
@@ -676,6 +729,7 @@ export async function submitAppointmentSurvey(
       SET survey_rating = $2,
           survey_text = $3
     WHERE id = $1
+      AND survey_rating IS NULL
     RETURNING *`,
     [id, payload.rating, payload.text ?? null],
   );
@@ -692,6 +746,7 @@ export async function submitAppointmentSurveyByPublicToken(
       SET survey_rating = $2,
           survey_text = $3
     WHERE public_token = $1
+      AND survey_rating IS NULL
     RETURNING *`,
     [token, payload.rating, payload.text ?? null],
   );
@@ -709,14 +764,10 @@ export async function confirmBookingRequest(requestId: string) {
     const existingAppointment = await getAppointmentForRequest(client, requestId);
 
     if (existingAppointment) {
-      return existingAppointment;
+      return { appointment: existingAppointment, created: false };
     }
 
-    if (!request?.preferredWindowId) {
-      return null;
-    }
-
-    if (request.status === "declined") {
+    if (!request?.preferredWindowId || (request.status !== "new" && request.status !== "waiting_client")) {
       return null;
     }
 
@@ -726,14 +777,15 @@ export async function confirmBookingRequest(requestId: string) {
     );
     const window = windowResult.rows[0] ? toTimeWindow(windowResult.rows[0]) : null;
 
-    if (!window || window.status === "reserved" || window.status === "blocked") {
+    if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
       return null;
     }
 
     await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
+    await assertNoScheduledAppointmentInRange(client, window.startAt, window.endAt);
 
     const appointment: Appointment = {
-      id: `APT-${Date.now()}`,
+      id: `APT-${request.id}`,
       publicToken: generatePublicToken(),
       requestId: request.id,
       clientId: request.clientId,
@@ -767,7 +819,7 @@ export async function confirmBookingRequest(requestId: string) {
       ],
     );
 
-    return appointment;
+    return { appointment, created: true };
   });
 }
 
@@ -781,7 +833,7 @@ export async function confirmBookingRequestByClient(requestId: string) {
     const existingAppointment = await getAppointmentForRequest(client, requestId);
 
     if (existingAppointment) {
-      return existingAppointment;
+      return { appointment: existingAppointment, created: false };
     }
 
     if (!request || request.status !== "waiting_client" || !request.preferredWindowId) {
@@ -794,14 +846,15 @@ export async function confirmBookingRequestByClient(requestId: string) {
     );
     const window = windowResult.rows[0] ? toTimeWindow(windowResult.rows[0]) : null;
 
-    if (!window || window.status === "reserved" || window.status === "blocked") {
+    if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
       return null;
     }
 
     await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
+    await assertNoScheduledAppointmentInRange(client, window.startAt, window.endAt);
 
     const appointment: Appointment = {
-      id: `APT-${Date.now()}`,
+      id: `APT-${request.id}`,
       publicToken: generatePublicToken(),
       requestId: request.id,
       clientId: request.clientId,
@@ -835,7 +888,7 @@ export async function confirmBookingRequestByClient(requestId: string) {
       ],
     );
 
-    return appointment;
+    return { appointment, created: true };
   });
 }
 
@@ -868,8 +921,8 @@ async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) 
 async function insertClient(client: PoolClient, item: Client) {
   await client.query(
     `INSERT INTO clients
-      (id, name, phone, preferred_contact_channel, contact_handle, first_visit, telegram_user_id, notes)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      (id, name, phone, preferred_contact_channel, contact_handle, first_visit, telegram_user_id, notes, archived_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
     ON CONFLICT (id) DO UPDATE SET
       name = EXCLUDED.name,
       phone = EXCLUDED.phone,
@@ -877,7 +930,8 @@ async function insertClient(client: PoolClient, item: Client) {
       contact_handle = EXCLUDED.contact_handle,
       first_visit = EXCLUDED.first_visit,
       telegram_user_id = EXCLUDED.telegram_user_id,
-      notes = EXCLUDED.notes`,
+      notes = EXCLUDED.notes,
+      archived_at = EXCLUDED.archived_at`,
     [
       item.id,
       item.name,
@@ -887,6 +941,7 @@ async function insertClient(client: PoolClient, item: Client) {
       item.firstVisit,
       item.telegramUserId ?? null,
       item.notes ?? null,
+      item.archivedAt ?? null,
     ],
   );
 }
@@ -911,7 +966,7 @@ async function releaseWindowIfUnused(client: PoolClient, windowId: string) {
       AND status = 'offered'
       AND NOT EXISTS (
         SELECT 1 FROM booking_requests
-        WHERE preferred_window_id = $1 AND status != 'declined'
+        WHERE preferred_window_id = $1 AND status IN ('new', 'waiting_client', 'confirmed')
       )`,
     [windowId],
   );
@@ -963,7 +1018,7 @@ async function assertWindowIsNotOwnedByAnotherActiveRequest(
     `SELECT id FROM booking_requests
       WHERE preferred_window_id = $1
         AND id <> $2
-        AND status != 'declined'
+        AND status IN ('new', 'waiting_client', 'confirmed')
       LIMIT 1`,
     [windowId, requestId],
   );
@@ -971,6 +1026,46 @@ async function assertWindowIsNotOwnedByAnotherActiveRequest(
   if (result.rows[0]) {
     throw new DomainError("Это окошко уже привязано к другой заявке.");
   }
+}
+
+async function assertNoScheduledAppointmentInRange(
+  client: PoolClient,
+  startAt: string,
+  endAt: string,
+  ignoredAppointmentId?: string,
+) {
+  const result = await client.query(
+    `SELECT id FROM appointments
+      WHERE status = 'scheduled'
+        AND start_at < $2::timestamptz
+        AND end_at > $1::timestamptz
+        AND ($3::text IS NULL OR id <> $3)
+      LIMIT 1`,
+    [startAt, endAt, ignoredAppointmentId ?? null],
+  );
+
+  if (result.rows[0]) {
+    throw new DomainError("This time is already occupied by another appointment.", 409);
+  }
+}
+
+function getAppointmentStatusTransitionError(
+  appointment: Appointment,
+  nextStatus: Appointment["status"],
+) {
+  if (appointment.status === nextStatus) {
+    return "";
+  }
+
+  if (appointment.status !== "scheduled") {
+    return "Closed appointment status cannot be changed.";
+  }
+
+  if (nextStatus === "scheduled") {
+    return "Cancelled or finished appointment cannot be reopened.";
+  }
+
+  return "";
 }
 
 async function getManualWindowStatusError(
@@ -993,7 +1088,7 @@ async function getManualWindowStatusError(
   const activeRequest = await client.query(
     `SELECT id FROM booking_requests
       WHERE preferred_window_id = $1
-        AND status != 'declined'
+        AND status IN ('new', 'waiting_client', 'confirmed')
       LIMIT 1`,
     [window.id],
   );
@@ -1024,7 +1119,7 @@ async function insertRequest(client: PoolClient, item: BookingRequest) {
     publicToken: item.publicToken ?? generatePublicToken(),
   };
 
-  await client.query(
+  const result = await client.query(
     `INSERT INTO booking_requests
       (
         id, public_token, client_id, service, option_ids, length, desired_result, photo_ids,
@@ -1032,7 +1127,8 @@ async function insertRequest(client: PoolClient, item: BookingRequest) {
         estimated_price_from, status, created_at, master_note, clarification_question
       )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-    ON CONFLICT (id) DO NOTHING`,
+    ON CONFLICT (id) DO NOTHING
+    RETURNING *`,
     [
       request.id,
       request.publicToken,
@@ -1054,5 +1150,9 @@ async function insertRequest(client: PoolClient, item: BookingRequest) {
     ],
   );
 
-  return request;
+  if (!result.rows[0]) {
+    throw new DomainError("Booking request with this id already exists", 409);
+  }
+
+  return toBookingRequest(result.rows[0]);
 }

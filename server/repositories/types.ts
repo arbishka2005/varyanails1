@@ -15,6 +15,16 @@ import type {
 
 export type { AppSnapshot, PublicBookingConfig } from "../../src/types.js";
 
+export type ConfirmBookingResult = {
+  appointment: Appointment;
+  created: boolean;
+};
+
+export type MutationResult<T> = {
+  item: T;
+  changed: boolean;
+};
+
 export type Repository = {
   bootstrapSeedData: () => Promise<void>;
   getSnapshot: () => Promise<AppSnapshot>;
@@ -30,7 +40,7 @@ export type Repository = {
     photos: PhotoAttachment[];
     request: BookingRequest;
   }) => Promise<PublicBookingAccess>;
-  updateRequestStatus: (id: string, status: RequestStatus) => Promise<BookingRequest | null>;
+  updateRequestStatus: (id: string, status: RequestStatus) => Promise<MutationResult<BookingRequest> | null>;
   updateRequestWindow: (
     id: string,
     preferredWindowId: string | null,
@@ -42,13 +52,16 @@ export type Repository = {
   updateServiceOption: (id: string, patch: Partial<ServiceOption>) => Promise<ServiceOption | null>;
   deleteServiceOption: (id: string) => Promise<boolean>;
   createService: (service: ServicePreset) => Promise<ServicePreset>;
-  updateService: (id: string, patch: Partial<ServicePreset>) => Promise<ServicePreset | null>;
+  updateService: (
+    id: string,
+    patch: Omit<Partial<ServicePreset>, "priceFrom"> & { priceFrom?: number | null },
+  ) => Promise<ServicePreset | null>;
   deleteService: (id: string) => Promise<boolean>;
   createTimeWindow: (window: TimeWindow) => Promise<TimeWindow>;
   updateTimeWindowStatus: (id: string, status: TimeWindowStatus) => Promise<TimeWindow | null>;
-  moveAppointment: (appointmentId: string, windowId: string) => Promise<Appointment | null>;
-  updateAppointmentStatus: (id: string, status: Appointment["status"]) => Promise<Appointment | null>;
-  deleteAppointment: (id: string) => Promise<boolean>;
+  moveAppointment: (appointmentId: string, windowId: string) => Promise<MutationResult<Appointment> | null>;
+  updateAppointmentStatus: (id: string, status: Appointment["status"]) => Promise<MutationResult<Appointment> | null>;
+  deleteAppointment: (id: string) => Promise<MutationResult<Appointment> | null>;
   markAppointmentReminder: (id: string, kind: "24h" | "3h", sentAt: string) => Promise<Appointment | null>;
   markAppointmentSurveySent: (id: string, sentAt: string) => Promise<Appointment | null>;
   submitAppointmentSurvey: (
@@ -59,7 +72,7 @@ export type Repository = {
     token: string,
     payload: { rating: number; text?: string },
   ) => Promise<Appointment | null>;
-  confirmBookingRequest: (requestId: string) => Promise<Appointment | null>;
-  confirmBookingRequestByClient: (requestId: string) => Promise<Appointment | null>;
-  confirmBookingRequestByPublicToken: (token: string) => Promise<Appointment | null>;
+  confirmBookingRequest: (requestId: string) => Promise<ConfirmBookingResult | null>;
+  confirmBookingRequestByClient: (requestId: string) => Promise<ConfirmBookingResult | null>;
+  confirmBookingRequestByPublicToken: (token: string) => Promise<ConfirmBookingResult | null>;
 };

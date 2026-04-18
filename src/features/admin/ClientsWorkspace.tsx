@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { CalendarClock, History, MessageCircle, Phone, Trash2 } from "lucide-react";
+﻿import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Archive, CalendarClock, History, MessageCircle, Phone } from "lucide-react";
 import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import {
@@ -28,6 +28,50 @@ import type {
 
 type ClientStatusFilter = RequestStatus | "all";
 
+type ClientRow = {
+  client: Client;
+  clientRequests: BookingRequest[];
+  clientAppointments: AppSnapshot["appointments"];
+  clientPhotos: PhotoAttachment[];
+  latestRequest: BookingRequest | null;
+  latestActivityAt: string;
+  memory: ReturnType<typeof parseClientMemory>;
+  hasActiveAppointment: boolean;
+  hasDuplicateContact: boolean;
+};
+
+function safeText(value: string | undefined, fallback: string) {
+  const normalized = value?.trim();
+  return normalized || fallback;
+}
+
+function safeFormatDateTime(value: string | undefined) {
+  if (!value) {
+    return "дата не указана";
+  }
+
+  try {
+    return formatDateTime(value);
+  } catch {
+    return "дата не читается";
+  }
+}
+
+function normalizeContact(value: string | undefined) {
+  return value?.replace(/[\s()\-+@]/g, "").toLocaleLowerCase("ru-RU") ?? "";
+}
+
+function sortByCreatedAtDesc(left: BookingRequest, right: BookingRequest) {
+  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+}
+
+function sortAppointmentsDesc(
+  left: AppSnapshot["appointments"][number],
+  right: AppSnapshot["appointments"][number],
+) {
+  return new Date(right.startAt).getTime() - new Date(left.startAt).getTime();
+}
+
 export function ClientsWorkspace({
   appointments,
   clients,
@@ -35,7 +79,6 @@ export function ClientsWorkspace({
   requests,
   services,
   deleteClient,
-  deleteAppointment,
   updateClientNotes,
 }: {
   appointments: AppSnapshot["appointments"];
@@ -44,7 +87,6 @@ export function ClientsWorkspace({
   requests: BookingRequest[];
   services: ServicePreset[];
   deleteClient: (id: string) => void;
-  deleteAppointment: (id: string) => void;
   updateClientNotes: (id: string, notes: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -52,19 +94,64 @@ export function ClientsWorkspace({
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
 
-  const clientRows = useMemo(
-    () =>
-      clients.map((client) => {
-        const clientRequests = requests.filter((request) => request.clientId === client.id);
-        const clientAppointments = appointments.filter((appointment) => appointment.clientId === client.id);
-        const clientPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds));
-        const clientPhotos = photos.filter((photo) => clientPhotoIds.has(photo.id));
-        const latestRequest = clientRequests[0];
-        const memory = parseClientMemory(client.notes);
+  const duplicateContactKeys = useMemo(() => {
+    const counts = new Map<string, number>();
 
-        return { client, clientRequests, clientAppointments, clientPhotos, latestRequest, memory };
-      }),
-    [appointments, clients, photos, requests],
+    for (const client of clients.filter((item) => !item.archivedAt)) {
+      const phoneKey = normalizeContact(client.phone);
+      const handleKey = normalizeContact(client.contactHandle);
+
+      if (phoneKey) {
+        counts.set(`phone:${phoneKey}`, (counts.get(`phone:${phoneKey}`) ?? 0) + 1);
+      }
+
+      if (handleKey) {
+        counts.set(`handle:${handleKey}`, (counts.get(`handle:${handleKey}`) ?? 0) + 1);
+      }
+    }
+
+    return counts;
+  }, [clients]);
+
+  const clientRows = useMemo<ClientRow[]>(
+    () =>
+      clients
+        .filter((client) => !client.archivedAt)
+        .map((client) => {
+          const clientRequests = requests
+            .filter((request) => request.clientId === client.id)
+            .slice()
+            .sort(sortByCreatedAtDesc);
+          const clientAppointments = appointments
+            .filter((appointment) => appointment.clientId === client.id)
+            .slice()
+            .sort(sortAppointmentsDesc);
+          const clientPhotoIds = new Set(clientRequests.flatMap((request) => request.photoIds ?? []));
+          const clientPhotos = photos.filter((photo) => clientPhotoIds.has(photo.id));
+          const latestRequest = clientRequests[0] ?? null;
+          const latestAppointment = clientAppointments[0] ?? null;
+          const memory = parseClientMemory(client.notes);
+          const phoneKey = normalizeContact(client.phone);
+          const handleKey = normalizeContact(client.contactHandle);
+          const hasDuplicateContact =
+            Boolean(phoneKey && (duplicateContactKeys.get(`phone:${phoneKey}`) ?? 0) > 1) ||
+            Boolean(handleKey && (duplicateContactKeys.get(`handle:${handleKey}`) ?? 0) > 1);
+          const latestActivityAt = latestAppointment?.startAt ?? latestRequest?.createdAt ?? "";
+
+          return {
+            client,
+            clientRequests,
+            clientAppointments,
+            clientPhotos,
+            latestRequest,
+            latestActivityAt,
+            memory,
+            hasActiveAppointment: clientAppointments.some((appointment) => appointment.status === "scheduled"),
+            hasDuplicateContact,
+          };
+        })
+        .sort((left, right) => new Date(right.latestActivityAt).getTime() - new Date(left.latestActivityAt).getTime()),
+    [appointments, clients, duplicateContactKeys, photos, requests],
   );
 
   const filteredClientRows = useMemo(
@@ -96,36 +183,30 @@ export function ClientsWorkspace({
     [clientRows, normalizedQuery, services, statusFilter],
   );
 
+  const archivedCount = clients.filter((client) => client.archivedAt).length;
   const hasActiveFilters = Boolean(normalizedQuery) || statusFilter !== "all";
 
-  const handleDeleteClient = (client: Client) => {
+  const handleArchiveClient = (row: ClientRow) => {
+    const activeWarning = row.hasActiveAppointment
+      ? "\n\nУ клиентки есть активная запись. Запись останется в расписании, но профиль уйдёт из рабочей базы."
+      : "";
     const confirmed = window.confirm(
-      `Удалить клиента ${client.name} из истории? Вместе с ним удалятся заявки, записи и привязанные фото.`,
+      `Архивировать клиентку ${safeText(row.client.name, "без имени")}? История заявок, записей и фото сохранится.${activeWarning}`,
     );
 
     if (!confirmed) {
       return;
     }
 
-    deleteClient(client.id);
-  };
-
-  const handleDeleteAppointment = (appointmentId: string) => {
-    const confirmed = window.confirm("Удалить эту запись из истории и освободить слот?");
-
-    if (!confirmed) {
-      return;
-    }
-
-    deleteAppointment(appointmentId);
+    deleteClient(row.client.id);
   };
 
   return (
     <section className="clients-layout">
       <AdminScreenHeader
-        eyebrow="база"
-        title="Твояшкины"
-        description="Контакты, история и заметки"
+        eyebrow="клиентки"
+        title="База клиенток"
+        description="Контакты, история, фото и память мастера"
       />
 
       <div className="panel client-filters">
@@ -139,9 +220,9 @@ export function ClientsWorkspace({
           />
         </label>
         <label>
-          Последний статус
+          Последний статус заявки
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ClientStatusFilter)}>
-            <option value="all">Все клиентки</option>
+            <option value="all">Все активные</option>
             {Object.entries(statusLabels).map(([status, label]) => (
               <option key={status} value={status}>
                 {label}
@@ -152,6 +233,7 @@ export function ClientsWorkspace({
         <div className="filter-summary">
           <span>
             Найдено: {filteredClientRows.length} из {clientRows.length}
+            {archivedCount > 0 ? ` · в архиве ${archivedCount}` : ""}
           </span>
           <button
             className="secondary-button"
@@ -169,95 +251,102 @@ export function ClientsWorkspace({
 
       <div className="client-card-grid">
         {filteredClientRows.length === 0 ? (
-          <div className="empty-state">По этим фильтрам клиенток не найдено.</div>
+          <div className="empty-state">По этим фильтрам активных клиенток не найдено.</div>
         ) : (
-          filteredClientRows.map(({ client, clientRequests, clientAppointments, clientPhotos, latestRequest, memory }) => (
-            <article className="panel client-card" key={client.id}>
-              <div className="card-header">
-                <div>
-                  <span className="status">{client.firstVisit ? "Первый визит" : "Постоянная клиентка"}</span>
-                  <h3>{client.name}</h3>
+          filteredClientRows.map((row) => {
+            const { client, clientRequests, clientAppointments, clientPhotos, latestRequest, memory } = row;
+            const displayName = safeText(client.name, "Без имени");
+            const contactHandle = safeText(client.contactHandle, "не указан");
+
+            return (
+              <article className="panel client-card" key={client.id}>
+                <div className="card-header">
+                  <div>
+                    <span className="status">{client.firstVisit ? "Первый визит" : "Постоянная клиентка"}</span>
+                    <h3>{displayName}</h3>
+                  </div>
+                  <div className="client-card-actions">
+                    <span className="request-id">{client.id}</span>
+                    <button className="danger-button" onClick={() => handleArchiveClient(row)} type="button">
+                      <Archive size={16} /> Архивировать
+                    </button>
+                  </div>
                 </div>
-                <div className="client-card-actions">
-                  <span className="request-id">{client.id}</span>
-                  <button className="danger-button" onClick={() => handleDeleteClient(client)} type="button">
-                    <Trash2 size={16} /> Удалить
-                  </button>
+
+                {row.hasDuplicateContact ? (
+                  <div className="notice-inline">
+                    <AlertTriangle size={16} /> Похоже, есть дубль по телефону или нику.
+                  </div>
+                ) : null}
+
+                <div className="info-grid">
+                  <Info icon={<Phone size={16} />} label="Телефон" value={safeText(client.phone, "не указан")} />
+                  <Info
+                    icon={<MessageCircle size={16} />}
+                    label="Связь"
+                    value={`${contactLabels[client.preferredContactChannel] ?? "Контакт"} ${contactHandle}`}
+                  />
+                  <Info label="Заявки" value={String(clientRequests.length)} />
+                  <Info label="Записи" value={String(clientAppointments.length)} />
+                  <Info
+                    label="Последняя услуга"
+                    value={latestRequest ? getServiceTitle(services, latestRequest.service) : "Пока нет"}
+                  />
+                  <Info
+                    label="Последний статус"
+                    value={latestRequest ? statusLabels[latestRequest.status] : "Пока нет"}
+                  />
                 </div>
-              </div>
 
-              <div className="info-grid">
-                <Info icon={<Phone size={16} />} label="Телефон" value={client.phone} />
-                <Info
-                  icon={<MessageCircle size={16} />}
-                  label="Связь"
-                  value={`${contactLabels[client.preferredContactChannel]} ${client.contactHandle}`}
-                />
-                <Info label="Заявки" value={String(clientRequests.length)} />
-                <Info label="Записи" value={String(clientAppointments.length)} />
-                <Info
-                  label="Последняя услуга"
-                  value={latestRequest ? getServiceTitle(services, latestRequest.service) : "Еще нет"}
-                />
-                <Info
-                  label="Последний статус"
-                  value={latestRequest ? statusLabels[latestRequest.status] : "Еще нет"}
-                />
-              </div>
+                <ClientMemoryPanel client={client} memory={memory} updateClientNotes={updateClientNotes} />
 
-              <ClientMemoryPanel client={client} memory={memory} updateClientNotes={updateClientNotes} />
-
-              <div className="client-history">
-                <strong>
-                  <CalendarClock size={16} /> Записи
-                </strong>
-                {clientAppointments.length === 0 ? (
-                  <p>Подтвержденных записей пока нет.</p>
-                ) : (
-                  clientAppointments.map((appointment) => (
-                    <div className="history-item history-item-with-action" key={appointment.id}>
-                      <div className="history-item-copy">
+                <div className="client-history">
+                  <strong>
+                    <CalendarClock size={16} /> Записи
+                  </strong>
+                  {clientAppointments.length === 0 ? (
+                    <p>Подтверждённых записей пока нет.</p>
+                  ) : (
+                    clientAppointments.map((appointment) => (
+                      <div className="history-item" key={appointment.id}>
                         <span>
                           {getServiceTitle(services, appointment.service)} · {appointmentStatusLabels[appointment.status]}
                         </span>
                         <small>
-                          {formatDateTime(appointment.startAt)} · {appointment.durationMinutes} мин
+                          {safeFormatDateTime(appointment.startAt)} · {appointment.durationMinutes} мин
                         </small>
                       </div>
-                      <button
-                        className="secondary-button history-item-button"
-                        onClick={() => handleDeleteAppointment(appointment.id)}
-                        type="button"
-                      >
-                        <Trash2 size={16} /> Удалить
-                      </button>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))
+                  )}
+                </div>
 
-              <div className="client-history">
-                <strong>
-                  <History size={16} /> История
-                </strong>
-                {clientRequests.length === 0 ? (
-                  <p>Заявок пока нет.</p>
-                ) : (
-                  clientRequests.map((request) => (
-                    <div className="history-item" key={request.id}>
-                      <span>{getServiceTitle(services, request.service)} · {statusLabels[request.status]}</span>
-                      <small>{formatDateTime(request.createdAt)} · {request.estimatedMinutes} мин</small>
-                    </div>
-                  ))
-                )}
-              </div>
+                <div className="client-history">
+                  <strong>
+                    <History size={16} /> Заявки
+                  </strong>
+                  {clientRequests.length === 0 ? (
+                    <p>Заявок пока нет.</p>
+                  ) : (
+                    clientRequests.map((request) => (
+                      <div className="history-item" key={request.id}>
+                        <span>{getServiceTitle(services, request.service)} · {statusLabels[request.status]}</span>
+                        <small>{safeFormatDateTime(request.createdAt)} · {request.estimatedMinutes} мин</small>
+                      </div>
+                    ))
+                  )}
+                </div>
 
-              <div className="client-history">
-                <strong>Фото</strong>
-                {clientPhotos.length === 0 ? <p>Фото пока не приложены.</p> : <PhotoGallery photos={clientPhotos} onOpen={setSelectedPhoto} />}
-              </div>
-            </article>
-          ))
+                <div className="client-history">
+                  <strong>Фото</strong>
+                  {clientPhotos.length === 0 ? (
+                    <p>Фото пока не приложены.</p>
+                  ) : (
+                    <PhotoGallery photos={clientPhotos} onOpen={setSelectedPhoto} />
+                  )}
+                </div>
+              </article>
+            );
+          })
         )}
       </div>
       <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
@@ -297,8 +386,14 @@ function ClientMemoryPanel({
     <section className="client-memory-panel">
       <div className="section-inline-title">
         <strong>Память мастера</strong>
-        <span>то, что важно вспомнить перед визитом</span>
+        <span>что важно вспомнить перед визитом</span>
       </div>
+
+      {draft.warning ? (
+        <div className="notice-inline">
+          <AlertTriangle size={16} /> {draft.warning}
+        </div>
+      ) : null}
 
       <div className="client-memory-tags" aria-label="Быстрые заметки о клиентке">
         {clientMemoryTags.map((tag) => (
@@ -315,12 +410,12 @@ function ClientMemoryPanel({
 
       <label>
         Короткая заметка
-      <textarea
+        <textarea
           value={draft.note}
           onBlur={() => saveMemory(draft)}
           onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
-          placeholder="Например: любит мягкий квадрат, не переносит кислотные оттенки, лучше писать вечером."
-      />
+          placeholder="Например: любит мягкий квадрат, лучше писать вечером."
+        />
       </label>
     </section>
   );

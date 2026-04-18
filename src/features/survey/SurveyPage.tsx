@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { api } from "../../api";
+﻿import { useEffect, useState } from "react";
+import { api, getApiErrorMessage } from "../../api";
 import { formatDateTime } from "../../lib/bookingPresentation";
 import type { Appointment } from "../../types";
 
@@ -8,10 +8,13 @@ export function SurveyPage({ appointmentToken }: { appointmentToken: string }) {
   const [rating, setRating] = useState<number | null>(null);
   const [text, setText] = useState("");
   const [status, setStatus] = useState<"loading" | "ready" | "submitted" | "error">("loading");
+  const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     let mounted = true;
     setStatus("loading");
+    setErrorMessage("");
     api
       .getPublicAppointment(appointmentToken)
       .then((data) => {
@@ -27,8 +30,9 @@ export function SurveyPage({ appointmentToken }: { appointmentToken: string }) {
           setStatus("ready");
         }
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (mounted) {
+          setErrorMessage(getApiErrorMessage(error, "Не удалось открыть форму."));
           setStatus("error");
         }
       });
@@ -38,17 +42,22 @@ export function SurveyPage({ appointmentToken }: { appointmentToken: string }) {
   }, [appointmentToken]);
 
   const submitSurvey = async () => {
-    if (!rating) {
+    if (!rating || isSubmitting) {
       return;
     }
     try {
+      setIsSubmitting(true);
+      setErrorMessage("");
       await api.submitAppointmentSurvey(appointmentToken, {
         rating,
         text: text.trim() ? text.trim() : undefined,
       });
       setStatus("submitted");
-    } catch {
-      setStatus("error");
+    } catch (error) {
+      setErrorMessage(getApiErrorMessage(error, "Не удалось отправить отзыв."));
+      setStatus("ready");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -57,10 +66,13 @@ export function SurveyPage({ appointmentToken }: { appointmentToken: string }) {
       <div className={`panel survey-panel is-${status}`}>
         <h2>Оцените визит</h2>
         {status === "loading" ? <p role="status">Загружаю данные записи...</p> : null}
-        {status === "error" ? <p role="alert">Не удалось открыть форму. Попробуйте позже или напишите мастеру.</p> : null}
+        {status === "error" ? (
+          <p role="alert">{errorMessage || "Не удалось открыть форму. Попробуйте позже или напишите мастеру."}</p>
+        ) : null}
         {status !== "loading" && status !== "error" && appointment ? (
           <>
             <p>Запись: {formatDateTime(appointment.startAt)}</p>
+            {errorMessage ? <p role="alert">{errorMessage}</p> : null}
             {status === "submitted" ? (
               <p role="status">Спасибо! Отзыв уже получен.</p>
             ) : (
@@ -85,8 +97,8 @@ export function SurveyPage({ appointmentToken }: { appointmentToken: string }) {
                     placeholder="Напишите пару слов о визите"
                   />
                 </label>
-                <button className="primary-button" disabled={!rating} onClick={submitSurvey} type="button">
-                  Отправить отзыв
+                <button className="primary-button" disabled={!rating || isSubmitting} onClick={submitSurvey} type="button">
+                  {isSubmitting ? "Отправляю..." : "Отправить отзыв"}
                 </button>
               </>
             )}

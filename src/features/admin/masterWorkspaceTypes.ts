@@ -21,17 +21,16 @@ export type MasterWorkspaceProps = {
   requests: BookingRequest[];
   services: ServicePreset[];
   windows: TimeWindow[];
-  confirmRequest: (id: string) => void;
-  updateStatus: (id: string, status: RequestStatus) => void;
-  updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void;
-  updateWindowStatus: (id: string, status: TimeWindowStatus) => void;
-  moveAppointment: (appointmentId: string, windowId: string) => void;
+  confirmRequest: (id: string) => void | Promise<unknown>;
+  updateStatus: (id: string, status: RequestStatus) => void | Promise<unknown>;
+  updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void | Promise<unknown>;
+  updateWindowStatus: (id: string, status: TimeWindowStatus) => void | Promise<unknown>;
+  moveAppointment: (appointmentId: string, windowId: string) => void | Promise<unknown>;
   updateAppointmentStatus: (
     appointmentId: string,
     status: AppSnapshot["appointments"][number]["status"],
-  ) => void;
-  deleteAppointment: (appointmentId: string) => void;
-  addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void;
+  ) => void | Promise<unknown>;
+  addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void | Promise<unknown>;
 };
 
 export type MasterWorkspaceSectionProps = Omit<MasterWorkspaceProps, "view">;

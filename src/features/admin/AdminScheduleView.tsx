@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { CalendarClock, Plus, Trash2 } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { CalendarClock, Plus } from "lucide-react";
 import {
   formatDateTime,
   formatDayLabel,
@@ -25,7 +25,6 @@ export function AdminScheduleView({
   appointments,
   clients,
   addTimeWindow,
-  deleteAppointment,
   services,
   moveAppointment,
   updateAppointmentStatus,
@@ -36,7 +35,6 @@ export function AdminScheduleView({
   | "appointments"
   | "clients"
   | "addTimeWindow"
-  | "deleteAppointment"
   | "services"
   | "moveAppointment"
   | "updateAppointmentStatus"
@@ -48,6 +46,8 @@ export function AdminScheduleView({
   const [dragOverWindowId, setDragOverWindowId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<{ appointmentId: string; windowId: string } | null>(null);
   const [dragPreview, setDragPreview] = useState<{ x: number; y: number; label: string } | null>(null);
+  const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
+  const busyActionRef = useRef<string | null>(null);
   const [windowForm, setWindowForm] = useState({
     date: getTodayDateKey(),
     start: "11:00",
@@ -95,13 +95,32 @@ export function AdminScheduleView({
     setTapMoveAppointmentId(null);
   };
 
+  const runScheduleAction = async <T,>(key: string, action: () => T | Promise<T>) => {
+    if (busyActionRef.current) {
+      return null;
+    }
+
+    busyActionRef.current = key;
+    setBusyActionKey(key);
+    try {
+      return await action();
+    } finally {
+      busyActionRef.current = null;
+      setBusyActionKey(null);
+    }
+  };
+
   const executeMove = async () => {
     if (!pendingMove) {
       return;
     }
 
-    await moveAppointment(pendingMove.appointmentId, pendingMove.windowId);
-    setPendingMove(null);
+    const result = await runScheduleAction(`move:${pendingMove.appointmentId}:${pendingMove.windowId}`, () =>
+      moveAppointment(pendingMove.appointmentId, pendingMove.windowId),
+    );
+    if (result !== false) {
+      setPendingMove(null);
+    }
   };
 
   const autoScroll = (clientY: number) => {
@@ -123,10 +142,10 @@ export function AdminScheduleView({
       return;
     }
 
-    addTimeWindow({
+    void runScheduleAction("window:create", () => addTimeWindow({
       startAt: toAppDateTime(windowForm.date, windowForm.start),
       endAt: toAppDateTime(windowForm.date, windowForm.end),
-    });
+    }));
   };
 
   const addQuickWindow = (preset: QuickWindowPreset) => {
@@ -136,10 +155,10 @@ export function AdminScheduleView({
       start: nextWindow.start,
       end: nextWindow.end,
     });
-    addTimeWindow({
+    void runScheduleAction(`window:create:${preset}`, () => addTimeWindow({
       startAt: toAppDateTime(nextWindow.date, nextWindow.start),
       endAt: toAppDateTime(nextWindow.date, nextWindow.end),
-    });
+    }));
   };
 
   const pendingDetails = pendingMove
@@ -216,6 +235,7 @@ export function AdminScheduleView({
             </label>
             <button
               className="secondary-button"
+              disabled={Boolean(busyActionKey)}
               onClick={submitWindow}
               type="button"
             >
@@ -224,13 +244,13 @@ export function AdminScheduleView({
           </div>
 
           <div className="quick-window-row" aria-label="Быстрые окна">
-            <button className="secondary-button" onClick={() => addQuickWindow("tomorrow-morning")} type="button">
+            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-morning")} type="button">
               Завтра утром
             </button>
-            <button className="secondary-button" onClick={() => addQuickWindow("tomorrow-evening")} type="button">
+            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-evening")} type="button">
               Завтра вечер
             </button>
-            <button className="secondary-button" onClick={() => addQuickWindow("weekend")} type="button">
+            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("weekend")} type="button">
               Выходные
             </button>
           </div>
@@ -238,9 +258,9 @@ export function AdminScheduleView({
           <div className="calendar-board">
             {windowsByDate.length === 0 ? (
               <div className="empty-state calendar-empty-state">
-                <strong>Нет окошек на недельке</strong>
-                <span>Добавь пару свободных мест, чтобы пополнить кошелек.</span>
-                <button className="primary-button" onClick={submitWindow} type="button">
+                <strong>Нет окошек на ближайшие дни</strong>
+                <span>Добавьте свободные слоты, чтобы клиентки могли записаться.</span>
+                <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={submitWindow} type="button">
                   <Plus size={17} /> Добавить окошко
                 </button>
               </div>
@@ -250,7 +270,7 @@ export function AdminScheduleView({
                   <div className="empty-state calendar-empty-state">
                     <strong>Нет окошек на неделю</strong>
                     <span>Ближайшие свободные места дальше, чем через 7 дней.</span>
-                    <button className="primary-button" onClick={() => addQuickWindow("tomorrow-morning")} type="button">
+                    <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-morning")} type="button">
                       <Plus size={17} /> Добавить окошко
                     </button>
                   </div>
@@ -387,6 +407,7 @@ export function AdminScheduleView({
                                   className={
                                     tapMoveAppointmentId === appointment.id ? "primary-button" : "secondary-button"
                                   }
+                                  disabled={Boolean(busyActionKey)}
                                   onClick={(event) => {
                                     event.stopPropagation();
                                     setTapMoveAppointmentId((current) =>
@@ -399,25 +420,17 @@ export function AdminScheduleView({
                                 </button>
                                 <button
                                   className="danger-button"
+                                  disabled={Boolean(busyActionKey)}
                                   onClick={() => {
                                     if (globalThis.confirm("Отменить запись?")) {
-                                      updateAppointmentStatus(appointment.id, "cancelled");
+                                      void runScheduleAction(`appointment:${appointment.id}:cancel`, () =>
+                                        updateAppointmentStatus(appointment.id, "cancelled"),
+                                      );
                                     }
                                   }}
                                   type="button"
                                 >
                                   Отменить
-                                </button>
-                                <button
-                                  className="secondary-button"
-                                  onClick={() => {
-                                    if (globalThis.confirm("Удалить запись из календаря?")) {
-                                      deleteAppointment(appointment.id);
-                                    }
-                                  }}
-                                  type="button"
-                                >
-                                  <Trash2 size={16} /> Удалить
                                 </button>
                               </div>
                             ) : windowItem.status === "available" ? (
@@ -430,7 +443,12 @@ export function AdminScheduleView({
                               ) : (
                                 <button
                                   className="secondary-button"
-                                  onClick={() => updateWindowStatus(windowItem.id, "blocked")}
+                                  disabled={Boolean(busyActionKey)}
+                                  onClick={() =>
+                                    void runScheduleAction(`window:${windowItem.id}:blocked`, () =>
+                                      updateWindowStatus(windowItem.id, "blocked"),
+                                    )
+                                  }
                                   type="button"
                                 >
                                   Закрыть
@@ -439,7 +457,12 @@ export function AdminScheduleView({
                             ) : windowItem.status === "blocked" ? (
                               <button
                                 className="secondary-button"
-                                onClick={() => updateWindowStatus(windowItem.id, "available")}
+                                disabled={Boolean(busyActionKey)}
+                                onClick={() =>
+                                  void runScheduleAction(`window:${windowItem.id}:available`, () =>
+                                    updateWindowStatus(windowItem.id, "available"),
+                                  )
+                                }
                                 type="button"
                               >
                                 Открыть
@@ -479,10 +502,10 @@ export function AdminScheduleView({
                 </div>
               ) : null}
               <div className="action-row">
-                <button className="primary-button" onClick={executeMove} type="button">
+                <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={executeMove} type="button">
                   Подтвердить
                 </button>
-                <button className="secondary-button" onClick={() => setPendingMove(null)} type="button">
+                <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => setPendingMove(null)} type="button">
                   Отменить
                 </button>
               </div>
@@ -532,7 +555,7 @@ export function AdminScheduleView({
                 nextAvailableDays.map((day) => (
                   <article className="admin-preview-item" key={day.key}>
                     <strong>{day.label}</strong>
-                    <small>{day.availableCount} свободных местечек</small>
+                    <small>{day.availableCount} свободных слотов</small>
                   </article>
                 ))
               )}

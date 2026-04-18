@@ -1,12 +1,12 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { ApiError, api } from "../api";
+import { api, getApiErrorMessage, isApiAuthError } from "../api";
 import { servicePresets } from "../data";
 import type { AppSnapshot, PublicBookingConfig } from "../types";
 import { useAdminActions } from "./useAdminActions";
 import { useAppShell } from "./useAppShell";
 import { useClientBookingFlow } from "./useClientBookingFlow";
 
-type PublicConfig = Pick<AppSnapshot, "services" | "windows">;
+type PublicConfig = Pick<AppSnapshot, "services" | "serviceOptions" | "windows">;
 
 export function useAppController() {
   const shell = useAppShell();
@@ -22,6 +22,7 @@ export function useAppController() {
   const requests = snapshot?.requests ?? [];
   const appointments = snapshot?.appointments ?? [];
   const windows = route.portal === "admin" ? (snapshot?.windows ?? []) : (publicConfig?.windows ?? []);
+  const serviceOptions = route.portal === "admin" ? (snapshot?.serviceOptions ?? []) : (publicConfig?.serviceOptions ?? []);
   const services =
     route.portal === "admin"
       ? snapshot?.services.length ? snapshot.services : servicePresets
@@ -35,11 +36,11 @@ export function useAppController() {
       setSnapshot(nextSnapshot);
       return nextSnapshot;
     } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
+      if (isApiAuthError(error)) {
         setAdminAccessDenied(true);
         setApiError("Нет доступа к админ-панели. Откройте приложение через Telegram.");
       } else {
-        setApiError(error instanceof Error ? error.message : "Не удалось подключиться к API");
+        setApiError(getApiErrorMessage(error, "Не удалось подключиться к API"));
       }
       return null;
     } finally {
@@ -53,11 +54,12 @@ export function useAppController() {
       const nextConfig = await api.getPublicBookingConfig();
       setPublicConfig({
         services: nextConfig.services,
+        serviceOptions: nextConfig.serviceOptions,
         windows: nextConfig.windows,
       });
       return nextConfig;
     } catch (error) {
-      setApiError(error instanceof Error ? error.message : "Не удалось загрузить публичные настройки записи");
+      setApiError(getApiErrorMessage(error, "Не удалось загрузить публичные настройки записи"));
       return null;
     } finally {
       setIsLoading(false);
@@ -95,9 +97,9 @@ export function useAppController() {
       newRequests: requests.filter((request) => request.status === "new").length,
       scheduledAppointments: appointments.filter((appointment) => appointment.status === "scheduled").length,
       availableWindows: windows.filter((window) => window.status === "available").length,
-      clients: clients.length,
+      clients: clients.filter((client) => !client.archivedAt).length,
     }),
-    [appointments, clients.length, requests, windows],
+    [appointments, clients, requests, windows],
   );
 
   return {
@@ -114,6 +116,7 @@ export function useAppController() {
       photos,
       requests,
       appointments,
+      serviceOptions,
     },
     client,
     admin: {

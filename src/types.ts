@@ -26,6 +26,7 @@ export type Client = {
   firstVisit: boolean;
   telegramUserId?: string;
   notes?: string;
+  archivedAt?: string;
 };
 
 export type PhotoAttachment = {

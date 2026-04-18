@@ -1,8 +1,10 @@
 ﻿import { useState } from "react";
 import { Check, ChevronDown, Clock3, MessageCircle, Phone, Send, Sparkles, X } from "lucide-react";
+import { useRef } from "react";
 import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import { contactLabels, getServiceTitle, lengthLabels, statusLabels } from "../../lib/bookingPresentation";
+import { isFutureDateTime } from "../../lib/dateTime";
 import type { BookingRequest, Client, PhotoAttachment, RequestStatus, ServicePreset, TimeWindow } from "../../types";
 
 export function RequestCard({
@@ -20,24 +22,27 @@ export function RequestCard({
   request: BookingRequest;
   services: ServicePreset[];
   windows: TimeWindow[];
-  confirmRequest: (id: string) => void;
-  updateStatus: (id: string, status: RequestStatus) => void;
-  updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void;
+  confirmRequest: (id: string) => void | Promise<unknown>;
+  updateStatus: (id: string, status: RequestStatus) => void | Promise<unknown>;
+  updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void | Promise<unknown>;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
   const [reviewStep, setReviewStep] = useState<number | null>(null);
   const [proposalWindowId, setProposalWindowId] = useState(request.preferredWindowId ?? "");
+  const isResolvingRef = useRef(false);
   const selectedWindow = request.preferredWindowId
     ? windows.find((window) => window.id === request.preferredWindowId) ?? null
     : null;
   const availableWindows = windows.filter(
     (window) =>
-      window.status === "available" || window.id === request.preferredWindowId,
+      (window.status === "available" && isFutureDateTime(window.startAt)) ||
+      window.id === request.preferredWindowId,
   );
-  const firstAvailableWindow = availableWindows.find((window) => window.status === "available") ?? null;
-  const hasConcreteWindow = Boolean(selectedWindow);
+  const firstAvailableWindow =
+    availableWindows.find((window) => window.status === "available" && isFutureDateTime(window.startAt)) ?? null;
+  const hasConcreteWindow = Boolean(selectedWindow && isFutureDateTime(selectedWindow.startAt));
   const handPhoto = photos.find((photo) => photo.kind === "hands");
   const referencePhoto = photos.find((photo) => photo.kind === "reference");
   const serviceTitle = getServiceTitle(services, request.service);
@@ -48,19 +53,28 @@ export function RequestCard({
     request,
   });
 
-  const runAction = (action: () => void) => {
-    setIsResolving(true);
-    action();
-    window.setTimeout(() => setIsResolving(false), 900);
-  };
-
-  const offerFirstWindow = () => {
-    if (firstAvailableWindow) {
-      updateWindow(request.id, firstAvailableWindow.id);
+  const runAction = async (action: () => void | Promise<unknown>) => {
+    if (isResolvingRef.current) {
       return;
     }
 
-    updateStatus(request.id, "needs_clarification");
+    isResolvingRef.current = true;
+    setIsResolving(true);
+    try {
+      await action();
+    } finally {
+      isResolvingRef.current = false;
+      setIsResolving(false);
+    }
+  };
+
+  const offerFirstWindow = async () => {
+    if (firstAvailableWindow) {
+      await updateWindow(request.id, firstAvailableWindow.id);
+      return;
+    }
+
+    await updateStatus(request.id, "needs_clarification");
   };
 
   const handleMainAction = () => {
@@ -75,21 +89,21 @@ export function RequestCard({
     }
 
     if (mainAction.kind === "accept") {
-      runAction(() => confirmRequest(request.id));
+      void runAction(() => confirmRequest(request.id));
       return;
     }
 
     if (mainAction.kind === "offer") {
-      runAction(offerFirstWindow);
+      void runAction(offerFirstWindow);
       return;
     }
 
     if (mainAction.kind === "clarify") {
-      runAction(() => updateStatus(request.id, "needs_clarification"));
+      void runAction(() => updateStatus(request.id, "needs_clarification"));
       return;
     }
 
-    runAction(() => updateStatus(request.id, "declined"));
+    void runAction(() => updateStatus(request.id, "declined"));
   };
 
   return (
@@ -109,7 +123,7 @@ export function RequestCard({
       <div className="admin-inbox-primary-action">
         <button
           className={mainAction.kind === "decline" || mainAction.kind === "closed" ? "danger-button" : "primary-button"}
-          disabled={mainAction.kind === "done" || mainAction.kind === "closed"}
+          disabled={isResolving || mainAction.kind === "done" || mainAction.kind === "closed"}
           onClick={handleMainAction}
           type="button"
         >
@@ -122,25 +136,26 @@ export function RequestCard({
         <div className="admin-inbox-card-details">
           {reviewStep !== null ? (
             <AdminRequestReviewFlow
-              availableWindows={availableWindows}
+              availableWindows={availableWindows.filter(
+                (window) => window.status === "available" && isFutureDateTime(window.startAt),
+              )}
               client={client}
               photos={photos}
               proposalWindowId={proposalWindowId || firstAvailableWindow?.id || ""}
               request={request}
-              selectedWindow={selectedWindow}
               serviceTitle={serviceTitle}
               step={reviewStep}
               onCancel={() => setReviewStep(null)}
               onComplete={(windowId) => {
-                runAction(() => {
+                void runAction(async () => {
                   if (!windowId) {
-                    updateStatus(request.id, "needs_clarification");
+                    await updateStatus(request.id, "needs_clarification");
                     return;
                   }
 
-                  updateWindow(request.id, windowId);
+                  await updateWindow(request.id, windowId);
+                  setReviewStep(null);
                 });
-                setReviewStep(null);
               }}
               onPhotoOpen={setSelectedPhoto}
               onStepChange={setReviewStep}
@@ -184,11 +199,11 @@ export function RequestCard({
               <label className="move-window-field">
                 Окошко заявки
                 <select
-                  disabled={request.status === "confirmed" || request.status === "declined"}
+                  disabled={isResolving || request.status === "confirmed" || request.status === "declined"}
                   value={request.preferredWindowId ?? ""}
                   onChange={(event) => {
                     const value = event.target.value;
-                    runAction(() => updateWindow(request.id, value || null));
+                    void runAction(() => updateWindow(request.id, value || null));
                   }}
                 >
                   <option value="">Выбрать окошко</option>
@@ -207,22 +222,22 @@ export function RequestCard({
               ) : (
                 <div className="action-row admin-inbox-secondary-actions">
                   <button
-                    onClick={() => runAction(() => confirmRequest(request.id))}
+                    onClick={() => void runAction(() => confirmRequest(request.id))}
                     className="success-button"
-                    disabled={!hasConcreteWindow}
+                    disabled={isResolving || !hasConcreteWindow}
                     type="button"
                   >
                     <Check size={17} /> Записать
                   </button>
                   {!hasConcreteWindow ? (
-                    <button onClick={() => runAction(offerFirstWindow)} className="secondary-button" type="button">
+                    <button disabled={isResolving} onClick={() => void runAction(offerFirstWindow)} className="secondary-button" type="button">
                       <Clock3 size={17} /> Выбрать окошко
                     </button>
                   ) : null}
-                  <button onClick={() => runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
+                  <button disabled={isResolving} onClick={() => void runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
                     <MessageCircle size={17} /> Уточнить
                   </button>
-                  <button onClick={() => runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
+                  <button disabled={isResolving} onClick={() => void runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
                     <X size={17} /> Не брать
                   </button>
                 </div>
@@ -290,7 +305,6 @@ function AdminRequestReviewFlow({
   photos,
   proposalWindowId,
   request,
-  selectedWindow,
   serviceTitle,
   step,
   onCancel,
@@ -304,7 +318,6 @@ function AdminRequestReviewFlow({
   photos: PhotoAttachment[];
   proposalWindowId: string;
   request: BookingRequest;
-  selectedWindow: TimeWindow | null;
   serviceTitle: string;
   step: number;
   onCancel: () => void;
@@ -313,7 +326,8 @@ function AdminRequestReviewFlow({
   onStepChange: (step: number) => void;
   onWindowChange: (windowId: string) => void;
 }) {
-  const selectedProposalWindow = availableWindows.find((window) => window.id === proposalWindowId) ?? selectedWindow;
+  const selectedProposalWindow =
+    availableWindows.find((window) => window.id === proposalWindowId && isFutureDateTime(window.startAt)) ?? null;
   const canSendProposal = Boolean(selectedProposalWindow);
   const steps = ["Хочет", "Фото", "Окошко", "Ответ"];
 

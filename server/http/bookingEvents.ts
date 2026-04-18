@@ -1,5 +1,5 @@
 ﻿import type { Appointment, BookingRequest, Client, TimeWindow } from "../../src/types.js";
-import { formatTimeRange } from "../../src/lib/bookingPresentation.js";
+import { formatTimeRange } from "../../src/lib/displayTime.js";
 import { notifyClient, notifyMasters } from "../notifications/telegram.js";
 import { repository } from "../repositories/index.js";
 

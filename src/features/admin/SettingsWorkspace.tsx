@@ -1,27 +1,26 @@
-import { useEffect, useState } from "react";
-import { CalendarClock, Plus, Settings, Trash2 } from "lucide-react";
-import { windowStatusLabel } from "../../lib/bookingPresentation";
-import { getTodayDateKey, toAppDateTime } from "../../lib/dateTime";
+import { useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Plus, RotateCcw, Settings, Trash2 } from "lucide-react";
 import { AdminScreenHeader } from "./AdminNavigation";
 import { makeServiceId, parseServiceEditor, toServiceEditorState, type ServiceEditorState } from "./serviceEditor";
-import type { ServiceKind, ServicePreset, TimeWindow, TimeWindowStatus } from "../../types";
+import type { Appointment, BookingRequest, ServiceKind, ServicePreset } from "../../types";
 
 export function SettingsWorkspace({
+  appointments,
+  requests,
   services,
-  windows,
-  addTimeWindow,
   createService,
   updateService,
   deleteService,
-  updateWindowStatus,
 }: {
+  appointments: Appointment[];
+  requests: BookingRequest[];
   services: ServicePreset[];
-  windows: TimeWindow[];
-  addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void;
   createService: (service: ServicePreset) => void;
-  updateService: (id: ServiceKind, patch: Partial<ServicePreset>) => void;
+  updateService: (
+    id: ServiceKind,
+    patch: Omit<Partial<ServicePreset>, "priceFrom"> & { priceFrom?: number | null },
+  ) => void;
   deleteService: (id: ServiceKind) => void;
-  updateWindowStatus: (id: string, status: TimeWindowStatus) => void;
 }) {
   const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceEditorState>>({});
   const [createForm, setCreateForm] = useState<ServiceEditorState>({
@@ -32,11 +31,27 @@ export function SettingsWorkspace({
     requiresReference: true,
   });
   const [serviceError, setServiceError] = useState<string | null>(null);
-  const [windowForm, setWindowForm] = useState({
-    date: getTodayDateKey(),
-    start: "11:00",
-    end: "14:00",
-  });
+  const [serviceWarning, setServiceWarning] = useState<string | null>(null);
+
+  const serviceUsage = useMemo(() => {
+    const usage = new Map<string, { requests: number; appointments: number }>();
+
+    for (const service of services) {
+      usage.set(service.id, { requests: 0, appointments: 0 });
+    }
+
+    for (const request of requests) {
+      const current = usage.get(request.service) ?? { requests: 0, appointments: 0 };
+      usage.set(request.service, { ...current, requests: current.requests + 1 });
+    }
+
+    for (const appointment of appointments) {
+      const current = usage.get(appointment.service) ?? { requests: 0, appointments: 0 };
+      usage.set(appointment.service, { ...current, appointments: current.appointments + 1 });
+    }
+
+    return usage;
+  }, [appointments, requests, services]);
 
   useEffect(() => {
     setServiceDrafts(
@@ -60,17 +75,6 @@ export function SettingsWorkspace({
     }));
   };
 
-  const submitWindow = () => {
-    if (!windowForm.date || !windowForm.start || !windowForm.end) {
-      return;
-    }
-
-    addTimeWindow({
-      startAt: toAppDateTime(windowForm.date, windowForm.start),
-      endAt: toAppDateTime(windowForm.date, windowForm.end),
-    });
-  };
-
   const submitCreateService = () => {
     const parsed = parseServiceEditor(
       createForm,
@@ -78,12 +82,16 @@ export function SettingsWorkspace({
     );
 
     if (!parsed) {
-      setServiceError("Заполните название и длительность, чтобы услуга сохранилась аккуратно.");
+      setServiceError("Заполните название, длительность от 15 до 600 минут и корректную цену.");
       return;
     }
 
     setServiceError(null);
-    createService(parsed);
+    setServiceWarning(parsed.warning ?? null);
+    createService({
+      ...parsed.service,
+      priceFrom: parsed.service.priceFrom ?? undefined,
+    });
     setCreateForm({
       title: "",
       durationMinutes: "120",
@@ -97,12 +105,23 @@ export function SettingsWorkspace({
     const parsed = parseServiceEditor(serviceDrafts[serviceId], serviceId);
 
     if (!parsed) {
-      setServiceError("У услуги должны быть название и корректная длительность.");
+      setServiceError("У услуги должны быть название, длительность от 15 до 600 минут и корректная цена.");
       return;
     }
 
+    const original = services.find((service) => service.id === serviceId);
+    const usage = serviceUsage.get(serviceId);
+    const isUsed = Boolean((usage?.requests ?? 0) + (usage?.appointments ?? 0));
+    const durationChanged = original ? original.durationMinutes !== parsed.service.durationMinutes : false;
+
     setServiceError(null);
-    updateService(serviceId, parsed);
+    setServiceWarning(
+      parsed.warning ??
+        (isUsed && durationChanged
+          ? "Длительность изменится для новых заявок. Старые заявки и записи сохраняют свою длительность."
+          : null),
+    );
+    updateService(serviceId, parsed.service);
   };
 
   const resetService = (service: ServicePreset) => {
@@ -113,8 +132,16 @@ export function SettingsWorkspace({
   };
 
   const removeService = (serviceId: ServiceKind) => {
+    const usage = serviceUsage.get(serviceId);
+    const usedCount = (usage?.requests ?? 0) + (usage?.appointments ?? 0);
+
     if (services.length <= 1) {
       setServiceError("Нужна хотя бы одна услуга, чтобы онлайн-запись продолжала работать.");
+      return;
+    }
+
+    if (usedCount > 0) {
+      setServiceError("Эта услуга уже есть в истории. Удаление отключено, чтобы не ломать заявки и записи.");
       return;
     }
 
@@ -126,92 +153,34 @@ export function SettingsWorkspace({
     <section className="settings-layout">
       <AdminScreenHeader
         eyebrow="прайс"
-        title="Прайс и окошки"
+        title="Услуги и правила записи"
+        description="Что клиентка выбирает при записи, сколько это длится и какие фото нужны"
       />
 
       <div className="panel settings-panel">
         <div className="section-title section-title-compact">
           <Settings size={22} />
           <div>
-            <h2>Процедуры</h2>
+            <h2>Прайс</h2>
+            <p>Окошки теперь на экране расписания, здесь только услуги.</p>
           </div>
         </div>
 
         <article className="settings-item settings-create-card">
           <div className="settings-item-header">
             <div>
-              <h3>Новая услужка</h3>
+              <h3>Новая услуга</h3>
+              <p>Добавьте позицию, которую клиентка увидит при записи.</p>
             </div>
             <button className="primary-button" onClick={submitCreateService} type="button">
-              <Plus size={17} /> Добавить услугу
+              <Plus size={17} /> Добавить
             </button>
           </div>
 
-          <div className="field-row">
-            <label>
-              Название
-              <input
-                type="text"
-                value={createForm.title}
-                onChange={(event) => setCreateForm((current) => ({ ...current, title: event.target.value }))}
-                placeholder="Например, покрытие с дизайном"
-              />
-            </label>
-            <label>
-              Цена от, ₽
-              <input
-                type="number"
-                min="0"
-                value={createForm.priceFrom}
-                onChange={(event) => setCreateForm((current) => ({ ...current, priceFrom: event.target.value }))}
-                placeholder="0"
-              />
-            </label>
-          </div>
-
-          <div className="field-row settings-grid-balanced">
-            <label>
-              Длительность, мин
-              <input
-                type="number"
-                min="0"
-                value={createForm.durationMinutes}
-                onChange={(event) =>
-                  setCreateForm((current) => ({ ...current, durationMinutes: event.target.value }))
-                }
-              />
-            </label>
-
-            <div className="settings-flags compact">
-              <label className="checkbox-line">
-                <input
-                  type="checkbox"
-                  checked={createForm.requiresHandPhoto}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, requiresHandPhoto: event.target.checked }))
-                  }
-                />
-                <span className="checkbox-copy">
-                  <strong>Нужно фото рук</strong>
-                  <small>Чтобы заранее увидеть состояние ногтей.</small>
-                </span>
-              </label>
-
-              <label className="checkbox-line">
-                <input
-                  type="checkbox"
-                  checked={createForm.requiresReference}
-                  onChange={(event) =>
-                    setCreateForm((current) => ({ ...current, requiresReference: event.target.checked }))
-                  }
-                />
-                <span className="checkbox-copy">
-                  <strong>Нужен референс</strong>
-                  <small>Чтобы точнее понять дизайн.</small>
-                </span>
-              </label>
-            </div>
-          </div>
+          <ServiceEditorFields
+            draft={createForm}
+            onChange={(patch) => setCreateForm((current) => ({ ...current, ...patch }))}
+          />
         </article>
 
         {serviceError ? (
@@ -220,162 +189,135 @@ export function SettingsWorkspace({
           </p>
         ) : null}
 
+        {serviceWarning ? (
+          <div className="notice-inline" role="status">
+            <AlertTriangle size={16} /> {serviceWarning}
+          </div>
+        ) : null}
+
         <div className="settings-list">
-          {services.map((service) => (
-            <article className="settings-item" key={service.id}>
-              <div className="settings-item-header">
-                <div>
-                  <h3>{service.title}</h3>
-                  <p className="settings-meta">ID: {service.id}</p>
+          {services.map((service) => {
+            const usage = serviceUsage.get(service.id) ?? { requests: 0, appointments: 0 };
+            const usedCount = usage.requests + usage.appointments;
+            const draft = serviceDrafts[service.id] ?? toServiceEditorState(service);
+
+            return (
+              <article className="settings-item" key={service.id}>
+                <div className="settings-item-header">
+                  <div>
+                    <h3>{service.title}</h3>
+                    <p className="settings-meta">
+                      ID: {service.id} · {usedCount > 0 ? `в истории ${usedCount}` : "ещё не использовалась"}
+                    </p>
+                  </div>
+
+                  <button
+                    className="danger-button settings-delete-button"
+                    disabled={services.length <= 1 || usedCount > 0}
+                    onClick={() => removeService(service.id)}
+                    type="button"
+                  >
+                    <Trash2 size={16} /> Удалить
+                  </button>
                 </div>
 
-                <button
-                  className="danger-button settings-delete-button"
-                  onClick={() => removeService(service.id)}
-                  type="button"
-                >
-                  <Trash2 size={16} /> Удалить
-                </button>
-              </div>
+                {usedCount > 0 ? (
+                  <div className="notice-inline">
+                    <AlertTriangle size={16} /> Услуга уже есть в истории. Название меняет отображение старых карточек, длительность и цена в заявках сохраняются отдельно.
+                  </div>
+                ) : null}
 
-              <div className="field-row">
-                <label>
-                  Название
-                  <input
-                    type="text"
-                    value={serviceDrafts[service.id]?.title ?? service.title}
-                    onChange={(event) => updateDraft(service.id, { title: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Длительность, мин
-                  <input
-                    type="number"
-                    min="0"
-                    value={serviceDrafts[service.id]?.durationMinutes ?? String(service.durationMinutes)}
-                    onChange={(event) => updateDraft(service.id, { durationMinutes: event.target.value })}
-                  />
-                </label>
-                <label>
-                  Цена от, ₽
-                  <input
-                    type="number"
-                    min="0"
-                    value={serviceDrafts[service.id]?.priceFrom ?? String(service.priceFrom ?? "")}
-                    onChange={(event) => updateDraft(service.id, { priceFrom: event.target.value })}
-                  />
-                </label>
-              </div>
+                <ServiceEditorFields draft={draft} onChange={(patch) => updateDraft(service.id, patch)} />
 
-              <div className="settings-flags">
-                <label className="checkbox-line">
-                  <input
-                    type="checkbox"
-                    checked={serviceDrafts[service.id]?.requiresHandPhoto ?? service.requiresHandPhoto}
-                    onChange={(event) => updateDraft(service.id, { requiresHandPhoto: event.target.checked })}
-                  />
-                  <span className="checkbox-copy">
-                    <strong>Обязательно фото рук</strong>
-                  </span>
-                </label>
-
-                <label className="checkbox-line">
-                  <input
-                    type="checkbox"
-                    checked={serviceDrafts[service.id]?.requiresReference ?? service.requiresReference}
-                    onChange={(event) => updateDraft(service.id, { requiresReference: event.target.checked })}
-                  />
-                  <span className="checkbox-copy">
-                    <strong>Обязательно фото референса</strong>
-                  </span>
-                </label>
-              </div>
-
-              <div className="settings-actions">
-                <button className="secondary-button" onClick={() => resetService(service)} type="button">
-                  Отменить правки
-                </button>
-                <button className="primary-button" onClick={() => saveService(service.id)} type="button">
-                  Сохранить услугу
-                </button>
-              </div>
-            </article>
-          ))}
+                <div className="settings-actions">
+                  <button className="secondary-button" onClick={() => resetService(service)} type="button">
+                    <RotateCcw size={16} /> Отменить
+                  </button>
+                  <button className="primary-button" onClick={() => saveService(service.id)} type="button">
+                    Сохранить
+                  </button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
-
-      <aside className="panel settings-panel">
-        <div className="section-title section-title-compact">
-          <CalendarClock size={22} />
-          <div>
-            <h2>Окошки</h2>
-          </div>
-        </div>
-
-        <div className="window-form">
-          <label>
-            Дата
-            <input
-              type="date"
-              value={windowForm.date}
-              onChange={(event) => setWindowForm({ ...windowForm, date: event.target.value })}
-            />
-          </label>
-          <div className="field-row">
-            <label>
-              Начало
-              <input
-                type="time"
-                value={windowForm.start}
-                onChange={(event) => setWindowForm({ ...windowForm, start: event.target.value })}
-              />
-            </label>
-            <label>
-              Конец
-              <input
-                type="time"
-                value={windowForm.end}
-                onChange={(event) => setWindowForm({ ...windowForm, end: event.target.value })}
-              />
-            </label>
-          </div>
-          <button className="primary-button" onClick={submitWindow} type="button">
-            <Plus size={17} /> Добавить окошко
-          </button>
-        </div>
-
-        <div className="window-list">
-          {windows.map((window) => (
-            <div className="window-item" key={window.id}>
-              <div>
-                <strong>{window.label}</strong>
-                <span>{windowStatusLabel(window.status)}</span>
-              </div>
-              {window.status === "reserved" ? (
-                <button className="secondary-button" disabled type="button">
-                  Занято
-                </button>
-              ) : window.status === "blocked" ? (
-                <button
-                  className="secondary-button"
-                  onClick={() => updateWindowStatus(window.id, "available")}
-                  type="button"
-                >
-                  Открыть
-                </button>
-              ) : (
-                <button
-                  className="danger-button"
-                  onClick={() => updateWindowStatus(window.id, "blocked")}
-                  type="button"
-                >
-                  Закрыть
-                </button>
-              )}
-            </div>
-          ))}
-        </div>
-      </aside>
     </section>
+  );
+}
+
+function ServiceEditorFields({
+  draft,
+  onChange,
+}: {
+  draft: ServiceEditorState;
+  onChange: (patch: Partial<ServiceEditorState>) => void;
+}) {
+  return (
+    <>
+      <div className="field-row">
+        <label>
+          Название
+          <input
+            type="text"
+            value={draft.title}
+            onChange={(event) => onChange({ title: event.target.value })}
+            placeholder="Например, покрытие с дизайном"
+            maxLength={80}
+          />
+        </label>
+        <label>
+          Цена от, ₽
+          <input
+            type="number"
+            min="0"
+            max="1000000"
+            value={draft.priceFrom}
+            onChange={(event) => onChange({ priceFrom: event.target.value })}
+            placeholder="0"
+          />
+        </label>
+      </div>
+
+      <div className="field-row settings-grid-balanced">
+        <label>
+          Длительность, мин
+          <input
+            type="number"
+            min="15"
+            max="600"
+            step="15"
+            value={draft.durationMinutes}
+            onChange={(event) => onChange({ durationMinutes: event.target.value })}
+          />
+        </label>
+
+        <div className="settings-flags compact">
+          <label className="checkbox-line">
+            <input
+              type="checkbox"
+              checked={draft.requiresHandPhoto}
+              onChange={(event) => onChange({ requiresHandPhoto: event.target.checked })}
+            />
+            <span className="checkbox-copy">
+              <strong>Фото рук</strong>
+              <small>Попросим клиентку приложить фото перед отправкой заявки.</small>
+            </span>
+          </label>
+
+          <label className="checkbox-line">
+            <input
+              type="checkbox"
+              checked={draft.requiresReference}
+              onChange={(event) => onChange({ requiresReference: event.target.checked })}
+            />
+            <span className="checkbox-copy">
+              <strong>Референс</strong>
+              <small>Попросим картинку дизайна или желаемого настроения.</small>
+            </span>
+          </label>
+        </div>
+      </div>
+    </>
   );
 }

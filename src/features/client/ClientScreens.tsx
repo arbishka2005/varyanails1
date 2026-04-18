@@ -12,10 +12,12 @@ import {
 import heroMainImage from "../../assets/hero-main.jpg";
 import { Info } from "../../components/Info";
 import { contactLabels, statusLabels } from "../../lib/bookingPresentation";
-import { PHONE_PREFIX } from "../../lib/phone";
+import { isFutureDateTime } from "../../lib/dateTime";
 import type { ClientSection, TelegramUser } from "../../app/navigation";
 import type { FormState } from "../booking/formState";
-import type { PublicBookingRequest } from "../../types";
+import type { PublicBookingRequest, TimeWindow } from "../../types";
+
+type LastRequestLookupStatus = "idle" | "loading" | "stale";
 
 export function ClientHeader() {
   return (
@@ -64,6 +66,7 @@ export function ClientHomeScreen({
   hasRequest,
   lastRequestInfo,
   lastSubmittedRequestId,
+  lastRequestLookupStatus,
   confirmClientWindow,
   openRequests,
   openBookingFlow,
@@ -71,16 +74,21 @@ export function ClientHomeScreen({
   hasRequest: boolean;
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
+  lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
   openRequests: () => void;
   openBookingFlow: () => void;
 }) {
   const request = lastRequestInfo?.request ?? null;
-  const canConfirmWindow = Boolean(
-    request?.status === "waiting_client" && lastRequestInfo?.window && request.publicToken,
-  );
+  const isCheckingStoredRequest = hasRequest && !request && lastRequestLookupStatus === "loading";
+  const isStaleStoredRequest = !hasRequest && lastRequestLookupStatus === "stale";
+  const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
   const isConfirmed = request?.status === "confirmed";
-  const statusLabel = request ? statusLabels[request.status] : hasRequest ? "Ждём ответ мастера" : "Новая запись";
+  const statusLabel = request
+    ? statusLabels[request.status]
+    : isCheckingStoredRequest
+      ? "Проверяю заявку"
+      : "Новая запись";
   const windowLabel =
     lastRequestInfo?.window?.label ?? request?.customWindowText ?? (isConfirmed ? "Время уточняется" : "");
   const mainActionLabel = !hasRequest
@@ -115,10 +123,17 @@ export function ClientHomeScreen({
         <div className="client-home-entry-main">
           <span className={`status ${request?.status ?? "new"}`}>{statusLabel}</span>
 
-          {!hasRequest ? (
+          {isCheckingStoredRequest ? (
+            <>
+              <p className="eyebrow">минутку</p>
+              <h1>Проверяю заявку</h1>
+              <p>Если запись уже закрыта, здесь можно будет начать новую.</p>
+            </>
+          ) : !hasRequest ? (
             <>
               <p className="eyebrow">vvrnailss</p>
               <h1>Привет, хочешь записаться?</h1>
+              {isStaleStoredRequest ? <p>Старая ссылка на заявку уже не актуальна.</p> : null}
             </>
           ) : canConfirmWindow ? (
             <>
@@ -166,12 +181,14 @@ export function ClientHomeScreen({
 export function ClientRequestsScreen({
   lastRequestInfo,
   lastSubmittedRequestId,
+  lastRequestLookupStatus,
   confirmClientWindow,
   refreshLastRequest,
   openBookingFlow,
 }: {
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
+  lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
   openBookingFlow: () => void;
@@ -188,6 +205,7 @@ export function ClientRequestsScreen({
       <ClientStatusPanel
         lastRequestInfo={lastRequestInfo}
         lastSubmittedRequestId={lastSubmittedRequestId}
+        lastRequestLookupStatus={lastRequestLookupStatus}
         confirmClientWindow={confirmClientWindow}
         refreshLastRequest={refreshLastRequest}
         onBookAgain={openBookingFlow}
@@ -216,9 +234,10 @@ export function ClientProfileScreen({
   return (
     <>
       <ClientScreenHeader
-        eyebrow="профиль"
-        title="Ваши данные"
-        actionLabel="К заявке"
+        eyebrow="данные"
+        title="Контакты для записи"
+        description="Это не аккаунт. Берём данные из Telegram и черновика записи."
+        actionLabel="Статус"
         onAction={openRequests}
       />
 
@@ -226,14 +245,14 @@ export function ClientProfileScreen({
         <div className="panel client-profile-card">
           <h3>{profileName}</h3>
           <div className="info-grid">
-            <Info icon={<Phone size={16} />} label="Телефон" value={form.phone || PHONE_PREFIX} />
+            <Info icon={<Phone size={16} />} label="Телефон" value={form.phone || "Добавите при записи"} />
             <Info
               icon={<MessageCircle size={16} />}
               label="Связь"
-              value={`${contactLabels[form.contactChannel]} ${profileHandle || "не указан"}`}
+              value={profileHandle ? `${contactLabels[form.contactChannel]} ${profileHandle}` : "Добавите при записи"}
             />
             <Info label="Telegram" value={telegramUser?.username ? `@${telegramUser.username}` : "не подключён"} />
-            <Info label="Статус" value={form.isNewClient ? "Первый визит" : "Повторная запись"} />
+            <Info label="Источник" value={telegramUser ? "Telegram + черновик" : "Черновик записи"} />
           </div>
         </div>
 
@@ -251,6 +270,7 @@ export function ClientProfileScreen({
 export function ClientStatusPanel({
   lastRequestInfo,
   lastSubmittedRequestId,
+  lastRequestLookupStatus,
   confirmClientWindow,
   refreshLastRequest,
   onBookAgain,
@@ -258,6 +278,7 @@ export function ClientStatusPanel({
 }: {
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
+  lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
   onBookAgain: () => void;
@@ -266,14 +287,24 @@ export function ClientStatusPanel({
   const timelineIndex = getClientTimelineIndex(lastRequestInfo);
   const request = lastRequestInfo?.request ?? null;
   const windowLabel = lastRequestInfo?.window?.label ?? request?.customWindowText ?? "";
-  const canConfirmWindow = Boolean(
-    request?.status === "waiting_client" && lastRequestInfo?.window && request.publicToken,
-  );
+  const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
+
+  if (lastRequestLookupStatus === "loading" && !lastRequestInfo) {
+    return (
+      <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
+        <div className="client-status-heading">
+          <span className="status new">Проверяю</span>
+          <h3>Ищу последнюю заявку</h3>
+          <p>Если она уже закрыта, начнём новую запись.</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!lastRequestInfo && !lastSubmittedRequestId) {
     return (
       <div className="panel client-empty-state-panel">
-        <h3>Записей пока нет</h3>
+        <h3>{lastRequestLookupStatus === "stale" ? "Старая заявка уже недоступна" : "Записей пока нет"}</h3>
         <button className="primary-button" onClick={onBookAgain} type="button">
           <Send size={17} /> Перейти к записи
         </button>
@@ -362,6 +393,21 @@ function getClientTimelineIndex(lastRequestInfo: PublicBookingRequest | null) {
   return 1;
 }
 
+function canConfirmClientWindow(
+  status: PublicBookingRequest["request"]["status"] | undefined,
+  window: TimeWindow | null | undefined,
+  publicToken: string | undefined,
+) {
+  return Boolean(
+    status === "waiting_client" &&
+      publicToken &&
+      window &&
+      window.status !== "blocked" &&
+      window.status !== "reserved" &&
+      isFutureDateTime(window.startAt),
+  );
+}
+
 function ClientRequestTimeline({ activeIndex }: { activeIndex: number }) {
   return (
     <ol className="client-request-timeline" aria-label="Этапы записи">
@@ -393,7 +439,7 @@ export function ClientBottomNav({
     { section: "home", label: "Главная", icon: <Sparkles size={18} /> },
     { section: "booking", label: "Запись", icon: <Send size={18} /> },
     { section: "requests", label: "Мои записи", icon: <History size={18} /> },
-    { section: "profile", label: "Профиль", icon: <UserRound size={18} /> },
+    { section: "profile", label: "Данные", icon: <UserRound size={18} /> },
   ];
 
   return (
