@@ -1,5 +1,6 @@
 ﻿import { useMemo, useState } from "react";
-import { AlertCircle, Clock3, MessageCircle, Sparkles, Wallet } from "lucide-react";
+import { useEffect } from "react";
+import { AlertCircle, Clock3, MessageCircle, Sparkles, Wallet, X } from "lucide-react";
 import {
   contactLabels,
   formatDateTime,
@@ -31,12 +32,15 @@ export function AdminDashboard({
   onNavigate,
   requests,
   services,
+  updateAppointmentStatus,
   windows,
 }: Pick<
   MasterWorkspaceSectionProps,
-  "appointments" | "clients" | "onNavigate" | "requests" | "services" | "windows"
+  "appointments" | "clients" | "onNavigate" | "requests" | "services" | "updateAppointmentStatus" | "windows"
 >) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
+  const [focusedAppointmentId, setFocusedAppointmentId] = useState<string | null>(null);
+  const [isAppointmentActionBusy, setIsAppointmentActionBusy] = useState(false);
   const todayKey = getTodayDateKey();
 
   const todayAppointments = useMemo(
@@ -56,6 +60,29 @@ export function AdminDashboard({
     () => todayAppointments.find((appointment) => isFutureDateTime(appointment.endAt)) ?? null,
     [todayAppointments],
   );
+
+  const focusedAppointment = useMemo(() => {
+    if (!focusedAppointmentId) {
+      return null;
+    }
+
+    return todayAppointments.find((appointment) => appointment.id === focusedAppointmentId) ?? null;
+  }, [focusedAppointmentId, todayAppointments]);
+
+  useEffect(() => {
+    if (!focusedAppointment) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFocusedAppointmentId(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [focusedAppointment]);
 
   const requestsToAnswer = useMemo(
     () =>
@@ -149,7 +176,11 @@ export function AdminDashboard({
           </div>
 
           {nextAppointment ? (
-            <button className="admin-next-appointment-card" onClick={() => onNavigate("schedule")} type="button">
+            <button
+              className="admin-next-appointment-card"
+              onClick={() => setFocusedAppointmentId(nextAppointment.id)}
+              type="button"
+            >
               <span className="status confirmed">Записана</span>
               <strong>{nextAppointment.client?.name ?? "Клиентка"}</strong>
               <small>{contactLabels[nextAppointment.client?.preferredContactChannel ?? "phone"]} · {nextAppointment.client?.contactHandle ?? nextAppointment.client?.phone ?? "контакт не указан"}</small>
@@ -215,7 +246,12 @@ export function AdminDashboard({
               <div className="empty-state">Сегодня без записей. Можно занять свободное окошко.</div>
             ) : (
               todayAppointments.map((appointment) => (
-                <button className="admin-preview-item" key={appointment.id} onClick={() => onNavigate("schedule")} type="button">
+                <button
+                  className="admin-preview-item"
+                  key={appointment.id}
+                  onClick={() => setFocusedAppointmentId(appointment.id)}
+                  type="button"
+                >
                   <span className="status confirmed">{formatTimeRange(appointment.startAt, appointment.endAt)}</span>
                   <strong>
                     {appointment.client?.name ?? "Клиентка"} · {getServiceTitle(services, appointment.service)}
@@ -263,6 +299,92 @@ export function AdminDashboard({
           </div>
         </article>
       </section>
+
+      {focusedAppointment ? (
+        <div
+          className="admin-lightbox"
+          onClick={() => {
+            if (!isAppointmentActionBusy) {
+              setFocusedAppointmentId(null);
+            }
+          }}
+          role="presentation"
+        >
+          <div
+            className="admin-lightbox-card"
+            onClick={(event) => event.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Детали записи"
+          >
+            <button
+              className="admin-lightbox-close"
+              onClick={() => setFocusedAppointmentId(null)}
+              type="button"
+              aria-label="Закрыть"
+              disabled={isAppointmentActionBusy}
+            >
+              <X size={18} />
+            </button>
+
+            <div className="admin-lightbox-header">
+              <span className="status confirmed">Запись</span>
+              <strong>{focusedAppointment.client?.name ?? "Клиентка"}</strong>
+              <small>
+                {formatTimeRange(focusedAppointment.startAt, focusedAppointment.endAt)} ·{" "}
+                {getServiceTitle(services, focusedAppointment.service)}
+              </small>
+            </div>
+
+            <div className="admin-lightbox-meta">
+              <div>
+                <span className="info-item-label">Контакт</span>
+                <strong>{contactLabels[focusedAppointment.client?.preferredContactChannel ?? "phone"]}</strong>
+                <small>{focusedAppointment.client?.contactHandle ?? focusedAppointment.client?.phone ?? "не указан"}</small>
+              </div>
+              <div>
+                <span className="info-item-label">Стоимость</span>
+                <strong>{formatMoney(getRequestPrice(focusedAppointment.request, services))}</strong>
+                <small>{focusedAppointment.durationMinutes} мин</small>
+              </div>
+            </div>
+
+            <div className="action-row">
+              <button
+                className="secondary-button"
+                onClick={() => {
+                  setFocusedAppointmentId(null);
+                  onNavigate("schedule");
+                }}
+                type="button"
+                disabled={isAppointmentActionBusy}
+              >
+                Открыть в расписании
+              </button>
+              <button
+                className="danger-button"
+                onClick={async () => {
+                  if (!globalThis.confirm("Отменить запись?")) {
+                    return;
+                  }
+
+                  setIsAppointmentActionBusy(true);
+                  try {
+                    await updateAppointmentStatus(focusedAppointment.id, "cancelled");
+                    setFocusedAppointmentId(null);
+                  } finally {
+                    setIsAppointmentActionBusy(false);
+                  }
+                }}
+                type="button"
+                disabled={isAppointmentActionBusy}
+              >
+                Отменить
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

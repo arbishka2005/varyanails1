@@ -54,8 +54,12 @@ export function AdminScheduleView({
     end: "14:00",
   });
 
-  const windowsByDate = useMemo(() => groupWindowsByDate(windows), [windows]);
-  const hasWindowsThisWeek = useMemo(() => windows.some((window) => isWithinNextDays(window.startAt, 7)), [windows]);
+  const visibleWindows = useMemo(() => windows.filter((window) => isFutureDateTime(window.endAt)), [windows]);
+  const windowsByDate = useMemo(() => groupWindowsByDate(visibleWindows), [visibleWindows]);
+  const hasWindowsThisWeek = useMemo(
+    () => visibleWindows.some((window) => isWithinNextDays(window.startAt, 7)),
+    [visibleWindows],
+  );
   const upcomingAppointments = useMemo(
     () =>
       [...appointments]
@@ -164,13 +168,13 @@ export function AdminScheduleView({
   const pendingDetails = pendingMove
     ? (() => {
         const appointment = appointments.find((item) => item.id === pendingMove.appointmentId);
-        const targetWindow = windows.find((item) => item.id === pendingMove.windowId);
+        const targetWindow = visibleWindows.find((item) => item.id === pendingMove.windowId);
 
         if (!appointment || !targetWindow) {
           return null;
         }
 
-        const oldWindow = windows.find(
+        const oldWindow = visibleWindows.find(
           (item) => item.startAt === appointment.startAt && item.endAt === appointment.endAt,
         );
 
@@ -365,7 +369,7 @@ export function AdminScheduleView({
                           }}
                           onTouchEnd={() => {
                             if (dragAppointmentId && dragOverWindowId) {
-                              const targetWindow = windows.find((item) => item.id === dragOverWindowId);
+                              const targetWindow = visibleWindows.find((item) => item.id === dragOverWindowId);
                               const targetAppointment = targetWindow
                                 ? findAppointmentForWindow(targetWindow) ?? null
                                 : null;

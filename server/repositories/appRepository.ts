@@ -30,7 +30,27 @@ import { makeWindowLabel } from "../../src/lib/displayTime.js";
 import { isFutureDateTime } from "../../src/lib/dateTime.js";
 import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
 
+async function cleanupStaleTimeWindows() {
+  await pool.query(
+    `
+      DELETE FROM time_windows time_window
+      WHERE time_window.end_at < NOW()
+        AND time_window.status IN ('available', 'offered', 'blocked')
+        AND NOT EXISTS (
+          SELECT 1 FROM booking_requests request
+          WHERE request.preferred_window_id = time_window.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM appointments appointment
+          WHERE appointment.start_at = time_window.start_at
+            AND appointment.end_at = time_window.end_at
+        )
+    `,
+  );
+}
+
 export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
+  await cleanupStaleTimeWindows();
   const [services, windows, options] = await Promise.all([
     pool.query("SELECT * FROM service_presets ORDER BY title ASC"),
     pool.query(
@@ -47,6 +67,7 @@ export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
 }
 
 export async function getSnapshot(): Promise<AppSnapshot> {
+  await cleanupStaleTimeWindows();
   const [clients, photos, requests, appointments, windows, services, options] = await Promise.all([
     pool.query("SELECT * FROM clients ORDER BY id DESC"),
     pool.query("SELECT * FROM photo_attachments ORDER BY id DESC"),

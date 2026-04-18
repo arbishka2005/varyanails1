@@ -13,7 +13,7 @@ import type {
 } from "../../src/types.js";
 import { seedClients, seedPhotos, seedRequests, serviceOptions, servicePresets, timeWindows } from "../../src/data.js";
 import { makeWindowLabel } from "../../src/lib/displayTime.js";
-import { doWindowRangesOverlap, getWindowConflict, isFutureDateTime } from "../../src/lib/dateTime.js";
+import { doWindowRangesOverlap, getWindowConflict, isFutureDateTime, isPastDateTime } from "../../src/lib/dateTime.js";
 import { config } from "../config.js";
 import { DomainError } from "../lib/domainErrors.js";
 import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
@@ -135,13 +135,45 @@ function normalizeSnapshot(snapshot: AppSnapshot) {
     return window;
   });
 
+  const windowIdsUsedByRequests = new Set(
+    snapshot.requests
+      .map((request) => request.preferredWindowId)
+      .filter((value): value is string => Boolean(value)),
+  );
+  const windowRangesUsedByAppointments = new Set(
+    snapshot.appointments.map((appointment) => `${appointment.startAt}|${appointment.endAt}`),
+  );
+  const windowsWithoutStaleGarbage = windows.filter((window) => {
+    if (window.status === "reserved") {
+      return true;
+    }
+
+    if (!isPastDateTime(window.endAt)) {
+      return true;
+    }
+
+    if (windowIdsUsedByRequests.has(window.id)) {
+      return true;
+    }
+
+    if (windowRangesUsedByAppointments.has(`${window.startAt}|${window.endAt}`)) {
+      return true;
+    }
+
+    return false;
+  });
+
+  if (windowsWithoutStaleGarbage.length !== windows.length) {
+    changed = true;
+  }
+
   return {
     changed,
     snapshot: {
       ...snapshot,
       requests,
       appointments,
-      windows,
+      windows: windowsWithoutStaleGarbage,
     },
   };
 }

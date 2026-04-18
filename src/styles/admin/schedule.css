@@ -118,17 +118,29 @@
   gap: 8px;
   font-size: 13px;
   color: var(--color-muted);
+  min-width: 0;
 }
 
 .slot-body {
   font-size: 14px;
   color: var(--color-ink);
   line-height: 1.45;
+  min-width: 0;
+}
+
+.slot-body small {
+  display: block;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
 }
 
 .slot-actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
   justify-content: flex-end;
+  min-width: 0;
 }
 
 .slot-action-stack {
@@ -136,6 +148,8 @@
   flex-wrap: wrap;
   justify-content: flex-end;
   gap: 8px;
+  align-items: center;
+  min-width: 0;
 }
 
 .slot-hint {
@@ -156,6 +170,31 @@
   border: 1px solid rgba(159, 123, 105, 0.16);
   border-radius: var(--radius-sm);
   background: var(--color-warning-soft);
+}
+
+@media (max-width: 440px) {
+  .slot-actions {
+    justify-content: stretch;
+  }
+
+  .slot-action-stack {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .slot-action-stack button {
+    flex: 1 1 140px;
+  }
+
+  .slot-hint {
+    display: none;
+  }
+
+  .slot-conflict-note {
+    width: 100%;
+    max-width: none;
+    text-align: left;
+  }
 }
 
 .calendar-empty-state {

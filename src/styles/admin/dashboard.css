@@ -340,3 +340,90 @@ button.admin-preview-item:hover,
   font-size: 26px;
   line-height: 1;
 }
+
+.admin-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(94, 63, 79, 0.36);
+  backdrop-filter: blur(18px);
+}
+
+.admin-lightbox-card {
+  position: relative;
+  width: min(100%, 560px);
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border-radius: calc(var(--radius-xl) + 2px);
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, 0.82), rgba(247, 242, 237, 0.46) 46%, rgba(235, 239, 244, 0.36) 100%),
+    var(--gradient-card);
+  box-shadow: 0 28px 70px rgba(93, 82, 108, 0.22);
+}
+
+.admin-lightbox-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.72);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 12px 24px rgba(133, 95, 104, 0.14);
+}
+
+.admin-lightbox-header {
+  display: grid;
+  gap: 8px;
+  padding-right: 44px;
+}
+
+.admin-lightbox-header strong {
+  font-size: 20px;
+  line-height: 1.15;
+}
+
+.admin-lightbox-header small {
+  color: var(--color-muted);
+  line-height: 1.4;
+}
+
+.admin-lightbox-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.admin-lightbox-meta > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.admin-lightbox-meta strong {
+  font-size: 15px;
+}
+
+.admin-lightbox-meta small {
+  color: var(--color-muted);
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 440px) {
+  .admin-lightbox-meta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
