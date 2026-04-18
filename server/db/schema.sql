@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
 CREATE TABLE IF NOT EXISTS clients (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -86,5 +88,21 @@ CREATE TABLE IF NOT EXISTS appointments (
 CREATE INDEX IF NOT EXISTS booking_requests_client_id_idx ON booking_requests(client_id);
 CREATE UNIQUE INDEX IF NOT EXISTS booking_requests_public_token_idx ON booking_requests(public_token);
 CREATE INDEX IF NOT EXISTS appointments_client_id_idx ON appointments(client_id);
+CREATE UNIQUE INDEX IF NOT EXISTS appointments_scheduled_request_id_idx ON appointments(request_id)
+  WHERE status = 'scheduled';
 CREATE UNIQUE INDEX IF NOT EXISTS appointments_public_token_idx ON appointments(public_token);
 CREATE INDEX IF NOT EXISTS time_windows_status_idx ON time_windows(status);
+CREATE UNIQUE INDEX IF NOT EXISTS time_windows_range_unique_idx ON time_windows(start_at, end_at);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'time_windows_no_overlap'
+  ) THEN
+    ALTER TABLE time_windows
+      ADD CONSTRAINT time_windows_no_overlap
+      EXCLUDE USING gist (tstzrange(start_at, end_at, '[)') WITH &&);
+  END IF;
+END $$;

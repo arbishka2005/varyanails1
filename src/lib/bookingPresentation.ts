@@ -10,6 +10,7 @@
   TimeWindow,
   TimeWindowStatus,
 } from "../types";
+import { APP_TIME_ZONE, compareDateTimeDesc, getLocalDateKey } from "./dateTime";
 
 export const contactLabels: Record<ContactChannel, string> = {
   telegram: "Telegram",
@@ -27,7 +28,7 @@ export const lengthLabels: Record<NailLength, string> = {
 export const statusLabels: Record<RequestStatus, string> = {
   new: "Новая заявка",
   needs_clarification: "Нужны уточнения",
-  waiting_client: "Ждёт клиента",
+  waiting_client: "Ждёт подтверждения",
   confirmed: "Подтверждена",
   declined: "Отклонена",
 };
@@ -51,6 +52,7 @@ export function formatDayLabel(value: string) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "long",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(value));
 }
 
@@ -58,10 +60,12 @@ export function formatTimeRange(startAt: string, endAt: string) {
   const start = new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(startAt));
   const end = new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(endAt));
 
   return `${start}-${end}`;
@@ -73,6 +77,7 @@ export function formatDateTime(value: string) {
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(value));
 }
 
@@ -82,14 +87,17 @@ export function makeWindowLabel(startAt: string, endAt: string) {
   const date = new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",
     month: "long",
+    timeZone: APP_TIME_ZONE,
   }).format(start);
   const startTime = new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(start);
   const endTime = new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(end);
 
   return `${date}, ${startTime}-${endTime}`;
@@ -110,7 +118,7 @@ export function groupWindowsByDate(windows: TimeWindow[]) {
   const map = new Map<string, { dateKey: string; label: string; items: TimeWindow[] }>();
 
   windows.forEach((window) => {
-    const dateKey = window.startAt.split("T")[0];
+    const dateKey = getLocalDateKey(window.startAt);
     const current = map.get(dateKey) ?? {
       dateKey,
       label: formatDayLabel(window.startAt),
@@ -136,7 +144,7 @@ export function buildRequestPriority(requests: BookingRequest[]) {
     .sort(
       (left, right) =>
         requestPriority[left.status] - requestPriority[right.status] ||
-        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+        compareDateTimeDesc(left.createdAt, right.createdAt),
     )
     .filter((request) => request.status !== "confirmed" && request.status !== "declined");
 }

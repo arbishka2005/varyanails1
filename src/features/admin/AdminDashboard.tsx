@@ -7,6 +7,7 @@ import {
   getServiceTitle,
   statusLabels,
 } from "../../lib/bookingPresentation";
+import { compareDateTimeAsc, compareDateTimeDesc, getLocalDateKey, getTodayDateKey, isFutureDateTime } from "../../lib/dateTime";
 import { type MasterWorkspaceSectionProps } from "./masterWorkspaceTypes";
 import type { Appointment, BookingRequest, Client, ServicePreset, TimeWindow } from "../../types";
 
@@ -36,7 +37,7 @@ export function AdminDashboard({
   "appointments" | "clients" | "onNavigate" | "requests" | "services" | "windows"
 >) {
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const todayKey = getLocalDateKey(new Date());
+  const todayKey = getTodayDateKey();
 
   const todayAppointments = useMemo(
     () =>
@@ -47,12 +48,12 @@ export function AdminDashboard({
           client: clients.find((client) => client.id === appointment.clientId),
           request: requests.find((request) => request.id === appointment.requestId),
         }))
-        .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime()),
+        .sort((left, right) => compareDateTimeAsc(left.startAt, right.startAt)),
     [appointments, clients, requests, todayKey],
   );
 
   const nextAppointment = useMemo(
-    () => todayAppointments.find((appointment) => new Date(appointment.endAt).getTime() >= Date.now()) ?? null,
+    () => todayAppointments.find((appointment) => isFutureDateTime(appointment.endAt)) ?? null,
     [todayAppointments],
   );
 
@@ -65,7 +66,7 @@ export function AdminDashboard({
           client: clients.find((client) => client.id === request.clientId),
           servicePreset: services.find((service) => service.id === request.service),
         }))
-        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime())
+        .sort((left, right) => compareDateTimeDesc(left.createdAt, right.createdAt))
         .slice(0, 4),
     [clients, requests, services],
   );
@@ -75,7 +76,7 @@ export function AdminDashboard({
     [todayKey, windows],
   );
   const openWindowsToday = todayWindows.filter(
-    (window) => window.status === "available" && new Date(window.startAt).getTime() >= Date.now(),
+    (window) => window.status === "available" && isFutureDateTime(window.startAt),
   );
 
   const dayRevenue = todayAppointments.reduce(
@@ -295,8 +296,8 @@ function buildDashboardWarnings(
   if (waitingClient) {
     warnings.push({
       id: "waiting-client",
-      title: "Окошко ждёт подтверждения",
-      detail: "Клиентка ещё не ответила на предложенное время.",
+      title: "Старая заявка ждёт клиентку",
+      detail: "Это legacy-сценарий. Лучше подтвердить или уточнить вручную.",
       action: "requests",
     });
   }
@@ -353,12 +354,4 @@ function formatMoney(value: number) {
   }
 
   return `${value.toLocaleString("ru-RU")} ₽`;
-}
-
-function getLocalDateKey(value: string | Date) {
-  const date = typeof value === "string" ? new Date(value) : value;
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
 }

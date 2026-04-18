@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isValidDateRange } from "../../src/lib/dateTime.js";
 
 export const contactChannelSchema = z.enum(["telegram", "vk", "phone"]);
 export const nailLengthSchema = z.enum(["short", "medium", "long", "extra"]);
@@ -60,11 +61,13 @@ export const bookingRequestSchema = z.object({
 export const createBookingRequestSchema = z.object({
   client: clientSchema,
   photos: z.array(photoSchema),
-  request: bookingRequestSchema,
+  request: bookingRequestSchema.extend({
+    status: z.literal("new"),
+  }),
 });
 
 export const updateRequestStatusSchema = z.object({
-  status: requestStatusSchema,
+  status: z.enum(["needs_clarification", "declined"]),
 });
 
 export const updateRequestWindowSchema = z.object({
@@ -112,8 +115,11 @@ export const createTimeWindowSchema = z.object({
   id: z.string().min(1),
   startAt: z.string().min(1),
   endAt: z.string().min(1),
-  status: timeWindowStatusSchema,
+  status: z.literal("available"),
   label: z.string().min(1),
+}).refine((value) => isValidDateRange(value.startAt, value.endAt), {
+  message: "Time window must end after it starts",
+  path: ["endAt"],
 });
 
 export const updateTimeWindowStatusSchema = z.object({

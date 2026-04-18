@@ -1,4 +1,4 @@
-export type NotificationPayload = {
+﻿export type NotificationPayload = {
   title: string;
   lines: string[];
   accent?: string;

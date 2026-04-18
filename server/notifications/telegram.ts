@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+﻿import { config } from "../config.js";
 import type { Client } from "../../src/types.js";
 import type { NotificationPayload } from "./templates.js";
 
@@ -13,7 +13,7 @@ function formatMessage(payload: NotificationPayload) {
   const header = `${payload.accent ?? "\u2728"} <b>${escapeHtml(payload.title)}</b>`;
   const body = payload.lines
     .filter(Boolean)
-    .map((line, index) => `${index === 0 ? "" : "• "}${escapeHtml(line)}`)
+    .map((line, index) => `${index === 0 ? "" : "\u2022 "}${escapeHtml(line)}`)
     .join("\n");
 
   return [header, body].filter(Boolean).join("\n\n");
@@ -25,7 +25,7 @@ export async function sendTelegramMessage(
   replyMarkup?: Record<string, unknown>,
 ) {
   if (!config.telegramBotToken) {
-    return;
+    return false;
   }
 
   const response = await fetch(`https://api.telegram.org/bot${config.telegramBotToken}/sendMessage`, {
@@ -38,12 +38,22 @@ export async function sendTelegramMessage(
       disable_web_page_preview: true,
       ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
     }),
+  }).catch((error: unknown) => {
+    console.error("Telegram notify failed:", error);
+    return null;
   });
+
+  if (!response) {
+    return false;
+  }
 
   if (!response.ok) {
     const body = await response.text();
     console.error("Telegram notify failed:", response.status, body);
+    return false;
   }
+
+  return true;
 }
 
 export async function notifyMasters(payload: NotificationPayload) {
@@ -59,9 +69,9 @@ export async function notifyMasters(payload: NotificationPayload) {
 
 export async function notifyClient(client: Client | null | undefined, payload: NotificationPayload) {
   if (!config.telegramBotToken || !client?.telegramUserId) {
-    return;
+    return false;
   }
 
   const message = formatMessage(payload);
-  await sendTelegramMessage(client.telegramUserId, message, payload.replyMarkup);
+  return sendTelegramMessage(client.telegramUserId, message, payload.replyMarkup);
 }

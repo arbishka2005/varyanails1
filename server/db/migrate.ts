@@ -76,6 +76,77 @@ export async function runMigrations() {
   `);
 
   await pool.query(`
+    DROP INDEX IF EXISTS appointments_request_id_idx;
+  `);
+
+  await pool.query(`
+    WITH duplicate_appointments AS (
+      SELECT id,
+        ROW_NUMBER() OVER (
+          PARTITION BY request_id
+          ORDER BY start_at DESC, id DESC
+        ) AS rank
+      FROM appointments
+      WHERE status = 'scheduled'
+    )
+    UPDATE appointments
+    SET status = 'cancelled',
+        cancelled_at = COALESCE(cancelled_at, NOW())
+    WHERE id IN (
+      SELECT id
+      FROM duplicate_appointments
+      WHERE rank > 1
+    );
+  `);
+
+  await pool.query(`
+    CREATE UNIQUE INDEX IF NOT EXISTS appointments_scheduled_request_id_idx
+      ON appointments(request_id)
+      WHERE status = 'scheduled';
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM time_windows
+        GROUP BY start_at, end_at
+        HAVING COUNT(*) > 1
+      ) THEN
+        CREATE UNIQUE INDEX IF NOT EXISTS time_windows_range_unique_idx
+          ON time_windows(start_at, end_at);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
+    CREATE EXTENSION IF NOT EXISTS btree_gist;
+  `);
+
+  await pool.query(`
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'time_windows_no_overlap'
+      ) AND NOT EXISTS (
+        SELECT 1
+        FROM time_windows left_window
+        JOIN time_windows right_window
+          ON left_window.id < right_window.id
+          AND left_window.start_at < right_window.end_at
+          AND right_window.start_at < left_window.end_at
+      ) THEN
+        ALTER TABLE time_windows
+          ADD CONSTRAINT time_windows_no_overlap
+          EXCLUDE USING gist (tstzrange(start_at, end_at, '[)') WITH &&);
+      END IF;
+    END $$;
+  `);
+
+  await pool.query(`
     ALTER TABLE IF EXISTS booking_requests
       ALTER COLUMN public_token SET NOT NULL;
   `);

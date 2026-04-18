@@ -1,14 +1,10 @@
-import type { Appointment, BookingRequest, Client, TimeWindow } from "../../src/types.js";
+﻿import type { Appointment, BookingRequest, Client, TimeWindow } from "../../src/types.js";
+import { formatTimeRange } from "../../src/lib/bookingPresentation.js";
 import { notifyClient, notifyMasters } from "../notifications/telegram.js";
 import { repository } from "../repositories/index.js";
 
 function buildWindowLine(window: TimeWindow | null) {
   return window ? `Окно: ${window.label}` : "Окно: нужно согласовать";
-}
-
-async function getClientName(clientId: string) {
-  const client = await repository.getClient(clientId);
-  return client?.name;
 }
 
 async function getClientAndWindow(clientId: string, windowId: string) {
@@ -40,46 +36,54 @@ export async function notifyBookingRequestCreated(options: {
 }
 
 export async function notifyRequestStatusChanged(request: BookingRequest) {
-  const clientName = await getClientName(request.clientId);
+  const client = await repository.getClient(request.clientId);
 
-  await notifyMasters({
-    title: "Статус заявки изменен",
-    lines: [
-      `Заявка: ${request.id}`,
-      `Статус: ${request.status}`,
-      clientName ? `Клиент: ${clientName}` : "",
-    ],
-  });
-}
+  if (request.status === "needs_clarification") {
+    await notifyClient(client, {
+      title: "Нужно уточнить запись",
+      lines: [
+        "Мастеру нужно чуть больше деталей по заявке.",
+        "Напишите, пожалуйста, чтобы спокойно подобрать время и формат.",
+      ],
+    });
+    return;
+  }
 
-export async function notifyRequestWindowChanged(request: BookingRequest) {
-  const [clientName, window] = await Promise.all([
-    getClientName(request.clientId),
-    request.preferredWindowId ? repository.getTimeWindow(request.preferredWindowId) : Promise.resolve(null),
-  ]);
-
-  await notifyMasters({
-    title: "Предложено другое окно",
-    lines: [
-      `Заявка: ${request.id}`,
-      clientName ? `Клиент: ${clientName}` : "",
-      buildWindowLine(window),
-    ],
-  });
+  if (request.status === "declined") {
+    await notifyClient(client, {
+      title: "Заявка закрыта",
+      lines: [
+        "Сейчас не получится взять эту запись.",
+        "Если хотите подобрать другое время, напишите мастеру.",
+      ],
+    });
+  }
 }
 
 export async function notifyBookingConfirmed(
   appointment: Appointment,
   confirmedBy: "master" | "client",
 ) {
-  const clientName = await getClientName(appointment.clientId);
+  const client = await repository.getClient(appointment.clientId);
+  const timeLabel = formatTimeRange(appointment.startAt, appointment.endAt);
 
-  await notifyMasters({
-    title: confirmedBy === "master" ? "Заявка подтверждена мастером" : "Клиент подтвердил окно",
+  if (confirmedBy === "client") {
+    await notifyMasters({
+      title: "Клиент подтвердил запись",
+      lines: [
+        `Заявка: ${appointment.requestId}`,
+        client ? `Клиент: ${client.name}` : "",
+        `Время: ${timeLabel}`,
+      ],
+    });
+    return;
+  }
+
+  await notifyClient(client, {
+    title: "Запись подтверждена",
     lines: [
-      `Заявка: ${appointment.requestId}`,
-      clientName ? `Клиент: ${clientName}` : "",
-      `Время: ${appointment.startAt}`,
+      `Время: ${timeLabel}`,
+      "Если планы изменятся, напишите мастеру заранее.",
     ],
   });
 }

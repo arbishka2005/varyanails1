@@ -1,6 +1,14 @@
 ﻿import { useMemo } from "react";
 import { ClipboardList } from "lucide-react";
 import { groupWindowsByDate } from "../../lib/bookingPresentation";
+import {
+  compareDateTimeDesc,
+  getLocalDateKey,
+  getTodayDateKey,
+  isFutureDateTime,
+  isOlderThan,
+  isPastDateTime,
+} from "../../lib/dateTime";
 import { AdminScreenHeader } from "./AdminNavigation";
 import { RequestCard } from "./RequestCard";
 import { type MasterWorkspaceSectionProps } from "./masterWorkspaceTypes";
@@ -42,7 +50,7 @@ export function AdminRequestsView({
           key: day.dateKey,
           label: day.label,
           availableCount: day.items.filter(
-            (window) => window.status === "available" && new Date(window.startAt).getTime() >= Date.now(),
+            (window) => window.status === "available" && isFutureDateTime(window.startAt),
           ).length,
         }))
         .filter((day) => day.availableCount > 0)
@@ -159,12 +167,13 @@ type InboxGroup = {
   title: string;
   requests: BookingRequest[];
 };
+const REQUEST_OVERDUE_MS = 24 * 60 * 60 * 1000;
 
 function buildInboxGroups(requests: BookingRequest[], windows: TimeWindow[]): InboxGroup[] {
-  const activeRequests = requests.filter((request) => request.status !== "declined");
+  const activeRequests = requests.filter((request) => request.status !== "declined" && request.status !== "confirmed");
   const groups: InboxGroup[] = [
     { id: "new", title: "Новенькие", requests: [] },
-    { id: "waiting", title: "Ждём клиентку", requests: [] },
+    { id: "waiting", title: "Старые подтверждения", requests: [] },
     { id: "today", title: "Сегодня красим", requests: [] },
     { id: "overdue", title: "Просрочено", requests: [] },
   ];
@@ -176,7 +185,7 @@ function buildInboxGroups(requests: BookingRequest[], windows: TimeWindow[]): In
   });
 
   groups.forEach((group) => {
-    group.requests.sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    group.requests.sort((left, right) => compareDateTimeDesc(left.createdAt, right.createdAt));
   });
 
   return groups;
@@ -209,8 +218,8 @@ function isRequestToday(request: BookingRequest, windows: TimeWindow[]) {
     return false;
   }
 
-  const today = new Date().toISOString().slice(0, 10);
-  return window.startAt.slice(0, 10) === today;
+  const today = getTodayDateKey();
+  return getLocalDateKey(window.startAt) === today;
 }
 
 function isRequestOverdue(request: BookingRequest, windows: TimeWindow[]) {
@@ -221,9 +230,8 @@ function isRequestOverdue(request: BookingRequest, windows: TimeWindow[]) {
   const window = getRequestWindow(request, windows);
 
   if (window) {
-    return new Date(window.endAt).getTime() < Date.now();
+    return isPastDateTime(window.endAt);
   }
 
-  const createdAt = new Date(request.createdAt).getTime();
-  return Date.now() - createdAt > 1000 * 60 * 60 * 24;
+  return isOlderThan(request.createdAt, REQUEST_OVERDUE_MS);
 }

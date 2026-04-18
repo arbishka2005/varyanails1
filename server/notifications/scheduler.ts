@@ -1,4 +1,5 @@
 import type { Client } from "../../src/types.js";
+import { APP_TIME_ZONE, getTimestamp } from "../../src/lib/dateTime.js";
 import type { Repository } from "../repositories/types.js";
 import {
   buildReminder24hPayload,
@@ -10,7 +11,7 @@ import {
 const HOUR_MS = 60 * 60 * 1000;
 const REMINDER_WINDOW_MS = 60 * 60 * 1000;
 
-type NotifyClient = (client: Client | null | undefined, payload: NotificationPayload) => Promise<void>;
+type NotifyClient = (client: Client | null | undefined, payload: NotificationPayload) => Promise<boolean>;
 
 function formatTimeRange(startAt: string, endAt: string) {
   const start = new Intl.DateTimeFormat("ru-RU", {
@@ -18,10 +19,12 @@ function formatTimeRange(startAt: string, endAt: string) {
     month: "long",
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(startAt));
   const end = new Intl.DateTimeFormat("ru-RU", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: APP_TIME_ZONE,
   }).format(new Date(endAt));
   return `${start} - ${end}`;
 }
@@ -56,20 +59,24 @@ export function startAppointmentScheduler(options: {
           continue;
         }
 
-        const startAt = new Date(appointment.startAt).getTime();
-        const endAt = new Date(appointment.endAt).getTime();
+        const startAt = getTimestamp(appointment.startAt);
+        const endAt = getTimestamp(appointment.endAt);
         const diffMs = startAt - now;
         const client = clientsById.get(appointment.clientId);
         const timeLabel = formatTimeRange(appointment.startAt, appointment.endAt);
 
         if (!appointment.reminder24hSentAt && isWithinWindow(diffMs, 24) && client?.telegramUserId) {
-          await notifyClient(client, buildReminder24hPayload(timeLabel, client.name));
-          await repository.markAppointmentReminder(appointment.id, "24h", new Date().toISOString());
+          const sent = await notifyClient(client, buildReminder24hPayload(timeLabel, client.name));
+          if (sent) {
+            await repository.markAppointmentReminder(appointment.id, "24h", new Date().toISOString());
+          }
         }
 
         if (!appointment.reminder3hSentAt && isWithinWindow(diffMs, 3) && client?.telegramUserId) {
-          await notifyClient(client, buildReminder3hPayload(timeLabel));
-          await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
+          const sent = await notifyClient(client, buildReminder3hPayload(timeLabel));
+          if (sent) {
+            await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
+          }
         }
 
         if (
@@ -80,8 +87,10 @@ export function startAppointmentScheduler(options: {
           appointment.publicToken
         ) {
           const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.publicToken}`;
-          await notifyClient(client, buildSurveyPayload(surveyUrl));
-          await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
+          const sent = await notifyClient(client, buildSurveyPayload(surveyUrl));
+          if (sent) {
+            await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
+          }
         }
       }
     } catch (error) {

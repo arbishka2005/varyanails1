@@ -8,6 +8,15 @@ import {
   groupWindowsByDate,
   windowStatusLabel,
 } from "../../lib/bookingPresentation";
+import {
+  compareDateTimeAsc,
+  getNextWeekendDateKey,
+  getRelativeDateKey,
+  getTodayDateKey,
+  isFutureDateTime,
+  isWithinNextDays,
+  toAppDateTime,
+} from "../../lib/dateTime";
 import { AdminScreenHeader } from "./AdminNavigation";
 import { type MasterWorkspaceSectionProps } from "./masterWorkspaceTypes";
 import type { TimeWindow } from "../../types";
@@ -40,7 +49,7 @@ export function AdminScheduleView({
   const [pendingMove, setPendingMove] = useState<{ appointmentId: string; windowId: string } | null>(null);
   const [dragPreview, setDragPreview] = useState<{ x: number; y: number; label: string } | null>(null);
   const [windowForm, setWindowForm] = useState({
-    date: new Date().toISOString().slice(0, 10),
+    date: getTodayDateKey(),
     start: "11:00",
     end: "14:00",
   });
@@ -52,9 +61,9 @@ export function AdminScheduleView({
       [...appointments]
         .filter(
           (appointment) =>
-            appointment.status === "scheduled" && new Date(appointment.startAt).getTime() >= Date.now(),
+            appointment.status === "scheduled" && isFutureDateTime(appointment.startAt),
         )
-        .sort((left, right) => new Date(left.startAt).getTime() - new Date(right.startAt).getTime())
+        .sort((left, right) => compareDateTimeAsc(left.startAt, right.startAt))
         .slice(0, 4),
     [appointments],
   );
@@ -65,7 +74,7 @@ export function AdminScheduleView({
           key: day.dateKey,
           label: day.label,
           availableCount: day.items.filter(
-            (window) => window.status === "available" && new Date(window.startAt).getTime() >= Date.now(),
+            (window) => window.status === "available" && isFutureDateTime(window.startAt),
           ).length,
         }))
         .filter((day) => day.availableCount > 0)
@@ -115,8 +124,8 @@ export function AdminScheduleView({
     }
 
     addTimeWindow({
-      startAt: `${windowForm.date}T${windowForm.start}:00+03:00`,
-      endAt: `${windowForm.date}T${windowForm.end}:00+03:00`,
+      startAt: toAppDateTime(windowForm.date, windowForm.start),
+      endAt: toAppDateTime(windowForm.date, windowForm.end),
     });
   };
 
@@ -128,8 +137,8 @@ export function AdminScheduleView({
       end: nextWindow.end,
     });
     addTimeWindow({
-      startAt: `${nextWindow.date}T${nextWindow.start}:00+03:00`,
-      endAt: `${nextWindow.date}T${nextWindow.end}:00+03:00`,
+      startAt: toAppDateTime(nextWindow.date, nextWindow.start),
+      endAt: toAppDateTime(nextWindow.date, nextWindow.end),
     });
   };
 
@@ -255,7 +264,7 @@ export function AdminScheduleView({
                       const client = appointment
                         ? clients.find((item) => item.id === appointment.clientId)
                         : null;
-                      const isFutureWindow = new Date(windowItem.startAt).getTime() >= Date.now();
+                      const isFutureWindow = isFutureDateTime(windowItem.startAt);
                       const activeMoveAppointmentId = tapMoveAppointmentId ?? dragAppointmentId;
                       const moveConflictReason = activeMoveAppointmentId
                         ? getMoveConflictReason(windowItem, appointment, isFutureWindow)
@@ -341,7 +350,7 @@ export function AdminScheduleView({
                                 ? findAppointmentForWindow(targetWindow) ?? null
                                 : null;
                               const targetIsFuture = targetWindow
-                                ? new Date(targetWindow.startAt).getTime() >= Date.now()
+                                ? isFutureDateTime(targetWindow.startAt)
                                 : false;
                               if (
                                 targetWindow &&
@@ -538,7 +547,7 @@ export function AdminScheduleView({
 type QuickWindowPreset = "tomorrow-morning" | "tomorrow-evening" | "weekend";
 
 function makeQuickWindow(preset: QuickWindowPreset) {
-  const date = preset === "weekend" ? getNextWeekendDate() : addDays(new Date(), 1);
+  const date = preset === "weekend" ? getNextWeekendDateKey() : getRelativeDateKey(1);
   const times: Record<QuickWindowPreset, { start: string; end: string }> = {
     "tomorrow-morning": { start: "10:00", end: "13:00" },
     "tomorrow-evening": { start: "18:00", end: "21:00" },
@@ -547,36 +556,10 @@ function makeQuickWindow(preset: QuickWindowPreset) {
   const time = times[preset];
 
   return {
-    date: toDateInputValue(date),
+    date,
     start: time.start,
     end: time.end,
   };
-}
-
-function addDays(date: Date, days: number) {
-  const nextDate = new Date(date);
-  nextDate.setDate(nextDate.getDate() + days);
-  return nextDate;
-}
-
-function getNextWeekendDate() {
-  const today = new Date();
-  const day = today.getDay();
-  const daysUntilSaturday = (6 - day + 7) % 7 || 7;
-  return addDays(today, daysUntilSaturday);
-}
-
-function toDateInputValue(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function isWithinNextDays(value: string, days: number) {
-  const time = new Date(value).getTime();
-  const now = Date.now();
-  return time >= now && time <= now + days * 24 * 60 * 60 * 1000;
 }
 
 function getMoveConflictReason(

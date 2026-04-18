@@ -1,4 +1,4 @@
-import { navigateTo } from "./app/navigation";
+﻿import { navigateTo } from "./app/navigation";
 import { useAppController } from "./app/useAppController";
 import { ClientRequestForm } from "./features/booking/ClientRequestForm";
 import {
@@ -15,59 +15,11 @@ import { SettingsWorkspace } from "./features/admin/SettingsWorkspace";
 import { SurveyPage } from "./features/survey/SurveyPage";
 
 export function App() {
-  const {
-    route,
-    form,
-    bookingDraftUi,
-    services,
-    windows,
-    clients,
-    photos,
-    requests,
-    appointments,
-    selectedService,
-    estimatedMinutes,
-    estimatedPriceFrom,
-    availableBookingWindows,
-    adminOverviewCounts,
-    lastRequestInfo,
-    lastSubmittedRequestId,
-    hasClientRequest,
-    isLoading,
-    apiError,
-    adminAccessDenied,
-    isTelegramMiniApp,
-    telegramInitData,
-    telegramUser,
-    startParam,
-    locationPath,
-    locationHash,
-    uploading,
-    uploadError,
-    setForm,
-    setBookingDraftStep,
-    setBookingDraftFormatQuestion,
-    openClientSection,
-    openAdminSection,
-    openBookingFlow,
-    submitRequest,
-    confirmClientWindow,
-    refreshLastRequest,
-    uploadPhoto,
-    confirmRequest,
-    updateStatus,
-    updateWindow,
-    updateService,
-    createService,
-    deleteService,
-    addTimeWindow,
-    updateWindowStatus,
-    moveAppointment,
-    updateAppointmentStatus,
-    deleteAppointment,
-    updateClientNotes,
-    deleteClient,
-  } = useAppController();
+  const { shell, status, data, client, admin } = useAppController();
+  const { route, telegram, openClientSection, openAdminSection } = shell;
+  const { isLoading, apiError, adminAccessDenied } = status;
+  const { services, windows, clients, photos, requests, appointments } = data;
+  const adminActions = admin.actions;
 
   return (
     <main className="app-shell" aria-busy={isLoading}>
@@ -79,7 +31,7 @@ export function App() {
 
       {isLoading ? (
         <div aria-live="polite" className="panel notice-panel loading-panel" role="status">
-          Загружаю данные из PostgreSQL...
+          Загружаю данные...
         </div>
       ) : null}
 
@@ -87,12 +39,12 @@ export function App() {
         <section className="client-portal">
           {route.section === "home" ? (
             <ClientHomeScreen
-              hasRequest={hasClientRequest}
-              lastRequestInfo={lastRequestInfo}
-              lastSubmittedRequestId={lastSubmittedRequestId}
-              confirmClientWindow={confirmClientWindow}
+              hasRequest={client.hasClientRequest}
+              lastRequestInfo={client.lastRequestInfo}
+              lastSubmittedRequestId={client.lastSubmittedRequestId}
+              confirmClientWindow={client.confirmClientWindow}
               openRequests={() => openClientSection("requests")}
-              openBookingFlow={() => openBookingFlow()}
+              openBookingFlow={() => client.openBookingFlow()}
             />
           ) : null}
 
@@ -101,53 +53,54 @@ export function App() {
               <ClientScreenHeader
                 eyebrow="запись"
                 title="Новая запись"
-                actionLabel={hasClientRequest ? "Мои записи" : undefined}
-                onAction={hasClientRequest ? () => openClientSection("requests") : undefined}
+                actionLabel={client.hasClientRequest ? "Мои записи" : undefined}
+                onAction={client.hasClientRequest ? () => openClientSection("requests") : undefined}
               />
               <ClientRequestForm
-                form={form}
-                estimatedMinutes={estimatedMinutes}
-                estimatedPriceFrom={estimatedPriceFrom}
-                requiresHandPhoto={form.isNewClient || selectedService.requiresHandPhoto}
-                requiresReference={selectedService.requiresReference}
+                form={client.form}
+                estimatedMinutes={client.estimatedMinutes}
+                estimatedPriceFrom={client.estimatedPriceFrom}
+                requiresHandPhoto={client.form.isNewClient || client.selectedService.requiresHandPhoto}
+                requiresReference={client.selectedService.requiresReference}
                 services={services}
-                selectedService={selectedService}
-                availableWindows={availableBookingWindows}
-                currentStep={bookingDraftUi.currentStep}
-                formatQuestion={bookingDraftUi.formatQuestion}
-                setForm={setForm}
-                setCurrentStep={setBookingDraftStep}
-                setFormatQuestion={setBookingDraftFormatQuestion}
-                submitRequest={submitRequest}
-                uploadPhoto={uploadPhoto}
-                uploading={uploading}
-                uploadError={uploadError}
+                selectedService={client.selectedService}
+                availableWindows={client.availableBookingWindows}
+                currentStep={client.bookingDraftUi.currentStep}
+                formatQuestion={client.bookingDraftUi.formatQuestion}
+                setForm={client.setForm}
+                setCurrentStep={client.setBookingDraftStep}
+                setFormatQuestion={client.setBookingDraftFormatQuestion}
+                submitRequest={client.submitRequest}
+                uploadPhoto={client.uploadPhoto}
+                uploading={client.uploading}
+                uploadError={client.uploadError}
+                isSubmitting={client.isSubmittingRequest}
               />
             </>
           ) : null}
 
           {route.section === "requests" ? (
             <ClientRequestsScreen
-              lastRequestInfo={lastRequestInfo}
-              lastSubmittedRequestId={lastSubmittedRequestId}
-              confirmClientWindow={confirmClientWindow}
-              refreshLastRequest={refreshLastRequest}
-              openBookingFlow={() => openBookingFlow()}
+              lastRequestInfo={client.lastRequestInfo}
+              lastSubmittedRequestId={client.lastSubmittedRequestId}
+              confirmClientWindow={client.confirmClientWindow}
+              refreshLastRequest={client.refreshLastRequest}
+              openBookingFlow={() => client.openBookingFlow()}
             />
           ) : null}
 
           {route.section === "profile" ? (
             <ClientProfileScreen
-              form={form}
-              telegramUser={telegramUser}
-              openBookingFlow={() => openBookingFlow()}
+              form={client.form}
+              telegramUser={telegram.telegramUser}
+              openBookingFlow={() => client.openBookingFlow()}
               openRequests={() => openClientSection("requests")}
             />
           ) : null}
 
           <ClientBottomNav
             currentSection={route.section}
-            hasRequest={hasClientRequest}
+            hasRequest={client.hasClientRequest}
             onNavigate={openClientSection}
           />
         </section>
@@ -161,12 +114,12 @@ export function App() {
             <div className="panel notice-panel">
               Админ-панель доступна только в Telegram Mini App для аккаунта мастера. Откройте приложение через кнопку в боте или проверьте, что ваш Telegram ID добавлен в список мастеров.
               <div className="notice-details">
-                <div>Telegram WebApp: {isTelegramMiniApp ? "yes" : "no"}</div>
-                <div>InitData length: {telegramInitData.length}</div>
-                <div>User ID: {telegramUser?.id ?? "n/a"}</div>
-                <div>Start param: {startParam || "n/a"}</div>
-                <div>Path: {locationPath || "/"}</div>
-                <div>Hash: {locationHash || "n/a"}</div>
+                <div>Telegram WebApp: {telegram.isTelegramMiniApp ? "yes" : "no"}</div>
+                <div>InitData length: {telegram.telegramInitData.length}</div>
+                <div>User ID: {telegram.telegramUser?.id ?? "n/a"}</div>
+                <div>Start param: {telegram.startParam || "n/a"}</div>
+                <div>Path: {telegram.locationPath || "/"}</div>
+                <div>Hash: {telegram.locationHash || "n/a"}</div>
               </div>
               <div className="action-row">
                 <button className="secondary-button" onClick={() => navigateTo("/")} type="button">
@@ -176,7 +129,7 @@ export function App() {
             </div>
           ) : (
             <>
-              {route.section === "dashboard" ? <AdminHeader counts={adminOverviewCounts} /> : null}
+              {route.section === "dashboard" ? <AdminHeader counts={admin.overviewCounts} /> : null}
 
               {route.section === "dashboard" || route.section === "requests" || route.section === "schedule" ? (
                 <MasterWorkspace
@@ -188,14 +141,14 @@ export function App() {
                   requests={requests}
                   services={services}
                   windows={windows}
-                  confirmRequest={confirmRequest}
-                  updateStatus={updateStatus}
-                  updateWindow={updateWindow}
-                  updateWindowStatus={updateWindowStatus}
-                  moveAppointment={moveAppointment}
-                  updateAppointmentStatus={updateAppointmentStatus}
-                  deleteAppointment={deleteAppointment}
-                  addTimeWindow={addTimeWindow}
+                  confirmRequest={adminActions.confirmRequest}
+                  updateStatus={adminActions.updateStatus}
+                  updateWindow={adminActions.updateWindow}
+                  updateWindowStatus={adminActions.updateWindowStatus}
+                  moveAppointment={adminActions.moveAppointment}
+                  updateAppointmentStatus={adminActions.updateAppointmentStatus}
+                  deleteAppointment={adminActions.deleteAppointment}
+                  addTimeWindow={adminActions.addTimeWindow}
                 />
               ) : null}
 
@@ -206,9 +159,9 @@ export function App() {
                   photos={photos}
                   requests={requests}
                   services={services}
-                  deleteClient={deleteClient}
-                  deleteAppointment={deleteAppointment}
-                  updateClientNotes={updateClientNotes}
+                  deleteClient={adminActions.deleteClient}
+                  deleteAppointment={adminActions.deleteAppointment}
+                  updateClientNotes={adminActions.updateClientNotes}
                 />
               ) : null}
 
@@ -216,17 +169,17 @@ export function App() {
                 <SettingsWorkspace
                   services={services}
                   windows={windows}
-                  addTimeWindow={addTimeWindow}
-                  createService={createService}
-                  updateService={updateService}
-                  deleteService={deleteService}
-                  updateWindowStatus={updateWindowStatus}
+                  addTimeWindow={adminActions.addTimeWindow}
+                  createService={adminActions.createService}
+                  updateService={adminActions.updateService}
+                  deleteService={adminActions.deleteService}
+                  updateWindowStatus={adminActions.updateWindowStatus}
                 />
               ) : null}
 
               <AdminBottomNav
                 currentSection={route.section}
-                newRequestsCount={adminOverviewCounts.newRequests}
+                newRequestsCount={admin.overviewCounts.newRequests}
                 onNavigate={openAdminSection}
               />
             </>

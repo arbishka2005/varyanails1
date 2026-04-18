@@ -43,7 +43,16 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
 
   if (!response.ok) {
-    const message = await response.text();
+    const rawMessage = await response.text();
+    let message = rawMessage;
+
+    try {
+      const parsed = JSON.parse(rawMessage) as { error?: string };
+      message = parsed.error ?? rawMessage;
+    } catch {
+      // Keep plain text errors as-is.
+    }
+
     throw new ApiError(message || `API request failed: ${response.status}`, response.status);
   }
 

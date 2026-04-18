@@ -50,6 +50,7 @@ publicRoutes.get("/api/public/appointments/:id", async (request, response) => {
 });
 
 publicRoutes.post("/api/public/booking-requests/:id/confirm", async (request, response) => {
+  const before = await repository.getBookingRequestByPublicToken(getParamId(request));
   const appointment = await repository.confirmBookingRequestByPublicToken(getParamId(request));
 
   if (!appointment) {
@@ -57,7 +58,9 @@ publicRoutes.post("/api/public/booking-requests/:id/confirm", async (request, re
     return;
   }
 
-  void notifyBookingConfirmed(appointment, "client");
+  if (before?.status !== "confirmed") {
+    void notifyBookingConfirmed(appointment, "client");
+  }
   response.status(201).json(appointment);
 });
 

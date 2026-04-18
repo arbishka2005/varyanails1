@@ -3,7 +3,6 @@ import { Check, ChevronDown, Clock3, MessageCircle, Phone, Send, Sparkles, X } f
 import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import { contactLabels, getServiceTitle, lengthLabels, statusLabels } from "../../lib/bookingPresentation";
-import { customWindowValue } from "../booking/formState";
 import type { BookingRequest, Client, PhotoAttachment, RequestStatus, ServicePreset, TimeWindow } from "../../types";
 
 export function RequestCard({
@@ -35,9 +34,9 @@ export function RequestCard({
     : null;
   const availableWindows = windows.filter(
     (window) =>
-      window.status === "available" || window.status === "offered" || window.id === request.preferredWindowId,
+      window.status === "available" || window.id === request.preferredWindowId,
   );
-  const firstAvailableWindow = availableWindows.find((window) => window.status === "available") ?? availableWindows[0];
+  const firstAvailableWindow = availableWindows.find((window) => window.status === "available") ?? null;
   const hasConcreteWindow = Boolean(selectedWindow);
   const handPhoto = photos.find((photo) => photo.kind === "hands");
   const referencePhoto = photos.find((photo) => photo.kind === "reference");
@@ -65,6 +64,10 @@ export function RequestCard({
   };
 
   const handleMainAction = () => {
+    if (mainAction.kind === "done" || mainAction.kind === "closed") {
+      return;
+    }
+
     if (mainAction.kind === "review") {
       setIsExpanded(true);
       setReviewStep(0);
@@ -104,8 +107,13 @@ export function RequestCard({
       </button>
 
       <div className="admin-inbox-primary-action">
-        <button className={mainAction.kind === "decline" ? "danger-button" : "primary-button"} onClick={handleMainAction} type="button">
-          {mainAction.kind === "review" ? <Sparkles size={17} /> : mainAction.kind === "accept" ? <Check size={17} /> : mainAction.kind === "offer" ? <Clock3 size={17} /> : mainAction.kind === "clarify" ? <MessageCircle size={17} /> : <X size={17} />}
+        <button
+          className={mainAction.kind === "decline" || mainAction.kind === "closed" ? "danger-button" : "primary-button"}
+          disabled={mainAction.kind === "done" || mainAction.kind === "closed"}
+          onClick={handleMainAction}
+          type="button"
+        >
+          {mainAction.kind === "review" ? <Sparkles size={17} /> : mainAction.kind === "accept" ? <Check size={17} /> : mainAction.kind === "offer" ? <Clock3 size={17} /> : mainAction.kind === "clarify" ? <MessageCircle size={17} /> : mainAction.kind === "done" ? <Check size={17} /> : <X size={17} />}
           {mainAction.label}
         </button>
       </div>
@@ -117,7 +125,7 @@ export function RequestCard({
               availableWindows={availableWindows}
               client={client}
               photos={photos}
-              proposalWindowId={proposalWindowId || firstAvailableWindow?.id || customWindowValue}
+              proposalWindowId={proposalWindowId || firstAvailableWindow?.id || ""}
               request={request}
               selectedWindow={selectedWindow}
               serviceTitle={serviceTitle}
@@ -125,7 +133,7 @@ export function RequestCard({
               onCancel={() => setReviewStep(null)}
               onComplete={(windowId) => {
                 runAction(() => {
-                  if (windowId === customWindowValue) {
+                  if (!windowId) {
                     updateStatus(request.id, "needs_clarification");
                     return;
                   }
@@ -174,42 +182,51 @@ export function RequestCard({
               ) : null}
 
               <label className="move-window-field">
-                Предложить окошко
+                Окошко заявки
                 <select
-                  value={request.preferredWindowId ?? customWindowValue}
+                  disabled={request.status === "confirmed" || request.status === "declined"}
+                  value={request.preferredWindowId ?? ""}
                   onChange={(event) => {
                     const value = event.target.value;
-                    runAction(() => updateWindow(request.id, value === customWindowValue ? null : value));
+                    runAction(() => updateWindow(request.id, value || null));
                   }}
                 >
+                  <option value="">Выбрать окошко</option>
                   {availableWindows.map((window) => (
                     <option key={window.id} value={window.id}>
                       {window.label}
                     </option>
                   ))}
-                  <option value={customWindowValue}>Нужно спросить другое время</option>
                 </select>
               </label>
 
-              <div className="action-row admin-inbox-secondary-actions">
-                <button
-                  onClick={() => runAction(() => confirmRequest(request.id))}
-                  className="success-button"
-                  disabled={!hasConcreteWindow || request.status === "confirmed"}
-                  type="button"
-                >
-                  <Check size={17} /> Записать
-                </button>
-                <button onClick={() => runAction(offerFirstWindow)} className="secondary-button" type="button">
-                  <Clock3 size={17} /> Предложить окошко
-                </button>
-                <button onClick={() => runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
-                  <MessageCircle size={17} /> Спросить ещё
-                </button>
-                <button onClick={() => runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
-                  <X size={17} /> Не брать
-                </button>
-              </div>
+              {request.status === "confirmed" ? (
+                <div className="empty-state">Заявка уже записана. Перенос и отмена теперь в расписании.</div>
+              ) : request.status === "declined" ? (
+                <div className="empty-state">Заявка закрыта.</div>
+              ) : (
+                <div className="action-row admin-inbox-secondary-actions">
+                  <button
+                    onClick={() => runAction(() => confirmRequest(request.id))}
+                    className="success-button"
+                    disabled={!hasConcreteWindow}
+                    type="button"
+                  >
+                    <Check size={17} /> Записать
+                  </button>
+                  {!hasConcreteWindow ? (
+                    <button onClick={() => runAction(offerFirstWindow)} className="secondary-button" type="button">
+                      <Clock3 size={17} /> Выбрать окошко
+                    </button>
+                  ) : null}
+                  <button onClick={() => runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
+                    <MessageCircle size={17} /> Уточнить
+                  </button>
+                  <button onClick={() => runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
+                    <X size={17} /> Не брать
+                  </button>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -221,7 +238,7 @@ export function RequestCard({
 }
 
 type NextAction = {
-  kind: "review" | "accept" | "offer" | "clarify" | "decline";
+  kind: "review" | "accept" | "offer" | "clarify" | "decline" | "done" | "closed";
   label: string;
 };
 
@@ -234,16 +251,26 @@ function getNextAction({
   hasConcreteWindow: boolean;
   request: BookingRequest;
 }): NextAction {
-  if (request.status === "new" || request.status === "needs_clarification") {
-    return { kind: "review", label: "Разобрать заявку" };
+  if (request.status === "confirmed") {
+    return { kind: "done", label: "Уже записана" };
   }
 
-  if (request.status === "confirmed") {
-    return { kind: "clarify", label: "Спросить ещё" };
+  if (request.status === "declined") {
+    return { kind: "closed", label: "Заявка закрыта" };
+  }
+
+  if (request.status === "new" || request.status === "needs_clarification") {
+    if (hasConcreteWindow) {
+      return { kind: "accept", label: "Записать" };
+    }
+
+    return hasAvailableWindow
+      ? { kind: "review", label: "Разобрать заявку" }
+      : { kind: "clarify", label: "Уточнить" };
   }
 
   if (hasConcreteWindow) {
-    return { kind: "accept", label: "Записать" };
+    return { kind: "accept", label: request.status === "waiting_client" ? "Записать сейчас" : "Записать" };
   }
 
   if (hasAvailableWindow) {
@@ -251,10 +278,10 @@ function getNextAction({
   }
 
   if (request.status === "waiting_client") {
-    return { kind: "clarify", label: "Спросить ещё" };
+    return { kind: "clarify", label: "Уточнить" };
   }
 
-  return { kind: "clarify", label: "Спросить ещё" };
+  return { kind: "clarify", label: "Уточнить" };
 }
 
 function AdminRequestReviewFlow({
@@ -287,7 +314,7 @@ function AdminRequestReviewFlow({
   onWindowChange: (windowId: string) => void;
 }) {
   const selectedProposalWindow = availableWindows.find((window) => window.id === proposalWindowId) ?? selectedWindow;
-  const canSendProposal = proposalWindowId !== customWindowValue && Boolean(selectedProposalWindow);
+  const canSendProposal = Boolean(selectedProposalWindow);
   const steps = ["Хочет", "Фото", "Окошко", "Ответ"];
 
   return (
@@ -337,7 +364,7 @@ function AdminRequestReviewFlow({
 
         {step === 2 ? (
           <>
-            <span className="status waiting_client">Выбрать окошко</span>
+            <span className="status new">Выбрать окошко</span>
             <h3>Куда ставим?</h3>
             <div className="admin-review-window-list">
               {availableWindows.length === 0 ? (
@@ -354,21 +381,14 @@ function AdminRequestReviewFlow({
                   </button>
                 ))
               )}
-              <button
-                className={proposalWindowId === customWindowValue ? "active" : ""}
-                onClick={() => onWindowChange(customWindowValue)}
-                type="button"
-              >
-                Спросить ещё
-              </button>
             </div>
           </>
         ) : null}
 
         {step === 3 ? (
           <>
-            <span className="status confirmed">Отправка</span>
-            <h3>{canSendProposal ? "Отправить окошко" : "Спросить ещё"}</h3>
+            <span className="status confirmed">Решение</span>
+            <h3>{canSendProposal ? "Поставить окошко" : "Уточнить"}</h3>
             <div className="admin-review-summary">
               <strong>{client?.name ?? "Клиентка"}</strong>
               <span>{serviceTitle}</span>
@@ -389,7 +409,7 @@ function AdminRequestReviewFlow({
         >
           {step === 3 ? (
             <>
-              {canSendProposal ? "Отправить" : "Спросить"} <Send size={17} />
+              {canSendProposal ? "Выбрать" : "Уточнить"} <Send size={17} />
             </>
           ) : (
             <>

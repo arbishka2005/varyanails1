@@ -1,5 +1,6 @@
 import type express from "express";
 import { ZodError } from "zod";
+import { DomainError } from "../lib/domainErrors.js";
 
 export function errorHandler(
   error: unknown,
@@ -9,6 +10,11 @@ export function errorHandler(
 ) {
   if (error instanceof ZodError) {
     response.status(400).json({ error: "Validation failed", issues: error.issues });
+    return;
+  }
+
+  if (error instanceof DomainError) {
+    response.status(error.status).json({ error: error.message });
     return;
   }
 

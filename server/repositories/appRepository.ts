@@ -25,6 +25,9 @@ import {
   toTimeWindow,
 } from "../db/mappers.js";
 import { generatePublicToken } from "../lib/publicTokens.js";
+import { DomainError } from "../lib/domainErrors.js";
+import { makeWindowLabel } from "../../src/lib/bookingPresentation.js";
+import { isFutureDateTime } from "../../src/lib/dateTime.js";
 
 export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
   const [services, windows, options] = await Promise.all([
@@ -37,7 +40,7 @@ export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
 
   return {
     services: services.rows.map(toService),
-    windows: windows.rows.map(toTimeWindow),
+    windows: windows.rows.map(toTimeWindow).filter((window) => isFutureDateTime(window.startAt)),
     serviceOptions: options.rows.map(toServiceOption),
   };
 }
@@ -168,6 +171,24 @@ export async function createBookingRequest(payload: {
   request: BookingRequest;
 }) {
   return withTransaction(async (client): Promise<PublicBookingAccess> => {
+    if (payload.request.status !== "new") {
+      throw new DomainError("Новая заявка должна начинаться в статусе new.");
+    }
+
+    if (!payload.request.preferredWindowId) {
+      throw new DomainError("Выберите свободное окошко из списка.");
+    }
+
+    const windowResult = await client.query(
+      "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
+      [payload.request.preferredWindowId],
+    );
+    const selectedWindow = windowResult.rows[0] ? toTimeWindow(windowResult.rows[0]) : null;
+
+    if (!selectedWindow || selectedWindow.status !== "available" || !isFutureDateTime(selectedWindow.startAt)) {
+      throw new DomainError("Это окошко уже занято. Выберите другое.");
+    }
+
     await insertClient(client, payload.client);
 
     for (const photo of payload.photos) {
@@ -175,12 +196,7 @@ export async function createBookingRequest(payload: {
     }
 
     const createdRequest = await insertRequest(client, payload.request);
-    if (createdRequest.preferredWindowId) {
-      await client.query(
-        "UPDATE time_windows SET status = 'offered' WHERE id = $1 AND status = 'available'",
-        [createdRequest.preferredWindowId],
-      );
-    }
+    await client.query("UPDATE time_windows SET status = 'offered' WHERE id = $1", [createdRequest.preferredWindowId]);
 
     return {
       requestId: createdRequest.id,
@@ -198,16 +214,23 @@ export async function updateRequestStatus(id: string, status: RequestStatus) {
       return null;
     }
 
+    const transitionError = getRequestStatusTransitionError(request, status);
+
+    if (transitionError) {
+      throw new DomainError(transitionError);
+    }
+
     const result = await client.query(
       `UPDATE booking_requests
         SET status = $2,
-            preferred_window_id = CASE WHEN $2 = 'declined' THEN NULL ELSE preferred_window_id END
+            preferred_window_id = CASE WHEN $2 IN ('declined', 'needs_clarification') THEN NULL ELSE preferred_window_id END,
+            custom_window_text = CASE WHEN $2 IN ('declined', 'needs_clarification') THEN NULL ELSE custom_window_text END
         WHERE id = $1
         RETURNING *`,
       [id, status],
     );
 
-    if (status === "declined" && request.preferredWindowId) {
+    if ((status === "declined" || status === "needs_clarification") && request.preferredWindowId) {
       await releaseWindowIfUnused(client, request.preferredWindowId);
     }
 
@@ -228,9 +251,41 @@ export async function updateRequestWindow(
       return null;
     }
 
+    if (request.status === "confirmed") {
+      throw new DomainError("Заявка уже подтверждена. Переносите запись в расписании.");
+    }
+
+    if (request.status === "declined") {
+      throw new DomainError("Заявка уже отклонена.");
+    }
+
+    if (preferredWindowId) {
+      const selectedWindowResult = await client.query(
+        "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
+        [preferredWindowId],
+      );
+      const selectedWindow = selectedWindowResult.rows[0] ? toTimeWindow(selectedWindowResult.rows[0]) : null;
+
+      if (
+        !selectedWindow ||
+        (selectedWindow.status !== "available" && preferredWindowId !== request.preferredWindowId)
+      ) {
+        throw new DomainError("Это окошко уже занято. Выберите другое.");
+      }
+
+      if (
+        preferredWindowId === request.preferredWindowId &&
+        (selectedWindow.status === "reserved" || selectedWindow.status === "blocked")
+      ) {
+        throw new DomainError("Это окошко уже недоступно.");
+      }
+    }
+
     const result = await client.query(
       `UPDATE booking_requests
-        SET preferred_window_id = $2, custom_window_text = $3, status = 'waiting_client'
+        SET preferred_window_id = $2,
+            custom_window_text = CASE WHEN $2::text IS NULL THEN $3 ELSE NULL END,
+            status = CASE WHEN $2::text IS NULL THEN 'needs_clarification' ELSE 'new' END
         WHERE id = $1
         RETURNING *`,
       [id, preferredWindowId, customWindowText ?? null],
@@ -392,23 +447,67 @@ export async function deleteService(id: string) {
 }
 
 export async function createTimeWindow(window: TimeWindow) {
-  const result = await pool.query(
-    `INSERT INTO time_windows (id, start_at, end_at, status, label)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING *`,
-    [window.id, window.startAt, window.endAt, window.status, window.label],
-  );
+  if (window.status !== "available") {
+    throw new DomainError("Новое окошко можно создать только свободным.");
+  }
 
-  return toTimeWindow(result.rows[0]);
+  return withTransaction(async (client) => {
+    await client.query("SELECT pg_advisory_xact_lock(hashtext('time_windows:create'))");
+
+    const duplicate = await client.query(
+      "SELECT id FROM time_windows WHERE start_at = $1 AND end_at = $2 LIMIT 1",
+      [window.startAt, window.endAt],
+    );
+
+    if (duplicate.rows[0]) {
+      throw new DomainError("Такое окошко уже есть.");
+    }
+
+    const overlap = await client.query(
+      `SELECT id FROM time_windows
+        WHERE start_at < $2::timestamptz
+          AND end_at > $1::timestamptz
+        LIMIT 1`,
+      [window.startAt, window.endAt],
+    );
+
+    if (overlap.rows[0]) {
+      throw new DomainError("Окошко пересекается с уже созданным.");
+    }
+
+    const result = await client.query(
+      `INSERT INTO time_windows (id, start_at, end_at, status, label)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *`,
+      [window.id, window.startAt, window.endAt, "available", makeWindowLabel(window.startAt, window.endAt)],
+    );
+
+    return toTimeWindow(result.rows[0]);
+  });
 }
 
 export async function updateTimeWindowStatus(id: string, status: TimeWindowStatus) {
-  const result = await pool.query(
-    "UPDATE time_windows SET status = $2 WHERE id = $1 RETURNING *",
-    [id, status],
-  );
+  return withTransaction(async (client) => {
+    const currentResult = await client.query("SELECT * FROM time_windows WHERE id = $1 FOR UPDATE", [id]);
+    const currentWindow = currentResult.rows[0] ? toTimeWindow(currentResult.rows[0]) : null;
 
-  return result.rows[0] ? toTimeWindow(result.rows[0]) : null;
+    if (!currentWindow) {
+      return null;
+    }
+
+    const transitionError = await getManualWindowStatusError(client, currentWindow, status);
+
+    if (transitionError) {
+      throw new DomainError(transitionError);
+    }
+
+    const result = await client.query(
+      "UPDATE time_windows SET status = $2 WHERE id = $1 RETURNING *",
+      [id, status],
+    );
+
+    return result.rows[0] ? toTimeWindow(result.rows[0]) : null;
+  });
 }
 
 export async function moveAppointment(appointmentId: string, windowId: string) {
@@ -423,13 +522,7 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
       return null;
     }
 
-    const targetResult = await client.query(
-      "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
-      [windowId],
-    );
-    const targetWindow = targetResult.rows[0] ? toTimeWindow(targetResult.rows[0]) : null;
-
-    if (!targetWindow || targetWindow.status !== "available") {
+    if (appointment.status !== "scheduled") {
       return null;
     }
 
@@ -445,8 +538,30 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
       return null;
     }
 
+    const targetResult = await client.query(
+      "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
+      [windowId],
+    );
+    const targetWindow = targetResult.rows[0] ? toTimeWindow(targetResult.rows[0]) : null;
+
+    if (!targetWindow) {
+      return null;
+    }
+
+    if (targetWindow.id === oldWindow.id) {
+      return appointment;
+    }
+
+    if (targetWindow.status !== "available") {
+      throw new DomainError("Перенести можно только в свободное окошко.");
+    }
+
     await client.query("UPDATE time_windows SET status = 'available' WHERE id = $1", [oldWindow.id]);
     await client.query("UPDATE time_windows SET status = 'reserved' WHERE id = $1", [targetWindow.id]);
+    await client.query(
+      "UPDATE booking_requests SET preferred_window_id = $2 WHERE id = $1",
+      [appointment.requestId, targetWindow.id],
+    );
 
     const updated = await client.query(
       `UPDATE appointments
@@ -485,6 +600,13 @@ export async function updateAppointmentStatus(id: string, status: Appointment["s
           SET status = 'available'
         WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
         [appointment.startAt, appointment.endAt],
+      );
+      await client.query(
+        `UPDATE booking_requests
+          SET status = 'declined',
+              preferred_window_id = NULL
+        WHERE id = $1 AND status = 'confirmed'`,
+        [appointment.requestId],
       );
     }
 
@@ -584,8 +706,17 @@ export async function confirmBookingRequest(requestId: string) {
       [requestId],
     );
     const request = requestResult.rows[0] ? toBookingRequest(requestResult.rows[0]) : null;
+    const existingAppointment = await getAppointmentForRequest(client, requestId);
+
+    if (existingAppointment) {
+      return existingAppointment;
+    }
 
     if (!request?.preferredWindowId) {
+      return null;
+    }
+
+    if (request.status === "declined") {
       return null;
     }
 
@@ -598,6 +729,8 @@ export async function confirmBookingRequest(requestId: string) {
     if (!window || window.status === "reserved" || window.status === "blocked") {
       return null;
     }
+
+    await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
 
     const appointment: Appointment = {
       id: `APT-${Date.now()}`,
@@ -645,6 +778,11 @@ export async function confirmBookingRequestByClient(requestId: string) {
       [requestId],
     );
     const request = requestResult.rows[0] ? toBookingRequest(requestResult.rows[0]) : null;
+    const existingAppointment = await getAppointmentForRequest(client, requestId);
+
+    if (existingAppointment) {
+      return existingAppointment;
+    }
 
     if (!request || request.status !== "waiting_client" || !request.preferredWindowId) {
       return null;
@@ -659,6 +797,8 @@ export async function confirmBookingRequestByClient(requestId: string) {
     if (!window || window.status === "reserved" || window.status === "blocked") {
       return null;
     }
+
+    await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
 
     const appointment: Appointment = {
       id: `APT-${Date.now()}`,
@@ -775,6 +915,107 @@ async function releaseWindowIfUnused(client: PoolClient, windowId: string) {
       )`,
     [windowId],
   );
+}
+
+function getRequestStatusTransitionError(request: BookingRequest, nextStatus: RequestStatus) {
+  if (request.status === nextStatus) {
+    return "";
+  }
+
+  if (nextStatus === "confirmed") {
+    return "Подтверждение заявки проходит через создание записи.";
+  }
+
+  if (nextStatus === "waiting_client") {
+    return "waiting_client оставлен только для старых заявок.";
+  }
+
+  if (request.status === "confirmed") {
+    return "Подтверждённую заявку меняйте через запись в расписании.";
+  }
+
+  if (request.status === "declined") {
+    return "Отклонённая заявка закрыта.";
+  }
+
+  if (nextStatus !== "needs_clarification" && nextStatus !== "declined") {
+    return "Недопустимый переход статуса заявки.";
+  }
+
+  return "";
+}
+
+async function getAppointmentForRequest(client: PoolClient, requestId: string) {
+  const result = await client.query(
+    "SELECT * FROM appointments WHERE request_id = $1 AND status = 'scheduled' LIMIT 1",
+    [requestId],
+  );
+
+  return result.rows[0] ? toAppointment(result.rows[0]) : null;
+}
+
+async function assertWindowIsNotOwnedByAnotherActiveRequest(
+  client: PoolClient,
+  windowId: string,
+  requestId: string,
+) {
+  const result = await client.query(
+    `SELECT id FROM booking_requests
+      WHERE preferred_window_id = $1
+        AND id <> $2
+        AND status != 'declined'
+      LIMIT 1`,
+    [windowId, requestId],
+  );
+
+  if (result.rows[0]) {
+    throw new DomainError("Это окошко уже привязано к другой заявке.");
+  }
+}
+
+async function getManualWindowStatusError(
+  client: PoolClient,
+  window: TimeWindow,
+  nextStatus: TimeWindowStatus,
+) {
+  if (window.status === nextStatus) {
+    return "";
+  }
+
+  const isManualTransition =
+    (window.status === "available" && nextStatus === "blocked") ||
+    (window.status === "blocked" && nextStatus === "available");
+
+  if (!isManualTransition) {
+    return "Этот статус меняется только через заявку или запись.";
+  }
+
+  const activeRequest = await client.query(
+    `SELECT id FROM booking_requests
+      WHERE preferred_window_id = $1
+        AND status != 'declined'
+      LIMIT 1`,
+    [window.id],
+  );
+
+  if (activeRequest.rows[0]) {
+    return "Окошко уже привязано к заявке.";
+  }
+
+  const activeAppointment = await client.query(
+    `SELECT id FROM appointments
+      WHERE start_at = $1
+        AND end_at = $2
+        AND status = 'scheduled'
+      LIMIT 1`,
+    [window.startAt, window.endAt],
+  );
+
+  if (activeAppointment.rows[0]) {
+    return "Окошко уже занято записью.";
+  }
+
+  return "";
 }
 
 async function insertRequest(client: PoolClient, item: BookingRequest) {

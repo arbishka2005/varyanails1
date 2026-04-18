@@ -1,4 +1,3 @@
-import { timeWindows } from "../../data";
 import { PHONE_PREFIX } from "../../lib/phone";
 import type {
   ContactChannel,
@@ -25,7 +24,6 @@ export type FormState = {
   comment: string;
 };
 
-export const customWindowValue = "custom";
 export type ClientFormStep = "service" | "time" | "photos" | "contact";
 export type ClientFormatQuestion = "service" | "length" | "visit" | "details";
 
@@ -59,10 +57,7 @@ export const initialForm: FormState = {
   desiredResult: "",
   handPhoto: null,
   referencePhoto: null,
-  preferredWindowId:
-    timeWindows.find((window) => window.status === "available")?.id ??
-    timeWindows[0]?.id ??
-    customWindowValue,
+  preferredWindowId: "",
   customWindowText: "",
   comment: "",
 };

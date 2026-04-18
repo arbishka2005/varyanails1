@@ -6,7 +6,6 @@ import {
   notifyAppointmentMoved,
   notifyBookingConfirmed,
   notifyRequestStatusChanged,
-  notifyRequestWindowChanged,
 } from "./bookingEvents.js";
 import {
   createServiceSchema,
@@ -36,6 +35,7 @@ adminRoutes.get("/api/snapshot", requireMaster, async (_request, response) => {
 
 adminRoutes.patch("/api/booking-requests/:id/status", requireMaster, async (request, response) => {
   const payload = updateRequestStatusSchema.parse(request.body);
+  const before = await repository.getBookingRequest(getParamId(request));
   const updated = await repository.updateRequestStatus(getParamId(request), payload.status);
 
   if (!updated) {
@@ -43,7 +43,9 @@ adminRoutes.patch("/api/booking-requests/:id/status", requireMaster, async (requ
     return;
   }
 
-  void notifyRequestStatusChanged(updated);
+  if (before?.status !== updated.status) {
+    void notifyRequestStatusChanged(updated);
+  }
   response.json(updated);
 });
 
@@ -60,11 +62,11 @@ adminRoutes.patch("/api/booking-requests/:id/window", requireMaster, async (requ
     return;
   }
 
-  void notifyRequestWindowChanged(updated);
   response.json(updated);
 });
 
 adminRoutes.post("/api/booking-requests/:id/confirm", requireMaster, async (request, response) => {
+  const before = await repository.getBookingRequest(getParamId(request));
   const appointment = await repository.confirmBookingRequest(getParamId(request));
 
   if (!appointment) {
@@ -72,12 +74,15 @@ adminRoutes.post("/api/booking-requests/:id/confirm", requireMaster, async (requ
     return;
   }
 
-  void notifyBookingConfirmed(appointment, "master");
+  if (before?.status !== "confirmed") {
+    void notifyBookingConfirmed(appointment, "master");
+  }
   response.status(201).json(appointment);
 });
 
 adminRoutes.patch("/api/appointments/:id/status", requireMaster, async (request, response) => {
   const payload = updateAppointmentStatusSchema.parse(request.body);
+  const before = await repository.getAppointment(getParamId(request));
   const updated = await repository.updateAppointmentStatus(getParamId(request), payload.status);
 
   if (!updated) {
@@ -85,7 +90,7 @@ adminRoutes.patch("/api/appointments/:id/status", requireMaster, async (request,
     return;
   }
 
-  if (updated.status === "cancelled") {
+  if (before?.status !== "cancelled" && updated.status === "cancelled") {
     void notifyAppointmentCancelled(updated);
   }
 
@@ -94,6 +99,7 @@ adminRoutes.patch("/api/appointments/:id/status", requireMaster, async (request,
 
 adminRoutes.patch("/api/appointments/:id/window", requireMaster, async (request, response) => {
   const payload = moveAppointmentSchema.parse(request.body);
+  const before = await repository.getAppointment(getParamId(request));
   const updated = await repository.moveAppointment(getParamId(request), payload.windowId);
 
   if (!updated) {
@@ -101,11 +107,14 @@ adminRoutes.patch("/api/appointments/:id/window", requireMaster, async (request,
     return;
   }
 
-  void notifyAppointmentMoved(updated, payload.windowId);
+  if (!before || before.startAt !== updated.startAt || before.endAt !== updated.endAt) {
+    void notifyAppointmentMoved(updated, payload.windowId);
+  }
   response.json(updated);
 });
 
 adminRoutes.delete("/api/appointments/:id", requireMaster, async (request, response) => {
+  const before = await repository.getAppointment(getParamId(request));
   const deleted = await repository.deleteAppointment(getParamId(request));
 
   if (!deleted) {
@@ -113,6 +122,9 @@ adminRoutes.delete("/api/appointments/:id", requireMaster, async (request, respo
     return;
   }
 
+  if (before && before.status !== "cancelled") {
+    void notifyAppointmentCancelled(before);
+  }
   response.status(204).end();
 });
 

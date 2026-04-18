@@ -21,10 +21,10 @@ import {
   lengthLabels,
   photoKindLabel,
 } from "../../lib/bookingPresentation";
+import { getLocalDateKey } from "../../lib/dateTime";
 import { getTelegramWebApp } from "../../app/navigation";
 import { isPhoneComplete, normalizePhoneInput } from "../../lib/phone";
 import {
-  customWindowValue,
   type ClientFormatQuestion,
   type ClientFormStep,
   type FormState,
@@ -50,7 +50,6 @@ type UploadCardProps = {
   onFileSelect: (file?: File) => void;
 };
 
-const customTimeSuggestions = ["После 18:00 в будни", "Утром в будни", "В выходные"] as const;
 const formatQuestionOrder: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
 
 const visitChoices = [
@@ -82,6 +81,7 @@ export function ClientRequestForm({
   uploadPhoto,
   uploading,
   uploadError,
+  isSubmitting,
 }: {
   form: FormState;
   estimatedMinutes: number;
@@ -100,6 +100,7 @@ export function ClientRequestForm({
   uploadPhoto: (kind: PhotoAttachment["kind"], file: File) => Promise<PhotoAttachment | null>;
   uploading: { hands: boolean; reference: boolean };
   uploadError: { hands: string; reference: string };
+  isSubmitting: boolean;
 }) {
   const maxPhotoSizeBytes = 8 * 1024 * 1024;
   const handInputRef = useRef<HTMLInputElement | null>(null);
@@ -133,7 +134,7 @@ export function ClientRequestForm({
           id: "time",
           label: "Время",
           title: "Когда удобно?",
-          description: "Нужен один слот или свой вариант времени.",
+          description: "Выберите свободный слот.",
           cta: needsPhotoStep ? "Дальше" : "Контакты",
         },
         ...(needsPhotoStep
@@ -169,7 +170,6 @@ export function ClientRequestForm({
   }, [form.desiredResult, form.length, selectedService.title]);
 
   const selectedWindow = availableWindows.find((window) => window.id === form.preferredWindowId) ?? null;
-  const needsCustomWindow = form.preferredWindowId === customWindowValue;
   const windowsByDate = useMemo(() => groupWindowsByDate(availableWindows), [availableWindows]);
   const stepIndex = Math.max(
     0,
@@ -179,7 +179,8 @@ export function ClientRequestForm({
   const activeStep = steps[stepIndex] ?? steps[0];
   const contactHandleRequired = form.contactChannel !== "phone";
   const isUploading = uploading.hands || uploading.reference;
-  const hasTimeSelection = needsCustomWindow ? Boolean(form.customWindowText.trim()) : Boolean(selectedWindow);
+  const isBusy = isUploading || isSubmitting;
+  const hasTimeSelection = Boolean(selectedWindow);
   const hasPhotoErrors = Boolean(
     fileValidationError.hands ||
       fileValidationError.reference ||
@@ -208,9 +209,7 @@ export function ClientRequestForm({
     (!needsPhotoStep || stepValidity.photos) &&
     stepValidity.contact;
   const progress = `${Math.round(((stepIndex + 1) / steps.length) * 100)}%`;
-  const summaryTime = needsCustomWindow
-    ? form.customWindowText.trim() || "Свой вариант"
-    : selectedWindow?.label ?? "Не выбрано";
+  const summaryTime = selectedWindow?.label ?? "Не выбрано";
   const summaryContact =
     form.contactChannel === "phone"
       ? form.phone || "Телефон"
@@ -273,13 +272,9 @@ export function ClientRequestForm({
 
   useEffect(() => {
     if (availableWindows.length === 0) {
-      if (form.preferredWindowId !== customWindowValue) {
-        patchForm({ preferredWindowId: customWindowValue });
+      if (form.preferredWindowId) {
+        patchForm({ preferredWindowId: "", customWindowText: "" });
       }
-      return;
-    }
-
-    if (form.preferredWindowId === customWindowValue) {
       return;
     }
 
@@ -297,7 +292,7 @@ export function ClientRequestForm({
       return;
     }
 
-    const selectedWindowDateKey = selectedWindow?.startAt.split("T")[0];
+    const selectedWindowDateKey = selectedWindow ? getLocalDateKey(selectedWindow.startAt) : null;
 
     if (selectedWindowDateKey && selectedWindowDateKey !== selectedDateKey) {
       setSelectedDateKey(selectedWindowDateKey);
@@ -372,6 +367,10 @@ export function ClientRequestForm({
   };
 
   const moveToNextStep = () => {
+    if (isSubmitting) {
+      return;
+    }
+
     if (currentStep === "service" && formatQuestion !== "details") {
       setFormatQuestion(formatQuestionOrder[Math.min(formatQuestionIndex + 1, formatQuestionOrder.length - 1)]);
       return;
@@ -403,7 +402,7 @@ export function ClientRequestForm({
   return (
     <section className="content-grid">
       <form
-        aria-busy={isUploading}
+        aria-busy={isBusy}
         className="panel request-form"
         onSubmit={(event) => event.preventDefault()}
       >
@@ -572,7 +571,7 @@ export function ClientRequestForm({
 
               {windowsByDate.length === 0 ? (
                 <div className="empty-state booking-empty-state">
-                  Свободных слотов сейчас нет. Оставьте свой вариант времени ниже.
+                  Свободных окошек сейчас нет. Мастер скоро добавит новые.
                 </div>
               ) : (
                 <>
@@ -626,58 +625,11 @@ export function ClientRequestForm({
               )}
             </div>
 
-            <section className="booking-choice-section">
-              <div className="booking-subtitle-row">
-                <span>Не подходит?</span>
-                <small>Можно сразу оставить свой вариант</small>
-              </div>
-
-              <button
-                className={`calendar-custom-button${needsCustomWindow ? " active" : ""}`}
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    preferredWindowId: customWindowValue,
-                  })
-                }
-                type="button"
-              >
-                Нужен другой день или час
-              </button>
-
-              {needsCustomWindow ? (
-                <div className="booking-stage-stack">
-                  <div className="booking-pill-group booking-pill-group-wrap">
-                    {customTimeSuggestions.map((suggestion) => (
-                      <button
-                        className={`booking-pill-button booking-pill-button-soft${form.customWindowText === suggestion ? " active" : ""}`}
-                        key={suggestion}
-                        onClick={() => patchForm({ customWindowText: suggestion })}
-                        type="button"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
-                  </div>
-
-                  <label className="booking-soft-field">
-                    <span>Свой вариант</span>
-                    <input
-                      aria-invalid={showErrors.time && !hasTimeSelection}
-                      value={form.customWindowText}
-                      onChange={(event) => patchForm({ customWindowText: event.target.value })}
-                      placeholder="Например: после 18:00 в будни"
-                    />
-                  </label>
-                </div>
-              ) : null}
-
-              {showErrors.time && !hasTimeSelection ? (
-                <small className="field-hint" id="timeHint">
-                  Выберите слот или напишите свой вариант времени.
-                </small>
-              ) : null}
-            </section>
+            {showErrors.time && !hasTimeSelection ? (
+              <small className="field-hint" id="timeHint">
+                Выберите свободное окошко из списка.
+              </small>
+            ) : null}
 
             <div className="booking-selection-note">
               <strong>Сейчас выбрано:</strong> {summaryTime}
@@ -829,7 +781,7 @@ export function ClientRequestForm({
           {stepIndex > 0 ? (
             <button
               className="secondary-button"
-              disabled={isUploading}
+              disabled={isBusy}
               onClick={moveToPreviousStep}
               type="button"
             >
@@ -839,7 +791,7 @@ export function ClientRequestForm({
 
           <button
             className="primary-button"
-            disabled={isUploading}
+            disabled={isBusy}
             onClick={() => {
               if (currentStep === "contact" && !isReadyToSubmit) {
                 setShowErrors((current) => ({ ...current, contact: true }));
@@ -852,7 +804,7 @@ export function ClientRequestForm({
           >
             {currentStep === "contact" ? (
               <>
-                Отправить заявку <Send size={18} />
+                {isSubmitting ? "Проверяю окошко..." : "Отправить заявку"} <Send size={18} />
               </>
             ) : (
               <>
@@ -869,7 +821,7 @@ export function ClientRequestForm({
         <div className="summary-badges">
           <span>{lengthLabels[form.length]}</span>
           <span>{form.isNewClient ? "первый визит" : "повтор"}</span>
-          <span>{needsCustomWindow ? "свой вариант" : "готовый слот"}</span>
+          <span>{selectedWindow ? "готовый слот" : "без времени"}</span>
         </div>
         <p>
           Примерная длительность: <strong>{formatDuration(estimatedMinutes)}</strong>

@@ -7,6 +7,7 @@ import type {
   ServicePreset,
   TimeWindow,
 } from "../../src/types.js";
+import { makeWindowLabel } from "../../src/lib/bookingPresentation.js";
 
 export function toClient(row: Record<string, unknown>): Client {
   return {
@@ -52,12 +53,15 @@ export function toServiceOption(row: Record<string, unknown>): ServiceOption {
 }
 
 export function toTimeWindow(row: Record<string, unknown>): TimeWindow {
+  const startAt = new Date(String(row.start_at)).toISOString();
+  const endAt = new Date(String(row.end_at)).toISOString();
+
   return {
     id: String(row.id),
-    startAt: new Date(String(row.start_at)).toISOString(),
-    endAt: new Date(String(row.end_at)).toISOString(),
+    startAt,
+    endAt,
     status: row.status as TimeWindow["status"],
-    label: String(row.label),
+    label: makeWindowLabel(startAt, endAt),
   };
 }
 

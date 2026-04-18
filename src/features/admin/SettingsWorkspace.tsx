@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalendarClock, Plus, Settings, Trash2 } from "lucide-react";
 import { windowStatusLabel } from "../../lib/bookingPresentation";
+import { getTodayDateKey, toAppDateTime } from "../../lib/dateTime";
 import { AdminScreenHeader } from "./AdminNavigation";
 import { makeServiceId, parseServiceEditor, toServiceEditorState, type ServiceEditorState } from "./serviceEditor";
 import type { ServiceKind, ServicePreset, TimeWindow, TimeWindowStatus } from "../../types";
@@ -32,7 +33,7 @@ export function SettingsWorkspace({
   });
   const [serviceError, setServiceError] = useState<string | null>(null);
   const [windowForm, setWindowForm] = useState({
-    date: "2026-04-18",
+    date: getTodayDateKey(),
     start: "11:00",
     end: "14:00",
   });
@@ -65,8 +66,8 @@ export function SettingsWorkspace({
     }
 
     addTimeWindow({
-      startAt: `${windowForm.date}T${windowForm.start}:00+03:00`,
-      endAt: `${windowForm.date}T${windowForm.end}:00+03:00`,
+      startAt: toAppDateTime(windowForm.date, windowForm.start),
+      endAt: toAppDateTime(windowForm.date, windowForm.end),
     });
   };
 
