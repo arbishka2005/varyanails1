@@ -1,4 +1,4 @@
-import type { Appointment, RequestStatus } from "../../src/types.js";
+import type { RequestStatus } from "../../src/types.js";
 import { repository } from "../repositories/index.js";
 import {
   notifyAppointmentCancelled,
@@ -85,7 +85,7 @@ export async function confirmRequestByClientTokenCommand(token: string) {
   return { ok: true, status: result.created ? 201 : 200, data: result.appointment } satisfies CommandResult<typeof result.appointment>;
 }
 
-export async function updateAppointmentStatusCommand(id: string, status: Appointment["status"]) {
+export async function updateAppointmentStatusCommand(id: string, status: "cancelled") {
   const result = await repository.updateAppointmentStatus(id, status);
 
   if (!result) {

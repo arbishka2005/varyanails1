@@ -389,8 +389,7 @@ function canConfirmClientWindow(
     status === "waiting_client" &&
       publicToken &&
       window &&
-      window.status !== "blocked" &&
-      window.status !== "reserved" &&
+      window.status === "offered" &&
       isFutureDateTime(window.startAt),
   );
 }

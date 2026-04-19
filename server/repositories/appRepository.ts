@@ -674,7 +674,7 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
   });
 }
 
-export async function updateAppointmentStatus(id: string, status: Appointment["status"]) {
+export async function updateAppointmentStatus(id: string, status: "cancelled") {
   return withTransaction(async (client) => {
     const current = await client.query("SELECT * FROM appointments WHERE id = $1 FOR UPDATE", [id]);
     const appointment = current.rows[0] ? toAppointment(current.rows[0]) : null;
@@ -827,9 +827,34 @@ export async function confirmBookingRequest(requestId: string) {
       [requestId],
     );
     const request = requestResult.rows[0] ? toBookingRequest(requestResult.rows[0]) : null;
+    const window = request?.preferredWindowId
+      ? await getWindowByIdForUpdate(client, request.preferredWindowId)
+      : null;
     const existingAppointment = await getAppointmentForRequest(client, requestId);
 
     if (existingAppointment) {
+      const consistencyError = getIdempotentConfirmConsistencyError({
+        request,
+        window,
+        appointment: existingAppointment,
+      });
+
+      if (consistencyError) {
+        throw new DomainError(consistencyError, 409);
+      }
+
+      if (!request || !window) {
+        throw new DomainError("Подтверждение недоступно: существующая запись требует ручной проверки.", 409);
+      }
+
+      await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
+      await assertNoScheduledAppointmentInRange(
+        client,
+        existingAppointment.startAt,
+        existingAppointment.endAt,
+        existingAppointment.id,
+      );
+
       return { appointment: existingAppointment, created: false };
     }
 
@@ -837,13 +862,7 @@ export async function confirmBookingRequest(requestId: string) {
       return null;
     }
 
-    const windowResult = await client.query(
-      "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
-      [request.preferredWindowId],
-    );
-    const window = windowResult.rows[0] ? toTimeWindow(windowResult.rows[0]) : null;
-
-    if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
+    if (!window || !isFutureDateTime(window.startAt) || window.status !== "offered") {
       return null;
     }
 
@@ -896,9 +915,34 @@ export async function confirmBookingRequestByClient(requestId: string) {
       [requestId],
     );
     const request = requestResult.rows[0] ? toBookingRequest(requestResult.rows[0]) : null;
+    const window = request?.preferredWindowId
+      ? await getWindowByIdForUpdate(client, request.preferredWindowId)
+      : null;
     const existingAppointment = await getAppointmentForRequest(client, requestId);
 
     if (existingAppointment) {
+      const consistencyError = getIdempotentConfirmConsistencyError({
+        request,
+        window,
+        appointment: existingAppointment,
+      });
+
+      if (consistencyError) {
+        throw new DomainError(consistencyError, 409);
+      }
+
+      if (!request || !window) {
+        throw new DomainError("Подтверждение недоступно: существующая запись требует ручной проверки.", 409);
+      }
+
+      await assertWindowIsNotOwnedByAnotherActiveRequest(client, window.id, request.id);
+      await assertNoScheduledAppointmentInRange(
+        client,
+        existingAppointment.startAt,
+        existingAppointment.endAt,
+        existingAppointment.id,
+      );
+
       return { appointment: existingAppointment, created: false };
     }
 
@@ -906,13 +950,7 @@ export async function confirmBookingRequestByClient(requestId: string) {
       return null;
     }
 
-    const windowResult = await client.query(
-      "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
-      [request.preferredWindowId],
-    );
-    const window = windowResult.rows[0] ? toTimeWindow(windowResult.rows[0]) : null;
-
-    if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
+    if (!window || !isFutureDateTime(window.startAt) || window.status !== "offered") {
       return null;
     }
 
@@ -1198,6 +1236,79 @@ async function getAppointmentForRequest(client: PoolClient, requestId: string) {
   return result.rows[0] ? toAppointment(result.rows[0]) : null;
 }
 
+async function getWindowByIdForUpdate(client: PoolClient, windowId: string) {
+  const result = await client.query("SELECT * FROM time_windows WHERE id = $1 FOR UPDATE", [windowId]);
+
+  return result.rows[0] ? toTimeWindow(result.rows[0]) : null;
+}
+
+function getIdempotentConfirmConsistencyError({
+  request,
+  window,
+  appointment,
+}: {
+  request: BookingRequest | null;
+  window: TimeWindow | null;
+  appointment: Appointment;
+}) {
+  if (!request) {
+    return "Подтверждение недоступно: заявка для существующей записи не найдена.";
+  }
+
+  if (request.status !== "confirmed") {
+    return "Подтверждение недоступно: существующая запись не согласована со статусом заявки.";
+  }
+
+  if (!request.preferredWindowId) {
+    return "Подтверждение недоступно: у заявки нет закреплённого окна.";
+  }
+
+  if (!window) {
+    return "Подтверждение недоступно: закреплённое окно заявки не найдено.";
+  }
+
+  if (window.status !== "reserved") {
+    return "Подтверждение недоступно: закреплённое окно больше не находится в статусе reserved.";
+  }
+
+  if (appointment.requestId !== request.id) {
+    return "Подтверждение недоступно: существующая запись привязана к другой заявке.";
+  }
+
+  if (appointment.clientId !== request.clientId) {
+    return "Подтверждение недоступно: существующая запись не согласована с клиентом заявки.";
+  }
+
+  if (appointment.service !== request.service) {
+    return "Подтверждение недоступно: существующая запись не согласована с услугой заявки.";
+  }
+
+  if (appointment.durationMinutes !== request.estimatedMinutes) {
+    return "Подтверждение недоступно: существующая запись не согласована с длительностью заявки.";
+  }
+
+  if (!haveSameOptionIds(appointment.optionIds, request.optionIds)) {
+    return "Подтверждение недоступно: существующая запись не согласована с опциями заявки.";
+  }
+
+  if (appointment.startAt !== window.startAt || appointment.endAt !== window.endAt) {
+    return "Подтверждение недоступно: существующая запись не совпадает с закреплённым окном.";
+  }
+
+  return "";
+}
+
+function haveSameOptionIds(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
+}
+
 async function assertWindowIsNotOwnedByAnotherActiveRequest(
   client: PoolClient,
   windowId: string,
@@ -1252,6 +1363,10 @@ function getAppointmentStatusTransitionError(
 
   if (nextStatus === "scheduled") {
     return "Cancelled or finished appointment cannot be reopened.";
+  }
+
+  if (nextStatus !== "cancelled") {
+    return "Only appointment cancellation is currently supported.";
   }
 
   return "";

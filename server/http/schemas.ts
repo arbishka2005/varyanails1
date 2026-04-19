@@ -11,6 +11,7 @@ export const requestStatusSchema = z.enum([
   "declined",
 ]);
 export const appointmentStatusSchema = z.enum(["scheduled", "completed", "cancelled", "no_show"]);
+export const appointmentStatusUpdateSchema = z.literal("cancelled");
 export const timeWindowStatusSchema = z.enum(["available", "offered", "reserved", "blocked"]);
 export const serviceKindSchema = z.string().min(1);
 export const serviceOptionKindSchema = z.string().min(1);
@@ -141,7 +142,7 @@ export const moveAppointmentSchema = z.object({
 });
 
 export const updateAppointmentStatusSchema = z.object({
-  status: appointmentStatusSchema,
+  status: appointmentStatusUpdateSchema,
 });
 
 export const appointmentSurveySchema = z.object({

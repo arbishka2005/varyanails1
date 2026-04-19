@@ -29,7 +29,7 @@ export type MasterWorkspaceProps = {
   moveAppointment: (appointmentId: string, windowId: string) => void | Promise<unknown>;
   updateAppointmentStatus: (
     appointmentId: string,
-    status: AppSnapshot["appointments"][number]["status"],
+    status: "cancelled",
   ) => void | Promise<unknown>;
   addTimeWindow: (window: Omit<TimeWindow, "id" | "label" | "status">) => void | Promise<unknown>;
 };

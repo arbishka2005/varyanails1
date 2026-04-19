@@ -1,14 +1,39 @@
-﻿import { useState } from "react";
-import { Check, ChevronDown, Clock3, MessageCircle, Phone, Send, Sparkles, X } from "lucide-react";
-import { useRef } from "react";
-import { Info } from "../../components/Info";
+import { useMemo, useRef, useState } from "react";
+import { Check, ChevronDown, Clock3, MessageCircle, X } from "lucide-react";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import { contactLabels, getServiceTitle, lengthLabels, statusLabels } from "../../lib/bookingPresentation";
 import { isFutureDateTime } from "../../lib/dateTime";
 import { allowsLengthSelection } from "../../lib/services";
-import type { BookingRequest, Client, PhotoAttachment, RequestStatus, ServicePreset, TimeWindow } from "../../types";
+import type {
+  Appointment,
+  BookingRequest,
+  Client,
+  PhotoAttachment,
+  RequestStatus,
+  ServicePreset,
+  TimeWindow,
+} from "../../types";
+
+type RequestCardAction = {
+  kind: "confirm" | "pick_window" | "clarify" | "review";
+  label: string;
+  tone: "primary" | "secondary";
+};
+
+type RequestCardState = {
+  note: string | null;
+  primaryAction: RequestCardAction | null;
+  secondaryActions: Array<"clarify" | "decline">;
+  canChangeWindow: boolean;
+  canDecline: boolean;
+  isLimited: boolean;
+  isProblem: boolean;
+  shouldOpenWindowPicker: boolean;
+  timeLabel: string;
+};
 
 export function RequestCard({
+  appointments,
   client,
   photos,
   request,
@@ -18,6 +43,7 @@ export function RequestCard({
   updateStatus,
   updateWindow,
 }: {
+  appointments: Appointment[];
   client?: Client;
   photos: PhotoAttachment[];
   request: BookingRequest;
@@ -30,31 +56,36 @@ export function RequestCard({
   const [isExpanded, setIsExpanded] = useState(false);
   const [isResolving, setIsResolving] = useState(false);
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
-  const [reviewStep, setReviewStep] = useState<number | null>(null);
   const [proposalWindowId, setProposalWindowId] = useState(request.preferredWindowId ?? "");
   const isResolvingRef = useRef(false);
+
   const selectedWindow = request.preferredWindowId
     ? windows.find((window) => window.id === request.preferredWindowId) ?? null
     : null;
-  const availableWindows = windows.filter(
-    (window) =>
-      (window.status === "available" && isFutureDateTime(window.startAt)) ||
-      window.id === request.preferredWindowId,
+  const availableWindows = windows.filter((window) => window.status === "available" && isFutureDateTime(window.startAt));
+  const selectedProposalWindow = useMemo(
+    () =>
+      availableWindows.find((window) => window.id === proposalWindowId) ??
+      (selectedWindow && isFutureDateTime(selectedWindow.startAt) ? selectedWindow : null),
+    [availableWindows, proposalWindowId, selectedWindow],
   );
-  const firstAvailableWindow =
-    availableWindows.find((window) => window.status === "available" && isFutureDateTime(window.startAt)) ?? null;
-  const hasConcreteWindow = Boolean(selectedWindow && isFutureDateTime(selectedWindow.startAt));
-  const handPhoto = photos.find((photo) => photo.kind === "hands");
-  const referencePhoto = photos.find((photo) => photo.kind === "reference");
+
   const service = services.find((item) => item.id === request.service) ?? null;
   const serviceTitle = getServiceTitle(services, request.service);
   const lengthLabel = allowsLengthSelection(service) ? lengthLabels[request.length] : "Своя длина";
-  const windowLabel = selectedWindow?.label ?? request.customWindowText ?? "Время не выбрано";
-  const mainAction = getNextAction({
-    hasConcreteWindow,
-    hasAvailableWindow: Boolean(firstAvailableWindow),
+  const photoSummary = getPhotoSummary(photos, service);
+  const cardState = getRequestCardState({
+    appointments,
+    availableWindows,
     request,
+    selectedWindow,
   });
+  const canSaveWindow =
+    cardState.canChangeWindow &&
+    selectedProposalWindow !== null &&
+    selectedProposalWindow.id !== request.preferredWindowId &&
+    request.status !== "confirmed" &&
+    request.status !== "declined";
 
   const runAction = async (action: () => void | Promise<unknown>) => {
     if (isResolvingRef.current) {
@@ -71,183 +102,157 @@ export function RequestCard({
     }
   };
 
-  const offerFirstWindow = async () => {
-    if (firstAvailableWindow) {
-      await updateWindow(request.id, firstAvailableWindow.id);
+  const handlePrimaryAction = () => {
+    if (!cardState.primaryAction) {
+      setIsExpanded((value) => !value);
       return;
     }
 
-    await updateStatus(request.id, "needs_clarification");
-  };
-
-  const handleMainAction = () => {
-    if (mainAction.kind === "done" || mainAction.kind === "closed") {
-      return;
-    }
-
-    if (mainAction.kind === "review") {
-      setIsExpanded(true);
-      setReviewStep(0);
-      return;
-    }
-
-    if (mainAction.kind === "accept") {
+    if (cardState.primaryAction.kind === "confirm") {
       void runAction(() => confirmRequest(request.id));
       return;
     }
 
-    if (mainAction.kind === "offer") {
-      void runAction(offerFirstWindow);
-      return;
-    }
-
-    if (mainAction.kind === "clarify") {
-      void runAction(() => updateStatus(request.id, "needs_clarification"));
-      return;
-    }
-
-    void runAction(() => updateStatus(request.id, "declined"));
+    setIsExpanded(true);
   };
 
   return (
-    <article className={`panel request-card admin-inbox-card${isExpanded ? " is-expanded" : ""}${isResolving ? " is-resolving" : ""}`}>
+    <article
+      className={`panel request-card admin-inbox-card${isExpanded ? " is-expanded" : ""}${
+        isResolving ? " is-resolving" : ""
+      }${cardState.isLimited ? " is-limited" : ""}${cardState.isProblem ? " is-problem" : ""}`}
+    >
       <button className="admin-inbox-card-summary" onClick={() => setIsExpanded((value) => !value)} type="button">
         <span className={`status ${request.status}`}>{statusLabels[request.status]}</span>
         <span className="admin-inbox-card-copy">
           <strong>{client?.name ?? "Клиентка"}</strong>
-          <small>
-            {serviceTitle} · {windowLabel}
-          </small>
+          <small>{serviceTitle}</small>
+          <small>{cardState.timeLabel}</small>
+          <small>{cardState.note ?? photoSummary}</small>
         </span>
-        <span className="request-id">{request.id}</span>
         <ChevronDown className="admin-inbox-card-chevron" size={18} />
       </button>
 
       <div className="admin-inbox-primary-action">
-        <button
-          className={mainAction.kind === "decline" || mainAction.kind === "closed" ? "danger-button" : "primary-button"}
-          disabled={isResolving || mainAction.kind === "done" || mainAction.kind === "closed"}
-          onClick={handleMainAction}
-          type="button"
-        >
-          {mainAction.kind === "review" ? <Sparkles size={17} /> : mainAction.kind === "accept" ? <Check size={17} /> : mainAction.kind === "offer" ? <Clock3 size={17} /> : mainAction.kind === "clarify" ? <MessageCircle size={17} /> : mainAction.kind === "done" ? <Check size={17} /> : <X size={17} />}
-          {mainAction.label}
-        </button>
+        {cardState.primaryAction ? (
+          <button
+            className={cardState.primaryAction.tone === "primary" ? "primary-button" : "secondary-button"}
+            disabled={isResolving}
+            onClick={handlePrimaryAction}
+            type="button"
+          >
+            {cardState.primaryAction.kind === "confirm" ? <Check size={17} /> : <MessageCircle size={17} />}
+            {cardState.primaryAction.label}
+          </button>
+        ) : (
+          <button className="secondary-button" disabled={isResolving} onClick={() => setIsExpanded((value) => !value)} type="button">
+            <MessageCircle size={17} /> Проверить
+          </button>
+        )}
       </div>
 
       {isExpanded ? (
         <div className="admin-inbox-card-details">
-          {reviewStep !== null ? (
-            <AdminRequestReviewFlow
-              availableWindows={availableWindows.filter(
-                (window) => window.status === "available" && isFutureDateTime(window.startAt),
-              )}
-              client={client}
-              photos={photos}
-              proposalWindowId={proposalWindowId || firstAvailableWindow?.id || ""}
-              request={request}
-              lengthLabel={lengthLabel}
-              serviceTitle={serviceTitle}
-              step={reviewStep}
-              onCancel={() => setReviewStep(null)}
-              onComplete={(windowId) => {
-                void runAction(async () => {
-                  if (!windowId) {
-                    await updateStatus(request.id, "needs_clarification");
+          {cardState.note ? <div className="admin-request-warning">{cardState.note}</div> : null}
+
+          <div className="admin-request-meta">
+            <div className="admin-request-meta-row">
+              <strong>Услуга</strong>
+              <span>
+                {serviceTitle} · {lengthLabel}
+              </span>
+            </div>
+            <div className="admin-request-meta-row">
+              <strong>Связь</strong>
+              <span>
+                {client
+                  ? `${contactLabels[client.preferredContactChannel]} · ${client.contactHandle || client.phone}`
+                  : "Не указана"}
+              </span>
+            </div>
+            <div className="admin-request-meta-row">
+              <strong>Фото</strong>
+              <span>{photoSummary}</span>
+            </div>
+          </div>
+
+          <div className="client-text admin-request-brief">
+            <strong>Запрос</strong>
+            <p>{request.desiredResult}</p>
+            {request.comment ? <p>{request.comment}</p> : null}
+          </div>
+
+          {(cardState.shouldOpenWindowPicker || cardState.canChangeWindow) && request.status !== "confirmed" && request.status !== "declined" ? (
+            <label className="move-window-field admin-request-window-field">
+              Окошко
+              <select
+                disabled={isResolving || availableWindows.length === 0}
+                value={selectedProposalWindow?.id ?? ""}
+                onChange={(event) => setProposalWindowId(event.target.value)}
+              >
+                <option value="">{availableWindows.length > 0 ? "Выбрать окошко" : "Свободных окошек нет"}</option>
+                {availableWindows.map((window) => (
+                  <option key={window.id} value={window.id}>
+                    {window.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
+          {photos.length > 0 ? (
+            <div className="request-photo-section">
+              <div className="section-inline-title">
+                <strong>Фото</strong>
+                <span>Открываются по тапу</span>
+              </div>
+              <PhotoGallery photos={photos} onOpen={setSelectedPhoto} />
+            </div>
+          ) : null}
+
+          <div className="action-row admin-inbox-secondary-actions">
+            {canSaveWindow ? (
+              <button
+                className="secondary-button"
+                disabled={isResolving || !selectedProposalWindow}
+                onClick={() => {
+                  if (!selectedProposalWindow) {
                     return;
                   }
 
-                  await updateWindow(request.id, windowId);
-                  setReviewStep(null);
-                });
-              }}
-              onPhotoOpen={setSelectedPhoto}
-              onStepChange={setReviewStep}
-              onWindowChange={setProposalWindowId}
-            />
-          ) : (
-            <>
-              <div className="info-grid">
-                <Info icon={<Phone size={16} />} label="Телефон" value={client?.phone ?? "Не указан"} />
-                <Info
-                  icon={<MessageCircle size={16} />}
-                  label="Связь"
-                  value={client ? `${contactLabels[client.preferredContactChannel]} ${client.contactHandle}` : "Не указана"}
-                />
-                <Info label="Клиентка" value={client?.firstVisit ? "Первый визит" : "Постоянная"} />
-                <Info label="Услуга" value={serviceTitle} />
-                <Info label="Длина" value={lengthLabel} />
-                <Info icon={<Clock3 size={16} />} label="Время" value={windowLabel} />
-                <Info label="Фото рук" value={handPhoto?.fileName ?? "Не приложено"} />
-                <Info label="Референс" value={referencePhoto?.fileName ?? "Не приложено"} />
-                <Info label="Стоимость" value={`от ${(request.estimatedPriceFrom ?? 0).toLocaleString("ru-RU")} ₽`} />
-              </div>
+                  void runAction(async () => {
+                    await updateWindow(request.id, selectedProposalWindow.id);
+                    setProposalWindowId(selectedProposalWindow.id);
+                  });
+                }}
+                type="button"
+              >
+                <Clock3 size={17} /> {request.preferredWindowId ? "Сменить окно" : "Назначить окно"}
+              </button>
+            ) : null}
 
-              <div className="client-text">
-                <strong>Что хочет клиентка</strong>
-                <p>{request.desiredResult}</p>
-                {request.comment ? <p>{request.comment}</p> : null}
-                <span>Расчёт: {request.estimatedMinutes} мин</span>
-              </div>
+            {cardState.secondaryActions.includes("clarify") ? (
+              <button
+                className="secondary-button"
+                disabled={isResolving}
+                onClick={() => void runAction(() => updateStatus(request.id, "needs_clarification"))}
+                type="button"
+              >
+                <MessageCircle size={17} /> Уточнить
+              </button>
+            ) : null}
 
-              {photos.length > 0 ? (
-                <div className="request-photo-section">
-                  <div className="section-inline-title">
-                    <strong>Фото клиентки</strong>
-                    <span>Тап по фото откроет крупно.</span>
-                  </div>
-                  <PhotoGallery photos={photos} onOpen={setSelectedPhoto} />
-                </div>
-              ) : null}
-
-              <label className="move-window-field">
-                Окошко заявки
-                <select
-                  disabled={isResolving || request.status === "confirmed" || request.status === "declined"}
-                  value={request.preferredWindowId ?? ""}
-                  onChange={(event) => {
-                    const value = event.target.value;
-                    void runAction(() => updateWindow(request.id, value || null));
-                  }}
-                >
-                  <option value="">Выбрать окошко</option>
-                  {availableWindows.map((window) => (
-                    <option key={window.id} value={window.id}>
-                      {window.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              {request.status === "confirmed" ? (
-                <div className="empty-state">Заявка уже записана. Перенос и отмена теперь в расписании.</div>
-              ) : request.status === "declined" ? (
-                <div className="empty-state">Заявка закрыта.</div>
-              ) : (
-                <div className="action-row admin-inbox-secondary-actions">
-                  <button
-                    onClick={() => void runAction(() => confirmRequest(request.id))}
-                    className="success-button"
-                    disabled={isResolving || !hasConcreteWindow}
-                    type="button"
-                  >
-                    <Check size={17} /> Записать
-                  </button>
-                  {!hasConcreteWindow ? (
-                    <button disabled={isResolving} onClick={() => void runAction(offerFirstWindow)} className="secondary-button" type="button">
-                      <Clock3 size={17} /> Выбрать окошко
-                    </button>
-                  ) : null}
-                  <button disabled={isResolving} onClick={() => void runAction(() => updateStatus(request.id, "needs_clarification"))} className="secondary-button" type="button">
-                    <MessageCircle size={17} /> Уточнить
-                  </button>
-                  <button disabled={isResolving} onClick={() => void runAction(() => updateStatus(request.id, "declined"))} className="danger-button" type="button">
-                    <X size={17} /> Не брать
-                  </button>
-                </div>
-              )}
-            </>
-          )}
+            {cardState.canDecline ? (
+              <button
+                className="danger-button"
+                disabled={isResolving}
+                onClick={() => void runAction(() => updateStatus(request.id, "declined"))}
+                type="button"
+              >
+                <X size={17} /> Отклонить
+              </button>
+            ) : null}
+          </div>
         </div>
       ) : null}
 
@@ -256,188 +261,154 @@ export function RequestCard({
   );
 }
 
-type NextAction = {
-  kind: "review" | "accept" | "offer" | "clarify" | "decline" | "done" | "closed";
-  label: string;
-};
-
-function getNextAction({
-  hasAvailableWindow,
-  hasConcreteWindow,
+function getRequestCardState({
+  appointments,
+  availableWindows,
   request,
+  selectedWindow,
 }: {
-  hasAvailableWindow: boolean;
-  hasConcreteWindow: boolean;
+  appointments: Appointment[];
+  availableWindows: TimeWindow[];
   request: BookingRequest;
-}): NextAction {
-  if (request.status === "confirmed") {
-    return { kind: "done", label: "Уже записана" };
+  selectedWindow: TimeWindow | null;
+}): RequestCardState {
+  const hasAvailableWindow = availableWindows.length > 0;
+  const hasFutureWindow = Boolean(selectedWindow && isFutureDateTime(selectedWindow.startAt));
+  const linkedAppointment = appointments.find(
+    (appointment) => appointment.requestId === request.id && appointment.status === "scheduled",
+  );
+  const isClosed = request.status === "confirmed" || request.status === "declined";
+  const isLegacy = request.status === "waiting_client";
+  const canConfirm =
+    request.status === "new" &&
+    selectedWindow !== null &&
+    hasFutureWindow &&
+    selectedWindow.status === "offered";
+  const canChangeWindow =
+    !isClosed &&
+    !isLegacy &&
+    hasAvailableWindow &&
+    (!selectedWindow ||
+      !hasFutureWindow ||
+      (selectedWindow.status === "available" && request.status === "new") ||
+      selectedWindow.status === "blocked" ||
+      selectedWindow.status === "reserved" ||
+      request.status === "needs_clarification");
+  const canDecline = request.status === "new" || request.status === "needs_clarification" || request.status === "waiting_client";
+
+  let note: string | null = null;
+  let isProblem = false;
+
+  if (isLegacy) {
+    note = "Legacy-заявка. Сначала проверьте вручную.";
+  } else if (request.status === "confirmed" && !linkedAppointment) {
+    note = "Заявка подтверждена, но связанной записи нет.";
+    isProblem = true;
+  } else if (request.status === "confirmed" && (!selectedWindow || selectedWindow.status !== "reserved")) {
+    note = "Подтверждённая заявка выглядит несогласованной с окошком.";
+    isProblem = true;
+  } else if (!selectedWindow && request.status !== "needs_clarification") {
+    note = "Валидное окно не выбрано.";
+  } else if (selectedWindow && !hasFutureWindow) {
+    note = "Окошко уже прошло. Нужно выбрать новое.";
+  } else if (selectedWindow && (selectedWindow.status === "reserved" || selectedWindow.status === "blocked")) {
+    note = "Текущее окошко недоступно.";
+  } else if (selectedWindow && selectedWindow.status === "available" && request.status === "new") {
+    note = "Окно больше не выглядит предложенным. Выберите окно заново.";
   }
 
-  if (request.status === "declined") {
-    return { kind: "closed", label: "Заявка закрыта" };
+  const primaryAction = getPrimaryAction({
+    canChangeWindow,
+    canConfirm,
+    isClosed,
+    isLegacy,
+    request,
+  });
+
+  const secondaryActions: Array<"clarify" | "decline"> = [];
+
+  if (!isClosed && request.status === "new" && primaryAction?.kind !== "clarify") {
+    secondaryActions.push("clarify");
   }
 
-  if (request.status === "new" || request.status === "needs_clarification") {
-    if (hasConcreteWindow) {
-      return { kind: "accept", label: "Записать" };
-    }
-
-    return hasAvailableWindow
-      ? { kind: "review", label: "Разобрать заявку" }
-      : { kind: "clarify", label: "Уточнить" };
-  }
-
-  if (hasConcreteWindow) {
-    return { kind: "accept", label: request.status === "waiting_client" ? "Записать сейчас" : "Записать" };
-  }
-
-  if (hasAvailableWindow) {
-    return { kind: "offer", label: "Предложить окошко" };
-  }
-
-  if (request.status === "waiting_client") {
-    return { kind: "clarify", label: "Уточнить" };
-  }
-
-  return { kind: "clarify", label: "Уточнить" };
+  return {
+    note,
+    primaryAction,
+    secondaryActions,
+    canChangeWindow,
+    canDecline,
+    isLimited: isLegacy || isProblem || isClosed,
+    isProblem,
+    shouldOpenWindowPicker: primaryAction?.kind === "pick_window",
+    timeLabel: getRequestTimeLabel(request, selectedWindow),
+  };
 }
 
-function AdminRequestReviewFlow({
-  availableWindows,
-  client,
-  photos,
-  proposalWindowId,
+function getPrimaryAction({
+  canChangeWindow,
+  canConfirm,
+  isClosed,
+  isLegacy,
   request,
-  lengthLabel,
-  serviceTitle,
-  step,
-  onCancel,
-  onComplete,
-  onPhotoOpen,
-  onStepChange,
-  onWindowChange,
 }: {
-  availableWindows: TimeWindow[];
-  client?: Client;
-  photos: PhotoAttachment[];
-  proposalWindowId: string;
+  canChangeWindow: boolean;
+  canConfirm: boolean;
+  isClosed: boolean;
+  isLegacy: boolean;
   request: BookingRequest;
-  lengthLabel: string;
-  serviceTitle: string;
-  step: number;
-  onCancel: () => void;
-  onComplete: (windowId: string) => void;
-  onPhotoOpen: (photo: PhotoAttachment) => void;
-  onStepChange: (step: number) => void;
-  onWindowChange: (windowId: string) => void;
-}) {
-  const selectedProposalWindow =
-    availableWindows.find((window) => window.id === proposalWindowId && isFutureDateTime(window.startAt)) ?? null;
-  const canSendProposal = Boolean(selectedProposalWindow);
-  const steps = ["Хочет", "Фото", "Окошко", "Ответ"];
+}): RequestCardAction | null {
+  if (isClosed) {
+    return null;
+  }
 
-  return (
-    <div className="admin-review-flow">
-      <div className="admin-review-progress" aria-label="Разбор заявки">
-        {steps.map((label, index) => (
-          <button
-            className={`${index < step ? "is-complete " : ""}${index === step ? "is-active" : ""}`}
-            key={label}
-            onClick={() => onStepChange(index)}
-            type="button"
-          >
-            <span>{index + 1}</span>
-            <small>{label}</small>
-          </button>
-        ))}
-      </div>
+  if (canConfirm) {
+    return { kind: "confirm", label: "Подтвердить", tone: "primary" };
+  }
 
-      <div className="admin-review-screen">
-        {step === 0 ? (
-          <>
-            <span className="status new">Что хочет клиентка</span>
-            <h3>{client?.name ?? "Клиентка"}</h3>
-            <div className="client-text">
-              <strong>{serviceTitle}</strong>
-              <p>{request.desiredResult}</p>
-              {request.comment ? <p>{request.comment}</p> : null}
-              <span>
-                {lengthLabel} · {request.estimatedMinutes} мин · от{" "}
-                {(request.estimatedPriceFrom ?? 0).toLocaleString("ru-RU")} ₽
-              </span>
-            </div>
-          </>
-        ) : null}
+  if (canChangeWindow) {
+    return { kind: "pick_window", label: "Выбрать окно", tone: "primary" };
+  }
 
-        {step === 1 ? (
-          <>
-            <span className="status">Фото</span>
-            <h3>Глянуть визуал</h3>
-            {photos.length > 0 ? (
-              <PhotoGallery photos={photos} onOpen={onPhotoOpen} />
-            ) : (
-              <div className="empty-state">Фото не приложены.</div>
-            )}
-          </>
-        ) : null}
+  if (!isLegacy && request.status === "new") {
+    return { kind: "clarify", label: "Уточнить", tone: "primary" };
+  }
 
-        {step === 2 ? (
-          <>
-            <span className="status new">Выбрать окошко</span>
-            <h3>Куда ставим?</h3>
-            <div className="admin-review-window-list">
-              {availableWindows.length === 0 ? (
-                <div className="empty-state">Окошек нет. Лучше спросить ещё.</div>
-              ) : (
-                availableWindows.map((window) => (
-                  <button
-                    className={proposalWindowId === window.id ? "active" : ""}
-                    key={window.id}
-                    onClick={() => onWindowChange(window.id)}
-                    type="button"
-                  >
-                    {window.label}
-                  </button>
-                ))
-              )}
-            </div>
-          </>
-        ) : null}
+  if (isLegacy || request.status === "needs_clarification") {
+    return { kind: "review", label: "Проверить", tone: "secondary" };
+  }
 
-        {step === 3 ? (
-          <>
-            <span className="status confirmed">Решение</span>
-            <h3>{canSendProposal ? "Поставить окошко" : "Уточнить"}</h3>
-            <div className="admin-review-summary">
-              <strong>{client?.name ?? "Клиентка"}</strong>
-              <span>{serviceTitle}</span>
-              <span>{selectedProposalWindow?.label ?? "Нужно уточнить время"}</span>
-            </div>
-          </>
-        ) : null}
-      </div>
+  return null;
+}
 
-      <div className="admin-review-actions">
-        <button className="secondary-button" onClick={step === 0 ? onCancel : () => onStepChange(step - 1)} type="button">
-          {step === 0 ? "Закрыть" : "Назад"}
-        </button>
-        <button
-          className="primary-button"
-          onClick={step === 3 ? () => onComplete(proposalWindowId) : () => onStepChange(step + 1)}
-          type="button"
-        >
-          {step === 3 ? (
-            <>
-              {canSendProposal ? "Выбрать" : "Уточнить"} <Send size={17} />
-            </>
-          ) : (
-            <>
-              Далее <Sparkles size={17} />
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
+function getRequestTimeLabel(request: BookingRequest, selectedWindow: TimeWindow | null) {
+  if (selectedWindow) {
+    return selectedWindow.label;
+  }
+
+  if (request.customWindowText) {
+    return request.customWindowText;
+  }
+
+  if (request.status === "needs_clarification") {
+    return "Нужно уточнить время";
+  }
+
+  return "Время не выбрано";
+}
+
+function getPhotoSummary(photos: PhotoAttachment[], service: ServicePreset | null) {
+  const handPhoto = photos.some((photo) => photo.kind === "hands");
+  const referencePhoto = photos.some((photo) => photo.kind === "reference");
+  const requiredCount = Number(Boolean(service?.requiresHandPhoto)) + Number(Boolean(service?.requiresReference));
+  const presentCount = Number(handPhoto) + Number(referencePhoto);
+
+  if (presentCount === 0) {
+    return requiredCount > 0 ? "Фото нет" : "Фото не приложены";
+  }
+
+  if (requiredCount > 0 && presentCount < requiredCount) {
+    return "Фото не все";
+  }
+
+  return presentCount > 1 ? "Фото и референс есть" : "Есть одно фото";
 }

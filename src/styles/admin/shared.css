@@ -15,7 +15,6 @@
 .admin-inbox-group-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: 0 4px;
   color: var(--color-muted);
@@ -25,16 +24,6 @@
   text-transform: uppercase;
 }
 
-.admin-inbox-group-header strong {
-  display: inline-grid;
-  place-items: center;
-  min-width: 26px;
-  height: 26px;
-  border-radius: 999px;
-  color: var(--color-accent-strong);
-  background: rgba(255, 255, 255, 0.52);
-}
-
 .admin-inbox-list {
   display: grid;
   gap: 12px;
@@ -42,7 +31,7 @@
 
 .admin-inbox-card {
   display: grid;
-  gap: 14px;
+  gap: 12px;
   padding: 16px;
   overflow: hidden;
   background:
@@ -59,9 +48,19 @@
   transform: translateX(22px) scale(0.98);
 }
 
+.admin-inbox-card.is-limited {
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.34), transparent 34%),
+    linear-gradient(145deg, rgba(255, 255, 255, 0.64), rgba(247, 239, 235, 0.44));
+}
+
+.admin-inbox-card.is-problem {
+  border-color: rgba(159, 123, 105, 0.22);
+}
+
 .admin-inbox-card-summary {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
   width: 100%;
@@ -74,12 +73,11 @@
 
 .admin-inbox-card-copy {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
 }
 
-.admin-inbox-card-copy strong,
-.admin-inbox-card-copy small {
+.admin-inbox-card-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -88,6 +86,7 @@
 .admin-inbox-card-copy small {
   color: var(--color-muted);
   line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .admin-inbox-card-chevron {
@@ -101,18 +100,18 @@
 
 .admin-inbox-primary-action {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
 }
 
 .admin-inbox-primary-action > button {
-  min-width: min(100%, 220px);
+  min-width: min(100%, 168px);
   justify-content: center;
 }
 
 .admin-inbox-card-details {
   display: grid;
-  gap: 16px;
-  padding-top: 12px;
+  gap: 14px;
+  padding-top: 10px;
   border-top: 1px solid rgba(142, 124, 152, 0.12);
   animation: adminInboxDetailsIn 180ms ease-out both;
 }
@@ -121,116 +120,60 @@
   margin-top: 0;
 }
 
-.admin-review-flow {
-  display: grid;
-  gap: 16px;
-}
-
-.admin-review-progress {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.admin-review-progress button {
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  min-width: 0;
-  padding: 10px 8px;
-  color: var(--color-muted);
-  border: 1px solid rgba(142, 124, 152, 0.12);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.admin-review-progress span {
-  display: inline-grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.68);
-}
-
-.admin-review-progress small {
-  overflow: hidden;
-  width: 100%;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.admin-review-progress button.is-complete,
-.admin-review-progress button.is-active {
-  color: var(--color-text);
-  border-color: rgba(255, 255, 255, 0.42);
-  background: rgba(255, 255, 255, 0.58);
-}
-
-.admin-review-progress button.is-active span {
-  color: #fff;
-  background: var(--gradient-accent);
-}
-
-.admin-review-screen {
-  display: grid;
-  gap: 14px;
-  min-height: 260px;
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.36);
+.admin-request-warning {
+  padding: 10px 12px;
+  border: 1px solid rgba(159, 123, 105, 0.16);
   border-radius: var(--radius-md);
-  background:
-    radial-gradient(circle at 14% 18%, rgba(255, 255, 255, 0.34), transparent 34%),
-    rgba(255, 255, 255, 0.34);
+  color: var(--color-accent-strong);
+  font-size: 13px;
+  font-weight: var(--font-weight-medium);
+  line-height: 1.45;
+  background: var(--color-warning-soft);
 }
 
-.admin-review-screen h3 {
-  margin: 0;
-  font-size: 26px;
-}
-
-.admin-review-window-list {
-  display: grid;
-  gap: 10px;
-}
-
-.admin-review-window-list button {
-  padding: 14px;
-  text-align: left;
-  color: var(--color-text);
-  border: 1px solid rgba(142, 124, 152, 0.14);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.48);
-}
-
-.admin-review-window-list button.active {
-  color: #fff;
-  border-color: transparent;
-  background: var(--gradient-accent);
-  box-shadow: 0 14px 28px rgba(181, 158, 181, 0.14);
-}
-
-.admin-review-summary {
+.admin-request-meta {
   display: grid;
   gap: 8px;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: var(--radius-sm);
-  background: rgba(255, 255, 255, 0.44);
 }
 
-.admin-review-summary span {
+.admin-request-meta-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(142, 124, 152, 0.1);
+}
+
+.admin-request-meta-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.admin-request-meta-row strong {
+  flex: 0 0 auto;
+  color: var(--color-accent-strong);
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+  line-height: 1.35;
+}
+
+.admin-request-meta-row span {
+  min-width: 0;
   color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
-.admin-review-actions {
-  display: grid;
-  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
-  gap: 10px;
+.admin-request-brief {
+  margin-bottom: 0;
+  gap: 6px;
 }
 
-.admin-review-actions button {
-  justify-content: center;
+.admin-request-window-field {
+  margin-bottom: 0;
 }
 
 @keyframes adminInboxDetailsIn {
@@ -403,7 +346,7 @@
 
 .empty-state {
   display: grid;
-  min-height: 160px;
+  min-height: 132px;
   place-items: center;
   border: 1px dashed rgba(175, 162, 193, 0.42);
   border-radius: var(--radius-md);

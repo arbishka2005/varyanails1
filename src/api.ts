@@ -308,7 +308,7 @@ export const api = {
       body: { windowId },
     }),
 
-  updateAppointmentStatus: (id: string, status: Appointment["status"]) =>
+  updateAppointmentStatus: (id: string, status: "cancelled") =>
     request<Appointment>(`/api/appointments/${id}/status`, {
       method: "PATCH",
       body: { status },

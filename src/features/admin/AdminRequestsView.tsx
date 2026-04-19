@@ -1,24 +1,20 @@
-﻿import { useMemo } from "react";
-import { ClipboardList } from "lucide-react";
-import { groupWindowsByDate } from "../../lib/bookingPresentation";
-import {
-  compareDateTimeDesc,
-  getLocalDateKey,
-  getTodayDateKey,
-  isFutureDateTime,
-  isOlderThan,
-  isPastDateTime,
-} from "../../lib/dateTime";
+import { useMemo } from "react";
+import { compareDateTimeDesc } from "../../lib/dateTime";
 import { AdminScreenHeader } from "./AdminNavigation";
 import { RequestCard } from "./RequestCard";
 import { type MasterWorkspaceSectionProps } from "./masterWorkspaceTypes";
-import type { BookingRequest, TimeWindow } from "../../types";
+import type { Appointment, BookingRequest, TimeWindow } from "../../types";
+
+type InboxGroup = {
+  id: "active" | "review";
+  title: string;
+  requests: BookingRequest[];
+};
 
 export function AdminRequestsView({
   appointments,
   clients,
   confirmRequest,
-  onNavigate,
   photos,
   requests,
   services,
@@ -30,7 +26,6 @@ export function AdminRequestsView({
   | "appointments"
   | "clients"
   | "confirmRequest"
-  | "onNavigate"
   | "photos"
   | "requests"
   | "services"
@@ -38,59 +33,32 @@ export function AdminRequestsView({
   | "updateWindow"
   | "windows"
 >) {
-  const newRequestsCount = requests.filter((request) => request.status === "new").length;
-  const scheduledCount = appointments.filter((appointment) => appointment.status === "scheduled").length;
-  const availableWindowsCount = windows.filter((window) => window.status === "available").length;
-  const activeClientsCount = clients.filter((client) => !client.archivedAt).length;
-
-  const nextAvailableDays = useMemo(
-    () =>
-      groupWindowsByDate(windows)
-        .map((day) => ({
-          key: day.dateKey,
-          label: day.label,
-          availableCount: day.items.filter(
-            (window) => window.status === "available" && isFutureDateTime(window.startAt),
-          ).length,
-        }))
-        .filter((day) => day.availableCount > 0)
-        .slice(0, 4),
-    [windows],
+  const inboxGroups = useMemo(
+    () => buildVisibleInboxGroups(requests, windows, appointments),
+    [appointments, requests, windows],
   );
-
-  const inboxGroups = useMemo(() => buildInboxGroups(requests, windows), [requests, windows]);
   const inboxCount = inboxGroups.reduce((sum, group) => sum + group.requests.length, 0);
 
   return (
     <>
-      <AdminScreenHeader
-        eyebrow="заявки"
-        title="Кто ждёт ответа"
-      />
+      <AdminScreenHeader eyebrow="Заявки" title="Разобрать заявки" />
 
       <section className="admin-screen-stack">
         <section className="requests-stack admin-inbox-stack">
-          <div className="section-title">
-            <ClipboardList size={22} />
-            <div>
-              <h2>Нужно разобрать</h2>
-            </div>
-          </div>
-
           {inboxCount === 0 ? (
-            <div className="empty-state">Пока никто не ждёт ответа.</div>
+            <div className="empty-state">Сейчас заявок нет.</div>
           ) : (
             inboxGroups.map((group) =>
               group.requests.length > 0 ? (
                 <section className="admin-inbox-group" key={group.id}>
                   <div className="admin-inbox-group-header">
                     <span>{group.title}</span>
-                    <strong>{group.requests.length}</strong>
                   </div>
 
                   <div className="admin-inbox-list">
                     {group.requests.map((request) => (
                       <RequestCard
+                        appointments={appointments}
                         key={request.id}
                         client={clients.find((client) => client.id === request.clientId)}
                         photos={photos.filter((photo) => request.photoIds.includes(photo.id))}
@@ -108,130 +76,73 @@ export function AdminRequestsView({
             )
           )}
         </section>
-
-        <section className="admin-overview-grid admin-overview-grid-compact">
-          <article className="panel admin-preview-panel">
-            <div className="section-inline-title">
-              <strong>Сводочка</strong>
-            </div>
-            <div className="admin-mini-stats">
-              <div className="admin-mini-stat">
-                <span>Новенькие</span>
-                <strong>{newRequestsCount}</strong>
-              </div>
-              <div className="admin-mini-stat">
-                <span>Записи</span>
-                <strong>{scheduledCount}</strong>
-              </div>
-              <div className="admin-mini-stat">
-                <span>Окошки</span>
-                <strong>{availableWindowsCount}</strong>
-              </div>
-              <div className="admin-mini-stat">
-                <span>Клиентки</span>
-                <strong>{activeClientsCount}</strong>
-              </div>
-            </div>
-          </article>
-
-          <article className="panel admin-preview-panel">
-            <div className="section-inline-title">
-              <strong>Куда можно поставить</strong>
-            </div>
-            <div className="admin-preview-list">
-              {nextAvailableDays.length === 0 ? (
-                <div className="empty-state">Свободных окошек нет. Надо открыть парочку.</div>
-              ) : (
-                nextAvailableDays.map((day) => (
-                  <button
-                    className="admin-preview-item"
-                    key={day.key}
-                    onClick={() => onNavigate("schedule")}
-                    type="button"
-                  >
-                    <strong>{day.label}</strong>
-                    <small>{day.availableCount} свободных слотов</small>
-                  </button>
-                ))
-              )}
-            </div>
-          </article>
-        </section>
       </section>
     </>
   );
 }
 
-type InboxGroup = {
-  id: "new" | "waiting" | "today" | "overdue";
-  title: string;
-  requests: BookingRequest[];
-};
-const REQUEST_OVERDUE_MS = 24 * 60 * 60 * 1000;
+function buildVisibleInboxGroups(
+  requests: BookingRequest[],
+  windows: TimeWindow[],
+  appointments: Appointment[],
+): InboxGroup[] {
+  const activeRequests = requests
+    .filter((request) => request.status === "new" || request.status === "needs_clarification")
+    .sort(sortInboxRequests);
 
-function buildInboxGroups(requests: BookingRequest[], windows: TimeWindow[]): InboxGroup[] {
-  const activeRequests = requests.filter((request) => request.status !== "declined" && request.status !== "confirmed");
-  const groups: InboxGroup[] = [
-    { id: "new", title: "Новенькие", requests: [] },
-    { id: "waiting", title: "Старые подтверждения", requests: [] },
-    { id: "today", title: "Сегодня красим", requests: [] },
-    { id: "overdue", title: "Просрочено", requests: [] },
+  const reviewRequests = requests
+    .filter((request) => {
+      if (request.status === "waiting_client") {
+        return true;
+      }
+
+      return hasRequestConsistencyIssue(request, windows, appointments);
+    })
+    .sort(sortInboxRequests);
+
+  return [
+    { id: "active", title: "Сейчас", requests: activeRequests },
+    { id: "review", title: "Проверить вручную", requests: reviewRequests },
   ];
-  const byId = new Map(groups.map((group) => [group.id, group]));
-
-  activeRequests.forEach((request) => {
-    const groupId = getInboxGroupId(request, windows);
-    byId.get(groupId)?.requests.push(request);
-  });
-
-  groups.forEach((group) => {
-    group.requests.sort((left, right) => compareDateTimeDesc(left.createdAt, right.createdAt));
-  });
-
-  return groups;
 }
 
-function getInboxGroupId(request: BookingRequest, windows: TimeWindow[]): InboxGroup["id"] {
-  if (isRequestOverdue(request, windows)) {
-    return "overdue";
+function hasRequestConsistencyIssue(
+  request: BookingRequest,
+  windows: TimeWindow[],
+  appointments: Appointment[],
+) {
+  if (request.status !== "confirmed") {
+    return false;
   }
 
-  if (isRequestToday(request, windows)) {
-    return "today";
+  const linkedAppointment = appointments.find(
+    (appointment) => appointment.requestId === request.id && appointment.status === "scheduled",
+  );
+
+  if (!linkedAppointment || !request.preferredWindowId) {
+    return true;
+  }
+
+  const selectedWindow = windows.find((window) => window.id === request.preferredWindowId) ?? null;
+  return !selectedWindow || selectedWindow.status !== "reserved";
+}
+
+function sortInboxRequests(left: BookingRequest, right: BookingRequest) {
+  return getRequestSortRank(left) - getRequestSortRank(right) || compareDateTimeDesc(left.createdAt, right.createdAt);
+}
+
+function getRequestSortRank(request: BookingRequest) {
+  if (request.status === "new") {
+    return 0;
+  }
+
+  if (request.status === "needs_clarification") {
+    return 1;
   }
 
   if (request.status === "waiting_client") {
-    return "waiting";
+    return 2;
   }
 
-  return "new";
-}
-
-function getRequestWindow(request: BookingRequest, windows: TimeWindow[]) {
-  return request.preferredWindowId ? windows.find((window) => window.id === request.preferredWindowId) ?? null : null;
-}
-
-function isRequestToday(request: BookingRequest, windows: TimeWindow[]) {
-  const window = getRequestWindow(request, windows);
-
-  if (!window) {
-    return false;
-  }
-
-  const today = getTodayDateKey();
-  return getLocalDateKey(window.startAt) === today;
-}
-
-function isRequestOverdue(request: BookingRequest, windows: TimeWindow[]) {
-  if (request.status === "confirmed") {
-    return false;
-  }
-
-  const window = getRequestWindow(request, windows);
-
-  if (window) {
-    return isPastDateTime(window.endAt);
-  }
-
-  return isOlderThan(request.createdAt, REQUEST_OVERDUE_MS);
+  return 3;
 }

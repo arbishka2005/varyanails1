@@ -11,7 +11,7 @@ import type {
   TimeWindow,
   TimeWindowStatus,
 } from "../../src/types.js";
-import { seedClients, seedPhotos, seedRequests, serviceOptions, servicePresets, timeWindows } from "../../src/data.js";
+import { seedAppointments, seedClients, seedPhotos, seedRequests, serviceOptions, servicePresets, timeWindows } from "../../src/data.js";
 import { makeWindowLabel } from "../../src/lib/displayTime.js";
 import { doWindowRangesOverlap, getWindowConflict, isFutureDateTime, isPastDateTime } from "../../src/lib/dateTime.js";
 import { config } from "../config.js";
@@ -155,7 +155,9 @@ function getActiveRequestPriority(status: RequestStatus) {
   return 3;
 }
 
-function normalizeSnapshot(snapshot: AppSnapshot) {
+// Legacy repair logic is intentionally kept off the read path. Broken file snapshots
+// should surface as-is instead of being auto-healed during reads.
+function legacyReadRepairSnapshot(snapshot: AppSnapshot) {
   let changed = false;
   const activeWindowOwners = new Map<string, BookingRequest>();
 
@@ -275,18 +277,22 @@ function normalizeSnapshot(snapshot: AppSnapshot) {
   };
 }
 
+function normalizeSnapshot(snapshot: AppSnapshot): AppSnapshot {
+  return {
+    ...snapshot,
+    windows: snapshot.windows.map((window) => {
+      const label = makeWindowLabel(window.startAt, window.endAt);
+      return window.label === label ? window : { ...window, label };
+    }),
+  };
+}
+
 async function readSnapshot(): Promise<AppSnapshot> {
   try {
     const raw = await readFile(config.fileStoragePath, "utf8");
     const parsed = JSON.parse(raw) as AppSnapshot;
     const merged = { ...emptySnapshot, ...parsed };
-    const normalized = normalizeSnapshot(merged);
-
-    if (normalized.changed) {
-      await writeSnapshot(normalized.snapshot);
-    }
-
-    return normalized.snapshot;
+    return normalizeSnapshot(merged);
   } catch {
     return { ...emptySnapshot };
   }
@@ -297,6 +303,8 @@ async function writeSnapshot(snapshot: AppSnapshot) {
   await writeFile(config.fileStoragePath, JSON.stringify(snapshot, null, 2), "utf8");
 }
 
+// File storage stays single-process and sequential here. It cannot reproduce
+// database-level race guarantees and must not auto-repair broken domain state on read.
 let mutationQueue = Promise.resolve();
 
 async function mutateSnapshot<T>(callback: (snapshot: AppSnapshot) => T | Promise<T>) {
@@ -336,6 +344,74 @@ function releaseWindowIfUnused(snapshot: AppSnapshot, windowId: string | null) {
       window.id === windowId && window.status === "offered" ? { ...window, status: "available" } : window,
     );
   }
+}
+
+function assertRequestPublicTokenIsUnique(
+  snapshot: AppSnapshot,
+  publicToken: string,
+  ignoredRequestId?: string,
+) {
+  const duplicate = snapshot.requests.find(
+    (request) => request.publicToken === publicToken && request.id !== ignoredRequestId,
+  );
+
+  if (duplicate) {
+    throw new DomainError("Booking request public token already exists.", 409);
+  }
+}
+
+function assertAppointmentIdIsUnique(snapshot: AppSnapshot, appointmentId: string, ignoredAppointmentId?: string) {
+  const duplicate = snapshot.appointments.find(
+    (appointment) => appointment.id === appointmentId && appointment.id !== ignoredAppointmentId,
+  );
+
+  if (duplicate) {
+    throw new DomainError("Appointment id already exists.", 409);
+  }
+}
+
+function assertAppointmentPublicTokenIsUnique(
+  snapshot: AppSnapshot,
+  publicToken: string,
+  ignoredAppointmentId?: string,
+) {
+  const duplicate = snapshot.appointments.find(
+    (appointment) => appointment.publicToken === publicToken && appointment.id !== ignoredAppointmentId,
+  );
+
+  if (duplicate) {
+    throw new DomainError("Appointment public token already exists.", 409);
+  }
+}
+
+function getUniqueRequestByPublicToken(snapshot: AppSnapshot, token: string) {
+  const matches = snapshot.requests.filter((request) => request.publicToken === token);
+
+  if (matches.length > 1) {
+    throw new DomainError("Duplicate booking request public token detected in file storage.", 409);
+  }
+
+  return matches[0] ?? null;
+}
+
+function getUniqueAppointmentById(snapshot: AppSnapshot, id: string) {
+  const matches = snapshot.appointments.filter((appointment) => appointment.id === id);
+
+  if (matches.length > 1) {
+    throw new DomainError("Duplicate appointment id detected in file storage.", 409);
+  }
+
+  return matches[0] ?? null;
+}
+
+function getUniqueAppointmentByPublicToken(snapshot: AppSnapshot, token: string) {
+  const matches = snapshot.appointments.filter((appointment) => appointment.publicToken === token);
+
+  if (matches.length > 1) {
+    throw new DomainError("Duplicate appointment public token detected in file storage.", 409);
+  }
+
+  return matches[0] ?? null;
 }
 
 function getWindowStatusError(snapshot: AppSnapshot, window: TimeWindow, nextStatus: TimeWindowStatus) {
@@ -435,10 +511,7 @@ function getRequestStatusTransitionError(request: BookingRequest, nextStatus: Re
   return "";
 }
 
-function getAppointmentStatusTransitionError(
-  appointment: Appointment,
-  nextStatus: Appointment["status"],
-) {
+function getAppointmentStatusTransitionError(appointment: Appointment, nextStatus: Appointment["status"]) {
   if (appointment.status === nextStatus) {
     return "";
   }
@@ -451,7 +524,78 @@ function getAppointmentStatusTransitionError(
     return "Cancelled or finished appointment cannot be reopened.";
   }
 
+  if (nextStatus !== "cancelled") {
+    return "Only appointment cancellation is currently supported.";
+  }
+
   return "";
+}
+
+function getIdempotentConfirmConsistencyError({
+  request,
+  window,
+  appointment,
+}: {
+  request: BookingRequest | null;
+  window: TimeWindow | null;
+  appointment: Appointment;
+}) {
+  if (!request) {
+    return "Подтверждение недоступно: заявка для существующей записи не найдена.";
+  }
+
+  if (request.status !== "confirmed") {
+    return "Подтверждение недоступно: существующая запись не согласована со статусом заявки.";
+  }
+
+  if (!request.preferredWindowId) {
+    return "Подтверждение недоступно: у заявки нет закреплённого окна.";
+  }
+
+  if (!window) {
+    return "Подтверждение недоступно: закреплённое окно заявки не найдено.";
+  }
+
+  if (window.status !== "reserved") {
+    return "Подтверждение недоступно: закреплённое окно больше не находится в статусе reserved.";
+  }
+
+  if (appointment.requestId !== request.id) {
+    return "Подтверждение недоступно: существующая запись привязана к другой заявке.";
+  }
+
+  if (appointment.clientId !== request.clientId) {
+    return "Подтверждение недоступно: существующая запись не согласована с клиентом заявки.";
+  }
+
+  if (appointment.service !== request.service) {
+    return "Подтверждение недоступно: существующая запись не согласована с услугой заявки.";
+  }
+
+  if (appointment.durationMinutes !== request.estimatedMinutes) {
+    return "Подтверждение недоступно: существующая запись не согласована с длительностью заявки.";
+  }
+
+  if (!haveSameOptionIds(appointment.optionIds, request.optionIds)) {
+    return "Подтверждение недоступно: существующая запись не согласована с опциями заявки.";
+  }
+
+  if (appointment.startAt !== window.startAt || appointment.endAt !== window.endAt) {
+    return "Подтверждение недоступно: существующая запись не совпадает с закреплённым окном.";
+  }
+
+  return "";
+}
+
+function haveSameOptionIds(left: string[], right: string[]) {
+  if (left.length !== right.length) {
+    return false;
+  }
+
+  const sortedLeft = [...left].sort();
+  const sortedRight = [...right].sort();
+
+  return sortedLeft.every((value, index) => value === sortedRight[index]);
 }
 
 export const fileRepository: Repository = {
@@ -466,8 +610,8 @@ export const fileRepository: Repository = {
       snapshot.windows = timeWindows;
       snapshot.clients = seedClients;
       snapshot.photos = seedPhotos;
-      snapshot.requests = seedRequests;
-      snapshot.appointments = [];
+      snapshot.requests = seedRequests.map(ensureRequestPublicToken);
+      snapshot.appointments = seedAppointments.map(ensureAppointmentPublicToken);
       snapshot.serviceOptions = serviceOptions;
     });
   },
@@ -492,17 +636,17 @@ export const fileRepository: Repository = {
 
   async getBookingRequestByPublicToken(token: string) {
     const snapshot = await readSnapshot();
-    return snapshot.requests.find((request) => request.publicToken === token) ?? null;
+    return getUniqueRequestByPublicToken(snapshot, token);
   },
 
   async getAppointment(id: string) {
     const snapshot = await readSnapshot();
-    return snapshot.appointments.find((appointment) => appointment.id === id) ?? null;
+    return getUniqueAppointmentById(snapshot, id);
   },
 
   async getAppointmentByPublicToken(token: string) {
     const snapshot = await readSnapshot();
-    return snapshot.appointments.find((appointment) => appointment.publicToken === token) ?? null;
+    return getUniqueAppointmentByPublicToken(snapshot, token);
   },
 
   async getTimeWindow(id: string) {
@@ -541,6 +685,7 @@ export const fileRepository: Repository = {
         throw new DomainError("Booking request with this id already exists", 409);
       }
 
+      assertRequestPublicTokenIsUnique(snapshot, request.publicToken as string);
       assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, selectedWindow.id, request.id);
 
       snapshot.clients = [payload.client, ...snapshot.clients.filter((client) => client.id !== payload.client.id)];
@@ -916,7 +1061,7 @@ export const fileRepository: Repository = {
     });
   },
 
-  async updateAppointmentStatus(id: string, status: Appointment["status"]) {
+  async updateAppointmentStatus(id: string, status: "cancelled") {
     return mutateSnapshot((snapshot) => {
       let updated: Appointment | null = null;
       let changed = false;
@@ -1064,9 +1209,15 @@ export const fileRepository: Repository = {
 
   async submitAppointmentSurveyByPublicToken(token: string, payload: { rating: number; text?: string }) {
     return mutateSnapshot((snapshot) => {
+      const appointmentByToken = getUniqueAppointmentByPublicToken(snapshot, token);
+
+      if (!appointmentByToken) {
+        return null;
+      }
+
       let updated: Appointment | null = null;
       snapshot.appointments = snapshot.appointments.map((appointment) => {
-        if (appointment.publicToken !== token) {
+        if (appointment.id !== appointmentByToken.id) {
           return appointment;
         }
         if (appointment.surveyRating) {
@@ -1086,25 +1237,40 @@ export const fileRepository: Repository = {
   async confirmBookingRequest(requestId: string) {
     return mutateSnapshot((snapshot) => {
       const request = snapshot.requests.find((item) => item.id === requestId);
+      const window = request?.preferredWindowId
+        ? snapshot.windows.find((item) => item.id === request.preferredWindowId) ?? null
+        : null;
       const existingAppointment = snapshot.appointments.find(
         (appointment) => appointment.requestId === requestId && appointment.status === "scheduled",
       );
 
       if (existingAppointment) {
+        const consistencyError = getIdempotentConfirmConsistencyError({
+          request: request ?? null,
+          window,
+          appointment: existingAppointment,
+        });
+
+        if (consistencyError) {
+          throw new DomainError(consistencyError, 409);
+        }
+
+        if (!request || !window) {
+          throw new DomainError("Подтверждение недоступно: существующая запись требует ручной проверки.", 409);
+        }
+
+        assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, window.id, request.id);
+        assertNoScheduledAppointmentInRange(snapshot, existingAppointment, existingAppointment.id);
+
         return { appointment: existingAppointment, created: false };
       }
-
-      const window = request?.preferredWindowId
-        ? snapshot.windows.find((item) => item.id === request.preferredWindowId)
-        : null;
 
       if (
         !request ||
         (request.status !== "new" && request.status !== "waiting_client") ||
         !window ||
         !isFutureDateTime(window.startAt) ||
-        window.status === "reserved" ||
-        window.status === "blocked"
+        window.status !== "offered"
       ) {
         return null;
       }
@@ -1124,6 +1290,8 @@ export const fileRepository: Repository = {
         status: "scheduled",
       });
 
+      assertAppointmentIdIsUnique(snapshot, appointment.id);
+      assertAppointmentPublicTokenIsUnique(snapshot, appointment.publicToken as string);
       snapshot.appointments = [appointment, ...snapshot.appointments];
       snapshot.requests = snapshot.requests.map((item) =>
         item.id === request.id ? { ...item, status: "confirmed" } : item,
@@ -1139,22 +1307,39 @@ export const fileRepository: Repository = {
   async confirmBookingRequestByClient(requestId: string) {
     return mutateSnapshot((snapshot) => {
       const request = snapshot.requests.find((item) => item.id === requestId);
+      const window = request?.preferredWindowId
+        ? snapshot.windows.find((item) => item.id === request.preferredWindowId) ?? null
+        : null;
       const existingAppointment = snapshot.appointments.find(
         (appointment) => appointment.requestId === requestId && appointment.status === "scheduled",
       );
 
       if (existingAppointment) {
+        const consistencyError = getIdempotentConfirmConsistencyError({
+          request: request ?? null,
+          window,
+          appointment: existingAppointment,
+        });
+
+        if (consistencyError) {
+          throw new DomainError(consistencyError, 409);
+        }
+
+        if (!request || !window) {
+          throw new DomainError("Подтверждение недоступно: существующая запись требует ручной проверки.", 409);
+        }
+
+        assertWindowIsNotOwnedByAnotherActiveRequest(snapshot, window.id, request.id);
+        assertNoScheduledAppointmentInRange(snapshot, existingAppointment, existingAppointment.id);
+
         return { appointment: existingAppointment, created: false };
       }
 
       if (!request || request.status !== "waiting_client") {
         return null;
       }
-      const window = request.preferredWindowId
-        ? snapshot.windows.find((item) => item.id === request.preferredWindowId)
-        : null;
 
-      if (!window || !isFutureDateTime(window.startAt) || window.status === "reserved" || window.status === "blocked") {
+      if (!window || !isFutureDateTime(window.startAt) || window.status !== "offered") {
         return null;
       }
 
@@ -1173,6 +1358,8 @@ export const fileRepository: Repository = {
         status: "scheduled",
       });
 
+      assertAppointmentIdIsUnique(snapshot, appointment.id);
+      assertAppointmentPublicTokenIsUnique(snapshot, appointment.publicToken as string);
       snapshot.appointments = [appointment, ...snapshot.appointments];
       snapshot.requests = snapshot.requests.map((item) =>
         item.id === request.id ? { ...item, status: "confirmed" } : item,
@@ -1187,7 +1374,7 @@ export const fileRepository: Repository = {
 
   async confirmBookingRequestByPublicToken(token: string) {
     const snapshot = await readSnapshot();
-    const request = snapshot.requests.find((item) => item.publicToken === token) ?? null;
+    const request = getUniqueRequestByPublicToken(snapshot, token);
 
     if (!request) {
       return null;

@@ -194,7 +194,7 @@ export function useAdminActions({
 
   const updateAppointmentStatus = async (
     appointmentId: string,
-    status: AppSnapshot["appointments"][number]["status"],
+    status: "cancelled",
   ) => {
     try {
       setApiError(null);
