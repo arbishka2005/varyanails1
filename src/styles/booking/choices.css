@@ -266,11 +266,11 @@
 .service-option-card {
   position: relative;
   display: grid;
-  gap: 10px;
-  min-height: 164px;
+  gap: 7px;
+  min-height: 112px;
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: calc(var(--radius-md) + 6px);
-  padding: 20px;
+  padding: 14px 16px;
   color: var(--color-ink);
   text-align: left;
   background:
@@ -295,9 +295,9 @@
 
 .service-option-card strong {
   font-family: var(--font-body);
-  font-size: 24px;
+  font-size: 18px;
   font-weight: var(--font-weight-heavy);
-  line-height: 1.1;
+  line-height: 1.18;
   text-wrap: balance;
 }
 

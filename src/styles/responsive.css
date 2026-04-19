@@ -373,7 +373,8 @@
   }
 
   .service-option-card {
-    min-height: 148px;
+    min-height: 96px;
+    padding: 13px 14px;
   }
 
   .summary-panel {

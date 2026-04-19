@@ -107,7 +107,9 @@ export function ClientRequestForm({
   const maxPhotoSizeBytes = 8 * 1024 * 1024;
   const handInputRef = useRef<HTMLInputElement | null>(null);
   const referenceInputRef = useRef<HTMLInputElement | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const formatAdvanceTimerRef = useRef<number | null>(null);
+  const didMountScrollRef = useRef(false);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
   const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
   const [showErrors, setShowErrors] = useState<Record<ClientFormStep, boolean>>({
@@ -279,6 +281,25 @@ export function ClientRequestForm({
   }, [canSelectLength, formatQuestion, setFormatQuestion]);
 
   useEffect(() => {
+    if (!didMountScrollRef.current) {
+      didMountScrollRef.current = true;
+      return;
+    }
+
+    window.requestAnimationFrame(() => {
+      const formTop = formRef.current?.getBoundingClientRect().top;
+      if (formTop === undefined) {
+        return;
+      }
+
+      window.scrollTo({
+        top: Math.max(0, window.scrollY + formTop - 12),
+        behavior: "auto",
+      });
+    });
+  }, [currentStep, formatQuestion]);
+
+  useEffect(() => {
     if (steps.some((step) => step.id === currentStep)) {
       return;
     }
@@ -418,6 +439,7 @@ export function ClientRequestForm({
   return (
     <section className="content-grid">
       <form
+        ref={formRef}
         aria-busy={isBusy}
         className="panel request-form"
         onSubmit={(event) => event.preventDefault()}
