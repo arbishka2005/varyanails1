@@ -217,6 +217,19 @@
     backdrop-filter: blur(24px) saturate(118%);
   }
 
+  .form-navigation :where(.primary-button, .secondary-button) {
+    min-height: 42px;
+    padding: 9px 12px;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    line-height: 1.15;
+  }
+
+  .form-navigation :where(.primary-button, .secondary-button) svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .form-navigation.single-action {
     grid-template-columns: 1fr;
   }
@@ -380,6 +393,8 @@
     right: 8px;
     bottom: max(8px, env(safe-area-inset-bottom));
     grid-template-columns: 0.9fr 1.1fr;
+    gap: 8px;
+    padding: 8px;
   }
 
   .form-navigation.single-action {
