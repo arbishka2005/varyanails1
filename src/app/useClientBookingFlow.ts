@@ -15,6 +15,7 @@ import { lengthLabels } from "../lib/bookingPresentation";
 import { isFutureDateTime } from "../lib/dateTime";
 import { readFileAsDataUrl } from "../lib/file";
 import { toStoredPhone } from "../lib/phone";
+import { allowsLengthSelection, getLengthDurationBoost, normalizeLengthForService } from "../lib/services";
 import type {
   BookingRequest,
   Client,
@@ -249,9 +250,8 @@ export function useClientBookingFlow({
   );
 
   const estimatedMinutes = useMemo(() => {
-    const lengthBoost = { short: 0, medium: 15, long: 30, extra: 45 }[form.length];
-    return selectedService.durationMinutes + lengthBoost;
-  }, [form.length, selectedService.durationMinutes]);
+    return selectedService.durationMinutes + getLengthDurationBoost(form.length, selectedService);
+  }, [form.length, selectedService]);
 
   const estimatedPriceFrom = useMemo(() => selectedService.priceFrom ?? 0, [selectedService.priceFrom]);
 
@@ -262,8 +262,12 @@ export function useClientBookingFlow({
       return customText;
     }
 
+    if (!allowsLengthSelection(selectedService)) {
+      return selectedService.title;
+    }
+
     return [selectedService.title, lengthLabels[form.length]].join(" - ");
-  }, [form.desiredResult, form.length, selectedService.title]);
+  }, [form.desiredResult, form.length, selectedService]);
 
   const availableBookingWindows = useMemo(
     () => windows.filter((window) => window.status === "available" && isFutureDateTime(window.startAt)),
@@ -405,6 +409,17 @@ export function useClientBookingFlow({
     });
   }, [services]);
 
+  useEffect(() => {
+    if (allowsLengthSelection(selectedService)) {
+      return;
+    }
+
+    const normalizedLength = normalizeLengthForService(form.length, selectedService);
+    if (form.length !== normalizedLength) {
+      setForm((current) => ({ ...current, length: normalizedLength }));
+    }
+  }, [form.length, selectedService]);
+
   const submitRequest = async () => {
     if (submitInFlightRef.current) {
       return false;
@@ -453,7 +468,7 @@ export function useClientBookingFlow({
       clientId: client.id,
       service: form.service,
       optionIds: form.optionIds,
-      length: form.length,
+      length: normalizeLengthForService(form.length, selectedService),
       desiredResult: normalizedDesiredResult,
       photoIds: newPhotos.map((photo) => photo.id),
       preferredWindowId: selectedWindow.id,

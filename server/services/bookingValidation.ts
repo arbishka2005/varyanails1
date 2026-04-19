@@ -1,12 +1,6 @@
 import type { BookingRequest, PhotoAttachment, ServicePreset } from "../../src/types.js";
+import { getLengthDurationBoost, normalizeLengthForService } from "../../src/lib/services.js";
 import { DomainError } from "../lib/domainErrors.js";
-
-const lengthDurationBoost: Record<BookingRequest["length"], number> = {
-  short: 0,
-  medium: 15,
-  long: 30,
-  extra: 45,
-};
 
 export function assertBookingRequestMatchesService(
   request: BookingRequest,
@@ -30,7 +24,11 @@ export function assertBookingRequestMatchesService(
     throw new DomainError("Для этой услуги нужен референс дизайна.", 400);
   }
 
-  const minimumDuration = service.durationMinutes + lengthDurationBoost[request.length];
+  if (request.length !== normalizeLengthForService(request.length, service)) {
+    throw new DomainError("Для этой услуги нельзя менять длину.", 400);
+  }
+
+  const minimumDuration = service.durationMinutes + getLengthDurationBoost(request.length, service);
   if (request.estimatedMinutes < minimumDuration) {
     throw new DomainError("Расчёт длительности не совпадает с выбранной услугой.", 400);
   }

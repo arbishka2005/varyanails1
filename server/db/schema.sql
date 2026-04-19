@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS service_presets (
   price_from INTEGER CHECK (price_from >= 0),
   requires_hand_photo BOOLEAN NOT NULL DEFAULT FALSE,
   requires_reference BOOLEAN NOT NULL DEFAULT FALSE,
+  allows_length_selection BOOLEAN NOT NULL DEFAULT TRUE,
   options JSONB NOT NULL DEFAULT '[]'::jsonb
 );
 

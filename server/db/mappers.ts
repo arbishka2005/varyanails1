@@ -40,6 +40,7 @@ export function toService(row: Record<string, unknown>): ServicePreset {
     priceFrom: row.price_from === null ? undefined : Number(row.price_from),
     requiresHandPhoto: Boolean(row.requires_hand_photo),
     requiresReference: Boolean(row.requires_reference),
+    allowsLengthSelection: row.allows_length_selection === undefined ? true : Boolean(row.allows_length_selection),
     options: Array.isArray(row.options) ? (row.options as ServicePreset["options"]) : [],
   };
 }

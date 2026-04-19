@@ -58,6 +58,7 @@ export type ServicePreset = {
   priceFrom?: number;
   requiresHandPhoto: boolean;
   requiresReference: boolean;
+  allowsLengthSelection?: boolean;
   options: ServiceOptionKind[];
 };
 

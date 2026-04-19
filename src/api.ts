@@ -297,6 +297,11 @@ export const api = {
       body: { status },
     }),
 
+  deleteTimeWindow: (id: string) =>
+    request<void>(`/api/time-windows/${id}`, {
+      method: "DELETE",
+    }),
+
   moveAppointment: (id: string, windowId: string) =>
     request<AppSnapshot["appointments"][number]>(`/api/appointments/${id}/window`, {
       method: "PATCH",

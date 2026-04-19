@@ -166,6 +166,19 @@ export function useAdminActions({
     }
   };
 
+  const deleteTimeWindow = async (id: string) => {
+    try {
+      setApiError(null);
+      await api.deleteTimeWindow(id);
+      await refreshSnapshot();
+      return true;
+    } catch (error) {
+      setApiError(getApiErrorMessage(error, "Не удалось удалить окошко"));
+      await refreshSnapshot();
+      return false;
+    }
+  };
+
   const moveAppointment = async (appointmentId: string, windowId: string) => {
     try {
       setApiError(null);
@@ -265,6 +278,7 @@ export function useAdminActions({
     deleteService,
     addTimeWindow,
     updateWindowStatus,
+    deleteTimeWindow,
     moveAppointment,
     updateAppointmentStatus,
     deleteAppointment,

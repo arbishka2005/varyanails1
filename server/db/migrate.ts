@@ -13,6 +13,11 @@ export async function runMigrations() {
   `);
 
   await pool.query(`
+    ALTER TABLE IF EXISTS service_presets
+      ADD COLUMN IF NOT EXISTS allows_length_selection BOOLEAN NOT NULL DEFAULT TRUE;
+  `);
+
+  await pool.query(`
     ALTER TABLE IF EXISTS booking_requests
       DROP CONSTRAINT IF EXISTS booking_requests_client_id_fkey,
       ADD CONSTRAINT booking_requests_client_id_fkey

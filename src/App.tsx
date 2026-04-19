@@ -87,7 +87,6 @@ export function App() {
               lastRequestLookupStatus={client.lastRequestLookupStatus}
               confirmClientWindow={client.confirmClientWindow}
               refreshLastRequest={client.refreshLastRequest}
-              openBookingFlow={() => client.openBookingFlow()}
             />
           ) : null}
 
@@ -147,6 +146,7 @@ export function App() {
                   updateStatus={adminActions.updateStatus}
                   updateWindow={adminActions.updateWindow}
                   updateWindowStatus={adminActions.updateWindowStatus}
+                  deleteTimeWindow={adminActions.deleteTimeWindow}
                   moveAppointment={adminActions.moveAppointment}
                   updateAppointmentStatus={adminActions.updateAppointmentStatus}
                   addTimeWindow={adminActions.addTimeWindow}

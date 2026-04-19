@@ -5,6 +5,7 @@ import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import { contactLabels, getServiceTitle, lengthLabels, statusLabels } from "../../lib/bookingPresentation";
 import { isFutureDateTime } from "../../lib/dateTime";
+import { allowsLengthSelection } from "../../lib/services";
 import type { BookingRequest, Client, PhotoAttachment, RequestStatus, ServicePreset, TimeWindow } from "../../types";
 
 export function RequestCard({
@@ -45,7 +46,9 @@ export function RequestCard({
   const hasConcreteWindow = Boolean(selectedWindow && isFutureDateTime(selectedWindow.startAt));
   const handPhoto = photos.find((photo) => photo.kind === "hands");
   const referencePhoto = photos.find((photo) => photo.kind === "reference");
+  const service = services.find((item) => item.id === request.service) ?? null;
   const serviceTitle = getServiceTitle(services, request.service);
+  const lengthLabel = allowsLengthSelection(service) ? lengthLabels[request.length] : "Своя длина";
   const windowLabel = selectedWindow?.label ?? request.customWindowText ?? "Время не выбрано";
   const mainAction = getNextAction({
     hasConcreteWindow,
@@ -143,6 +146,7 @@ export function RequestCard({
               photos={photos}
               proposalWindowId={proposalWindowId || firstAvailableWindow?.id || ""}
               request={request}
+              lengthLabel={lengthLabel}
               serviceTitle={serviceTitle}
               step={reviewStep}
               onCancel={() => setReviewStep(null)}
@@ -172,7 +176,7 @@ export function RequestCard({
                 />
                 <Info label="Клиентка" value={client?.firstVisit ? "Первый визит" : "Постоянная"} />
                 <Info label="Услуга" value={serviceTitle} />
-                <Info label="Длина" value={lengthLabels[request.length]} />
+                <Info label="Длина" value={lengthLabel} />
                 <Info icon={<Clock3 size={16} />} label="Время" value={windowLabel} />
                 <Info label="Фото рук" value={handPhoto?.fileName ?? "Не приложено"} />
                 <Info label="Референс" value={referencePhoto?.fileName ?? "Не приложено"} />
@@ -305,6 +309,7 @@ function AdminRequestReviewFlow({
   photos,
   proposalWindowId,
   request,
+  lengthLabel,
   serviceTitle,
   step,
   onCancel,
@@ -318,6 +323,7 @@ function AdminRequestReviewFlow({
   photos: PhotoAttachment[];
   proposalWindowId: string;
   request: BookingRequest;
+  lengthLabel: string;
   serviceTitle: string;
   step: number;
   onCancel: () => void;
@@ -357,7 +363,7 @@ function AdminRequestReviewFlow({
               <p>{request.desiredResult}</p>
               {request.comment ? <p>{request.comment}</p> : null}
               <span>
-                {lengthLabels[request.length]} · {request.estimatedMinutes} мин · от{" "}
+                {lengthLabel} · {request.estimatedMinutes} мин · от{" "}
                 {(request.estimatedPriceFrom ?? 0).toLocaleString("ru-RU")} ₽
               </span>
             </div>

@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { api, getApiErrorMessage, isApiAuthError } from "../api";
 import { servicePresets } from "../data";
+import { compareServicesByDisplayOrder } from "../lib/services";
 import type { AppSnapshot, PublicBookingConfig } from "../types";
 import { useAdminActions } from "./useAdminActions";
 import { useAppShell } from "./useAppShell";
@@ -23,10 +24,11 @@ export function useAppController() {
   const appointments = snapshot?.appointments ?? [];
   const windows = route.portal === "admin" ? (snapshot?.windows ?? []) : (publicConfig?.windows ?? []);
   const serviceOptions = route.portal === "admin" ? (snapshot?.serviceOptions ?? []) : (publicConfig?.serviceOptions ?? []);
-  const services =
+  const rawServices =
     route.portal === "admin"
       ? snapshot?.services.length ? snapshot.services : servicePresets
       : publicConfig?.services.length ? publicConfig.services : servicePresets;
+  const services = useMemo(() => [...rawServices].sort(compareServicesByDisplayOrder), [rawServices]);
 
   const refreshSnapshot = async () => {
     try {

@@ -25,6 +25,7 @@ export type MasterWorkspaceProps = {
   updateStatus: (id: string, status: RequestStatus) => void | Promise<unknown>;
   updateWindow: (id: string, preferredWindowId: string | null, customWindowText?: string) => void | Promise<unknown>;
   updateWindowStatus: (id: string, status: TimeWindowStatus) => void | Promise<unknown>;
+  deleteTimeWindow: (id: string) => void | Promise<unknown>;
   moveAppointment: (appointmentId: string, windowId: string) => void | Promise<unknown>;
   updateAppointmentStatus: (
     appointmentId: string,

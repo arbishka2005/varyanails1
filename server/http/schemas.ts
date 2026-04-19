@@ -93,6 +93,7 @@ export const updateServiceSchema = z.object({
   priceFrom: z.number().int().min(0).max(1_000_000).nullable().optional(),
   requiresHandPhoto: z.boolean().optional(),
   requiresReference: z.boolean().optional(),
+  allowsLengthSelection: z.boolean().optional(),
   options: z.array(serviceOptionKindSchema).optional(),
 });
 
@@ -103,6 +104,7 @@ export const createServiceSchema = z.object({
   priceFrom: z.number().int().min(0).max(1_000_000).optional(),
   requiresHandPhoto: z.boolean(),
   requiresReference: z.boolean(),
+  allowsLengthSelection: z.boolean().optional(),
   options: z.array(serviceOptionKindSchema),
 });
 

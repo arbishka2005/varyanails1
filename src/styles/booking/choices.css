@@ -439,11 +439,18 @@
   color: var(--color-accent-strong);
 }
 
+.booking-inline-card > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
 .booking-inline-card strong,
 .booking-selection-note strong {
   color: var(--color-ink);
   font-size: 14px;
   font-weight: var(--font-weight-strong);
+  line-height: 1.25;
 }
 
 .booking-inline-card small,

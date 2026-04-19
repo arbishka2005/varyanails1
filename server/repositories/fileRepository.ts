@@ -30,6 +30,103 @@ const emptySnapshot: AppSnapshot = {
   serviceOptions: [],
 };
 
+const legacyServiceTuples = new Map([
+  ["natural", { title: "Покрытие на свои ногти", durationMinutes: 135, priceFrom: 2200 }],
+  ["correction", { title: "Коррекция", durationMinutes: 150, priceFrom: 2500 }],
+  ["extension", { title: "Наращивание", durationMinutes: 210, priceFrom: 3200 }],
+  ["manicure", { title: "Маникюр без покрытия", durationMinutes: 75, priceFrom: 1200 }],
+]);
+
+function matchesLegacyServiceTuple(service: ServicePreset) {
+  const legacy = legacyServiceTuples.get(service.id);
+  return Boolean(
+    legacy &&
+      service.title === legacy.title &&
+      service.durationMinutes === legacy.durationMinutes &&
+      (service.priceFrom ?? -1) === legacy.priceFrom,
+  );
+}
+
+function syncLegacyServices(snapshot: AppSnapshot) {
+  let changed = false;
+  const canonicalServicesById = new Map(servicePresets.map((service) => [service.id, service]));
+  const removedAppointmentRanges = snapshot.appointments
+    .filter((appointment) => appointment.service === "removal")
+    .map((appointment) => `${appointment.startAt}|${appointment.endAt}`);
+  const removalRequestIds = new Set([
+    ...snapshot.requests.filter((request) => request.service === "removal").map((request) => request.id),
+    ...snapshot.appointments
+      .filter((appointment) => appointment.service === "removal")
+      .map((appointment) => appointment.requestId),
+  ]);
+  const removedRequests = snapshot.requests.filter((request) => removalRequestIds.has(request.id));
+  const removedClientIds = new Set([
+    ...removedRequests.map((request) => request.clientId),
+    ...snapshot.appointments
+      .filter((appointment) => appointment.service === "removal")
+      .map((appointment) => appointment.clientId),
+  ]);
+  const removedPhotoIds = new Set(removedRequests.flatMap((request) => request.photoIds));
+  const removedWindowIds = new Set(
+    removedRequests
+      .map((request) => request.preferredWindowId)
+      .filter((windowId): windowId is string => Boolean(windowId)),
+  );
+
+  if (removedRequests.length > 0 || removedAppointmentRanges.length > 0) {
+    changed = true;
+    snapshot.appointments = snapshot.appointments.filter((appointment) => appointment.service !== "removal");
+    snapshot.requests = snapshot.requests.filter((request) => !removalRequestIds.has(request.id));
+    snapshot.photos = snapshot.photos.filter(
+      (photo) => !removedPhotoIds.has(photo.id) || snapshot.requests.some((request) => request.photoIds.includes(photo.id)),
+    );
+    snapshot.clients = snapshot.clients.filter(
+      (client) =>
+        !removedClientIds.has(client.id) ||
+        snapshot.requests.some((request) => request.clientId === client.id) ||
+        snapshot.appointments.some((appointment) => appointment.clientId === client.id),
+    );
+    snapshot.windows = snapshot.windows.map((window) => {
+      const isRemovedRequestWindow = removedWindowIds.has(window.id);
+      const isRemovedAppointmentWindow = removedAppointmentRanges.includes(`${window.startAt}|${window.endAt}`);
+      if ((isRemovedRequestWindow && window.status === "offered") || (isRemovedAppointmentWindow && window.status === "reserved")) {
+        return { ...window, status: "available" };
+      }
+
+      return window;
+    });
+  }
+
+  snapshot.services = snapshot.services.flatMap((service) => {
+    if (service.id === "removal") {
+      changed = true;
+      return [];
+    }
+
+    const canonical = canonicalServicesById.get(service.id);
+    if (!canonical) {
+      return [service];
+    }
+
+    if (matchesLegacyServiceTuple(service)) {
+      changed = true;
+      return [{ ...canonical }];
+    }
+
+    if (
+      (service.id === "natural" || service.id === "correction" || service.id === "manicure") &&
+      service.allowsLengthSelection !== false
+    ) {
+      changed = true;
+      return [{ ...service, allowsLengthSelection: false }];
+    }
+
+    return [service];
+  });
+
+  return changed;
+}
+
 function ensureRequestPublicToken(request: BookingRequest): BookingRequest {
   return request.publicToken ? request : { ...request, publicToken: generatePublicToken() };
 }
@@ -361,6 +458,7 @@ export const fileRepository: Repository = {
   async bootstrapSeedData() {
     await mutateSnapshot((snapshot) => {
       if (snapshot.services.length > 0) {
+        syncLegacyServices(snapshot);
         return;
       }
 
@@ -731,6 +829,33 @@ export const fileRepository: Repository = {
         return updated;
       });
       return updated;
+    });
+  },
+
+  async deleteTimeWindow(id: string) {
+    return mutateSnapshot((snapshot) => {
+      const currentWindow = snapshot.windows.find((window) => window.id === id) ?? null;
+
+      if (!currentWindow) {
+        return false;
+      }
+
+      if (currentWindow.status !== "available" && currentWindow.status !== "blocked") {
+        throw new DomainError("Можно удалить только свободное или закрытое окно.", 409);
+      }
+
+      const isUsedByRequest = snapshot.requests.some((request) => request.preferredWindowId === id);
+      const isUsedByAppointment = snapshot.appointments.some(
+        (appointment) => appointment.startAt === currentWindow.startAt && appointment.endAt === currentWindow.endAt,
+      );
+
+      if (isUsedByRequest || isUsedByAppointment) {
+        throw new DomainError("Окно уже связано с заявкой или записью. Его можно закрыть, но не удалить.", 409);
+      }
+
+      const before = snapshot.windows.length;
+      snapshot.windows = snapshot.windows.filter((window) => window.id !== id);
+      return snapshot.windows.length !== before;
     });
   },
 

@@ -24,6 +24,7 @@ import {
 import { getLocalDateKey } from "../../lib/dateTime";
 import { getTelegramWebApp } from "../../app/navigation";
 import { isPhoneComplete, normalizePhoneInput } from "../../lib/phone";
+import { allowsLengthSelection, normalizeLengthForService } from "../../lib/services";
 import {
   type ClientFormatQuestion,
   type ClientFormStep,
@@ -50,7 +51,8 @@ type UploadCardProps = {
   onFileSelect: (file?: File) => void;
 };
 
-const formatQuestionOrder: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
+const fullFormatQuestionOrder: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
+const ownLengthFormatQuestionOrder: ClientFormatQuestion[] = ["service", "visit", "details"];
 
 const visitChoices = [
   { value: true, label: "Первый визит", hint: "покажу фото рук" },
@@ -120,6 +122,8 @@ export function ClientRequestForm({
   };
 
   const needsPhotoStep = requiresHandPhoto || requiresReference;
+  const canSelectLength = allowsLengthSelection(selectedService);
+  const formatQuestionOrder = canSelectLength ? fullFormatQuestionOrder : ownLengthFormatQuestionOrder;
   const steps = useMemo(
     () =>
       [
@@ -127,7 +131,7 @@ export function ClientRequestForm({
           id: "service",
           label: "Формат",
           title: "Что делаем?",
-          description: "Выберите услугу и длину. Остальное подстроим дальше.",
+          description: canSelectLength ? "Выберите услугу и длину. Остальное подстроим дальше." : "Выберите услугу. Длина здесь не меняется.",
           cta: "Выбрать время",
         },
         {
@@ -156,7 +160,7 @@ export function ClientRequestForm({
           cta: "Отправить заявку",
         },
       ] satisfies StepDefinition[],
-    [needsPhotoStep],
+    [canSelectLength, needsPhotoStep],
   );
 
   const normalizedDesiredResult = useMemo(() => {
@@ -166,8 +170,12 @@ export function ClientRequestForm({
       return customText;
     }
 
+    if (!canSelectLength) {
+      return selectedService.title;
+    }
+
     return [selectedService.title, lengthLabels[form.length]].join(" - ");
-  }, [form.desiredResult, form.length, selectedService.title]);
+  }, [canSelectLength, form.desiredResult, form.length, selectedService.title]);
 
   const selectedWindow = availableWindows.find((window) => window.id === form.preferredWindowId) ?? null;
   const windowsByDate = useMemo(() => groupWindowsByDate(availableWindows), [availableWindows]);
@@ -229,7 +237,7 @@ export function ClientRequestForm({
   const currentFormatQuestionTitle =
     formatQuestion === "service"
       ? "Какая услуга нужна?"
-      : formatQuestion === "length"
+      : formatQuestion === "length" && canSelectLength
         ? "Какая длина?"
         : formatQuestion === "visit"
           ? "Вы уже были у мастера?"
@@ -237,7 +245,7 @@ export function ClientRequestForm({
   const currentFormatQuestionHint =
     formatQuestion === "service"
       ? "Нажмите на подходящий вариант."
-      : formatQuestion === "length"
+      : formatQuestion === "length" && canSelectLength
         ? "По умолчанию стоит средняя."
         : formatQuestion === "visit"
           ? "От этого зависит, нужны ли фото рук."
@@ -261,6 +269,14 @@ export function ClientRequestForm({
       formatAdvanceTimerRef.current = null;
     }, 220);
   };
+
+  useEffect(() => {
+    if (canSelectLength || formatQuestion !== "length") {
+      return;
+    }
+
+    setFormatQuestion("visit");
+  }, [canSelectLength, formatQuestion, setFormatQuestion]);
 
   useEffect(() => {
     if (steps.some((step) => step.id === currentStep)) {
@@ -465,14 +481,17 @@ export function ClientRequestForm({
                         className={`service-option-card${form.service === service.id ? " active" : ""}`}
                         key={service.id}
                         onClick={() => {
-                          patchForm({ service: service.id });
-                          advanceFormatQuestion("length");
+                          patchForm({
+                            service: service.id,
+                            length: normalizeLengthForService(form.length, service),
+                          });
+                          advanceFormatQuestion(allowsLengthSelection(service) ? "length" : "visit");
                         }}
                         type="button"
                       >
                         <span>{getServiceModeLabel(service)}</span>
                         <strong>{service.title}</strong>
-                        <small>{formatServiceMeta(service.durationMinutes, service.priceFrom ?? 0)}</small>
+                        <small>{formatServiceMeta(getServiceDisplayDuration(service), service.priceFrom ?? 0)}</small>
                       </button>
                     ))}
                   </div>
@@ -819,7 +838,7 @@ export function ClientRequestForm({
         <Sparkles size={28} />
         <h2>{selectedService.title}</h2>
         <div className="summary-badges">
-          <span>{lengthLabels[form.length]}</span>
+          <span>{canSelectLength ? lengthLabels[form.length] : "своя длина"}</span>
           <span>{form.isNewClient ? "первый визит" : "повтор"}</span>
           <span>{selectedWindow ? "готовый слот" : "без времени"}</span>
         </div>
@@ -903,9 +922,17 @@ function formatServiceMeta(durationMinutes: number, priceFrom: number) {
   return `${formatDuration(durationMinutes)} · от ${priceFrom.toLocaleString("ru-RU")} ₽`;
 }
 
+function getServiceDisplayDuration(service: ServicePreset) {
+  return service.durationMinutes + (allowsLengthSelection(service) ? 45 : 0);
+}
+
 function getServiceModeLabel(service: ServicePreset) {
+  if (!allowsLengthSelection(service)) {
+    return "своя длина";
+  }
+
   if (service.requiresReference) {
-    return "с дизайном / референсом";
+    return "можно всё";
   }
 
   return "быстрый уход";

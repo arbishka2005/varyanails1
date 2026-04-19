@@ -7,11 +7,8 @@
   color: var(--color-muted);
 }
 
-.quick-window-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: -6px 0 18px;
+.calendar-panel .section-title .secondary-button {
+  margin-left: auto;
 }
 
 .calendar-move-mode {
@@ -42,15 +39,15 @@
   font-size: 14px;
 }
 
+.calendar-toolbar-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .calendar-board {
   display: grid;
   gap: 16px;
-}
-
-.calendar-hint {
-  font-size: 13px;
-  color: var(--color-muted);
-  margin: 8px 0 16px;
 }
 
 .calendar-day h3 {
@@ -73,20 +70,8 @@
   backdrop-filter: blur(18px);
 }
 
-.calendar-slot[draggable="true"] {
-  cursor: grab;
-}
-
 .calendar-slot.droppable {
   box-shadow: 0 0 0 3px rgba(155, 141, 183, 0.14);
-}
-
-.calendar-slot.drag-over {
-  outline: 2px dashed var(--color-accent);
-  outline-offset: 2px;
-}
-
-.calendar-slot.droppable:not(.drag-over) {
   cursor: pointer;
 }
 
@@ -152,13 +137,6 @@
   min-width: 0;
 }
 
-.slot-hint {
-  flex-basis: 100%;
-  text-align: right;
-  font-size: 12px;
-  color: var(--color-muted);
-}
-
 .slot-conflict-note {
   max-width: 260px;
   padding: 9px 10px;
@@ -186,10 +164,6 @@
     flex: 1 1 140px;
   }
 
-  .slot-hint {
-    display: none;
-  }
-
   .slot-conflict-note {
     width: 100%;
     max-width: none;
@@ -210,19 +184,6 @@
 
 .calendar-empty-state span {
   color: var(--color-muted);
-}
-
-.drag-preview {
-  position: fixed;
-  z-index: 20;
-  pointer-events: none;
-  background: var(--color-surface-strong);
-  border: 1px solid var(--color-line);
-  border-radius: var(--radius-md);
-  padding: 8px 10px;
-  font-size: 12px;
-  color: var(--color-ink);
-  box-shadow: var(--shadow-card);
 }
 
 .move-details {

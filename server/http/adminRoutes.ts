@@ -164,3 +164,14 @@ adminRoutes.patch("/api/time-windows/:id/status", requireMaster, async (request,
 
   response.json(updated);
 });
+
+adminRoutes.delete("/api/time-windows/:id", requireMaster, async (request, response) => {
+  const deleted = await repository.deleteTimeWindow(getParamId(request));
+
+  if (!deleted) {
+    sendError(response, 404, "Time window not found");
+    return;
+  }
+
+  response.status(204).end();
+});

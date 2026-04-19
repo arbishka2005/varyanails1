@@ -30,6 +30,13 @@ import { makeWindowLabel } from "../../src/lib/displayTime.js";
 import { isFutureDateTime } from "../../src/lib/dateTime.js";
 import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
 
+const legacyServiceTuples = new Map([
+  ["natural", { title: "Покрытие на свои ногти", durationMinutes: 135, priceFrom: 2200 }],
+  ["correction", { title: "Коррекция", durationMinutes: 150, priceFrom: 2500 }],
+  ["extension", { title: "Наращивание", durationMinutes: 210, priceFrom: 3200 }],
+  ["manicure", { title: "Маникюр без покрытия", durationMinutes: 75, priceFrom: 1200 }],
+]);
+
 async function cleanupStaleTimeWindows() {
   await pool.query(
     `
@@ -148,8 +155,8 @@ export async function bootstrapSeedData() {
       for (const service of servicePresets) {
         await client.query(
           `INSERT INTO service_presets
-            (id, title, duration_minutes, price_from, requires_hand_photo, requires_reference, options)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            (id, title, duration_minutes, price_from, requires_hand_photo, requires_reference, allows_length_selection, options)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
           [
             service.id,
             service.title,
@@ -157,11 +164,14 @@ export async function bootstrapSeedData() {
             service.priceFrom ?? null,
             service.requiresHandPhoto,
             service.requiresReference,
+            service.allowsLengthSelection ?? true,
             JSON.stringify(service.options),
           ],
         );
       }
     }
+
+    await syncLegacyServiceCatalog(client);
 
     if (!hasServices) {
       for (const window of timeWindows) {
@@ -368,8 +378,8 @@ export async function deleteClient(id: string) {
 export async function createService(service: ServicePreset) {
   const result = await pool.query(
     `INSERT INTO service_presets
-      (id, title, duration_minutes, price_from, requires_hand_photo, requires_reference, options)
-    VALUES ($1, $2, $3, $4, $5, $6, $7)
+      (id, title, duration_minutes, price_from, requires_hand_photo, requires_reference, allows_length_selection, options)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
     ON CONFLICT (id) DO NOTHING
     RETURNING *`,
     [
@@ -379,6 +389,7 @@ export async function createService(service: ServicePreset) {
       service.priceFrom ?? null,
       service.requiresHandPhoto,
       service.requiresReference,
+      service.allowsLengthSelection ?? true,
       JSON.stringify(service.options),
     ],
   );
@@ -451,7 +462,8 @@ export async function updateService(
       price_from = CASE WHEN $8::boolean THEN $4 ELSE price_from END,
       requires_hand_photo = COALESCE($5, requires_hand_photo),
       requires_reference = COALESCE($6, requires_reference),
-      options = COALESCE($7, options)
+      options = COALESCE($7, options),
+      allows_length_selection = COALESCE($9, allows_length_selection)
     WHERE id = $1
     RETURNING *`,
     [
@@ -463,6 +475,7 @@ export async function updateService(
       patch.requiresReference ?? null,
       patch.options ? JSON.stringify(patch.options) : null,
       Object.prototype.hasOwnProperty.call(patch, "priceFrom"),
+      patch.allowsLengthSelection ?? null,
     ],
   );
 
@@ -559,6 +572,38 @@ export async function updateTimeWindowStatus(id: string, status: TimeWindowStatu
     );
 
     return result.rows[0] ? toTimeWindow(result.rows[0]) : null;
+  });
+}
+
+export async function deleteTimeWindow(id: string) {
+  return withTransaction(async (client) => {
+    const currentResult = await client.query("SELECT * FROM time_windows WHERE id = $1 FOR UPDATE", [id]);
+    const currentWindow = currentResult.rows[0] ? toTimeWindow(currentResult.rows[0]) : null;
+
+    if (!currentWindow) {
+      return false;
+    }
+
+    if (currentWindow.status !== "available" && currentWindow.status !== "blocked") {
+      throw new DomainError("Можно удалить только свободное или закрытое окно.", 409);
+    }
+
+    const usage = await client.query(
+      `
+        SELECT 1 FROM booking_requests WHERE preferred_window_id = $1
+        UNION
+        SELECT 1 FROM appointments WHERE start_at = $2 AND end_at = $3
+        LIMIT 1
+      `,
+      [id, currentWindow.startAt, currentWindow.endAt],
+    );
+
+    if ((usage.rowCount ?? 0) > 0) {
+      throw new DomainError("Окно уже связано с заявкой или записью. Его можно закрыть, но не удалить.", 409);
+    }
+
+    const result = await client.query("DELETE FROM time_windows WHERE id = $1", [id]);
+    return (result.rowCount ?? 0) > 0;
   });
 }
 
@@ -937,6 +982,129 @@ async function withTransaction<T>(callback: (client: PoolClient) => Promise<T>) 
   } finally {
     client.release();
   }
+}
+
+async function syncLegacyServiceCatalog(client: PoolClient) {
+  for (const service of servicePresets) {
+    const legacy = legacyServiceTuples.get(service.id);
+    if (!legacy) {
+      continue;
+    }
+
+    await client.query(
+      `UPDATE service_presets
+       SET title = $2,
+           duration_minutes = $3,
+           price_from = $4,
+           requires_hand_photo = $5,
+           requires_reference = $6,
+           allows_length_selection = $7,
+           options = $8
+       WHERE id = $1
+         AND title = $9
+         AND duration_minutes = $10
+         AND COALESCE(price_from, -1) = $11`,
+      [
+        service.id,
+        service.title,
+        service.durationMinutes,
+        service.priceFrom ?? null,
+        service.requiresHandPhoto,
+        service.requiresReference,
+        service.allowsLengthSelection ?? true,
+        JSON.stringify(service.options),
+        legacy.title,
+        legacy.durationMinutes,
+        legacy.priceFrom,
+      ],
+    );
+  }
+
+  await client.query(
+    `UPDATE service_presets
+     SET allows_length_selection = FALSE
+     WHERE id IN ('natural', 'correction', 'manicure')`,
+  );
+
+  await client.query(
+    `
+      WITH removed_appointments AS (
+        DELETE FROM appointments appointment
+        WHERE appointment.service = 'removal'
+        RETURNING appointment.client_id, appointment.request_id, appointment.start_at, appointment.end_at
+      ),
+      removed_requests AS (
+        DELETE FROM booking_requests request
+        WHERE request.service = 'removal'
+          OR request.id IN (SELECT removed_appointments.request_id FROM removed_appointments)
+        RETURNING request.client_id, request.preferred_window_id, request.photo_ids
+      ),
+      released_request_windows AS (
+        UPDATE time_windows time_window
+        SET status = 'available'
+        WHERE time_window.status = 'offered'
+          AND time_window.id IN (
+            SELECT removed_requests.preferred_window_id
+            FROM removed_requests
+            WHERE removed_requests.preferred_window_id IS NOT NULL
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM booking_requests active_request
+            WHERE active_request.preferred_window_id = time_window.id
+              AND active_request.status IN ('new', 'waiting_client', 'confirmed')
+          )
+        RETURNING time_window.id
+      ),
+      released_appointment_windows AS (
+        UPDATE time_windows time_window
+        SET status = 'available'
+        WHERE time_window.status = 'reserved'
+          AND EXISTS (
+            SELECT 1
+            FROM removed_appointments removed_appointment
+            WHERE removed_appointment.start_at = time_window.start_at
+              AND removed_appointment.end_at = time_window.end_at
+          )
+          AND NOT EXISTS (
+            SELECT 1
+            FROM appointments appointment
+            WHERE appointment.start_at = time_window.start_at
+              AND appointment.end_at = time_window.end_at
+              AND appointment.status = 'scheduled'
+          )
+        RETURNING time_window.id
+      ),
+      removed_photo_ids AS (
+        SELECT jsonb_array_elements_text(removed_requests.photo_ids) AS photo_id
+        FROM removed_requests
+      ),
+      deleted_photos AS (
+        DELETE FROM photo_attachments photo
+        WHERE photo.id IN (SELECT photo_id FROM removed_photo_ids)
+          AND NOT EXISTS (
+            SELECT 1
+            FROM booking_requests request
+            WHERE request.photo_ids ? photo.id
+          )
+        RETURNING photo.id
+      ),
+      touched_clients AS (
+        SELECT client_id FROM removed_requests
+        UNION
+        SELECT client_id FROM removed_appointments
+      ),
+      deleted_clients AS (
+        DELETE FROM clients client
+        WHERE client.id IN (SELECT client_id FROM touched_clients)
+          AND NOT EXISTS (SELECT 1 FROM booking_requests request WHERE request.client_id = client.id)
+          AND NOT EXISTS (SELECT 1 FROM appointments appointment WHERE appointment.client_id = client.id)
+        RETURNING client.id
+      )
+      DELETE FROM service_presets
+      WHERE id = 'removal'
+    `,
+  );
 }
 
 async function insertClient(client: PoolClient, item: Client) {

@@ -59,6 +59,7 @@ export type Repository = {
   deleteService: (id: string) => Promise<boolean>;
   createTimeWindow: (window: TimeWindow) => Promise<TimeWindow>;
   updateTimeWindowStatus: (id: string, status: TimeWindowStatus) => Promise<TimeWindow | null>;
+  deleteTimeWindow: (id: string) => Promise<boolean>;
   moveAppointment: (appointmentId: string, windowId: string) => Promise<MutationResult<Appointment> | null>;
   updateAppointmentStatus: (id: string, status: Appointment["status"]) => Promise<MutationResult<Appointment> | null>;
   deleteAppointment: (id: string) => Promise<MutationResult<Appointment> | null>;

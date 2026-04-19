@@ -1,7 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import { CalendarClock, Plus } from "lucide-react";
 import {
-  formatDateTime,
   formatDayLabel,
   formatTimeRange,
   getServiceTitle,
@@ -9,12 +8,8 @@ import {
   windowStatusLabel,
 } from "../../lib/bookingPresentation";
 import {
-  compareDateTimeAsc,
-  getNextWeekendDateKey,
-  getRelativeDateKey,
   getTodayDateKey,
   isFutureDateTime,
-  isWithinNextDays,
   toAppDateTime,
 } from "../../lib/dateTime";
 import { AdminScreenHeader } from "./AdminNavigation";
@@ -25,6 +20,7 @@ export function AdminScheduleView({
   appointments,
   clients,
   addTimeWindow,
+  deleteTimeWindow,
   services,
   moveAppointment,
   updateAppointmentStatus,
@@ -35,17 +31,16 @@ export function AdminScheduleView({
   | "appointments"
   | "clients"
   | "addTimeWindow"
+  | "deleteTimeWindow"
   | "services"
   | "moveAppointment"
   | "updateAppointmentStatus"
   | "updateWindowStatus"
   | "windows"
 >) {
-  const [dragAppointmentId, setDragAppointmentId] = useState<string | null>(null);
   const [tapMoveAppointmentId, setTapMoveAppointmentId] = useState<string | null>(null);
-  const [dragOverWindowId, setDragOverWindowId] = useState<string | null>(null);
   const [pendingMove, setPendingMove] = useState<{ appointmentId: string; windowId: string } | null>(null);
-  const [dragPreview, setDragPreview] = useState<{ x: number; y: number; label: string } | null>(null);
+  const [isWindowFormOpen, setIsWindowFormOpen] = useState(false);
   const [busyActionKey, setBusyActionKey] = useState<string | null>(null);
   const busyActionRef = useRef<string | null>(null);
   const [windowForm, setWindowForm] = useState({
@@ -56,35 +51,6 @@ export function AdminScheduleView({
 
   const visibleWindows = useMemo(() => windows.filter((window) => isFutureDateTime(window.endAt)), [windows]);
   const windowsByDate = useMemo(() => groupWindowsByDate(visibleWindows), [visibleWindows]);
-  const hasWindowsThisWeek = useMemo(
-    () => visibleWindows.some((window) => isWithinNextDays(window.startAt, 7)),
-    [visibleWindows],
-  );
-  const upcomingAppointments = useMemo(
-    () =>
-      [...appointments]
-        .filter(
-          (appointment) =>
-            appointment.status === "scheduled" && isFutureDateTime(appointment.startAt),
-        )
-        .sort((left, right) => compareDateTimeAsc(left.startAt, right.startAt))
-        .slice(0, 4),
-    [appointments],
-  );
-  const nextAvailableDays = useMemo(
-    () =>
-      windowsByDate
-        .map((day) => ({
-          key: day.dateKey,
-          label: day.label,
-          availableCount: day.items.filter(
-            (window) => window.status === "available" && isFutureDateTime(window.startAt),
-          ).length,
-        }))
-        .filter((day) => day.availableCount > 0)
-        .slice(0, 4),
-    [windowsByDate],
-  );
 
   const findAppointmentForWindow = (window: (typeof windows)[number]) =>
     appointments.find(
@@ -127,42 +93,18 @@ export function AdminScheduleView({
     }
   };
 
-  const autoScroll = (clientY: number) => {
-    const threshold = 80;
-    const speed = 12;
-
-    if (clientY < threshold) {
-      window.scrollBy(0, -speed);
-      return;
-    }
-
-    if (window.innerHeight - clientY < threshold) {
-      window.scrollBy(0, speed);
-    }
-  };
-
-  const submitWindow = () => {
+  const submitWindow = async () => {
     if (!windowForm.date || !windowForm.start || !windowForm.end) {
       return;
     }
 
-    void runScheduleAction("window:create", () => addTimeWindow({
+    const result = await runScheduleAction("window:create", () => addTimeWindow({
       startAt: toAppDateTime(windowForm.date, windowForm.start),
       endAt: toAppDateTime(windowForm.date, windowForm.end),
     }));
-  };
-
-  const addQuickWindow = (preset: QuickWindowPreset) => {
-    const nextWindow = makeQuickWindow(preset);
-    setWindowForm({
-      date: nextWindow.date,
-      start: nextWindow.start,
-      end: nextWindow.end,
-    });
-    void runScheduleAction(`window:create:${preset}`, () => addTimeWindow({
-      startAt: toAppDateTime(nextWindow.date, nextWindow.start),
-      endAt: toAppDateTime(nextWindow.date, nextWindow.end),
-    }));
+    if (result !== false) {
+      setIsWindowFormOpen(false);
+    }
   };
 
   const pendingDetails = pendingMove
@@ -200,8 +142,12 @@ export function AdminScheduleView({
             <div>
               <h2>Кто и когда</h2>
             </div>
+            {!isWindowFormOpen ? (
+              <button className="secondary-button" onClick={() => setIsWindowFormOpen(true)} type="button">
+                <Plus size={17} /> Добавить окно
+              </button>
+            ) : null}
           </div>
-          <div className="calendar-hint">Перетащи запись или нажми "Перенести"</div>
 
           {tapMoveAppointmentId ? (
             <div className="calendar-move-mode">
@@ -212,73 +158,61 @@ export function AdminScheduleView({
             </div>
           ) : null}
 
-          <div className="calendar-toolbar">
-            <label>
-              Дата
-              <input
-                type="date"
-                value={windowForm.date}
-                onChange={(event) => setWindowForm({ ...windowForm, date: event.target.value })}
-              />
-            </label>
-            <label>
-              Начало
-              <input
-                type="time"
-                value={windowForm.start}
-                onChange={(event) => setWindowForm({ ...windowForm, start: event.target.value })}
-              />
-            </label>
-            <label>
-              Конец
-              <input
-                type="time"
-                value={windowForm.end}
-                onChange={(event) => setWindowForm({ ...windowForm, end: event.target.value })}
-              />
-            </label>
-            <button
-              className="secondary-button"
-              disabled={Boolean(busyActionKey)}
-              onClick={submitWindow}
-              type="button"
-            >
-              Создать окошко
-            </button>
-          </div>
-
-          <div className="quick-window-row" aria-label="Быстрые окна">
-            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-morning")} type="button">
-              Завтра утром
-            </button>
-            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-evening")} type="button">
-              Завтра вечер
-            </button>
-            <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("weekend")} type="button">
-              Выходные
-            </button>
-          </div>
+          {isWindowFormOpen ? (
+            <div className="calendar-toolbar">
+              <label>
+                Дата
+                <input
+                  type="date"
+                  value={windowForm.date}
+                  onChange={(event) => setWindowForm({ ...windowForm, date: event.target.value })}
+                />
+              </label>
+              <label>
+                Начало
+                <input
+                  type="time"
+                  value={windowForm.start}
+                  onChange={(event) => setWindowForm({ ...windowForm, start: event.target.value })}
+                />
+              </label>
+              <label>
+                Конец
+                <input
+                  type="time"
+                  value={windowForm.end}
+                  onChange={(event) => setWindowForm({ ...windowForm, end: event.target.value })}
+                />
+              </label>
+              <div className="calendar-toolbar-actions">
+                <button
+                  className="secondary-button"
+                  disabled={Boolean(busyActionKey)}
+                  onClick={() => setIsWindowFormOpen(false)}
+                  type="button"
+                >
+                  Отмена
+                </button>
+                <button
+                  className="primary-button"
+                  disabled={Boolean(busyActionKey)}
+                  onClick={() => void submitWindow()}
+                  type="button"
+                >
+                  Сохранить
+                </button>
+              </div>
+            </div>
+          ) : null}
 
           <div className="calendar-board">
             {windowsByDate.length === 0 ? (
               <div className="empty-state calendar-empty-state">
                 <strong>Нет окошек на ближайшие дни</strong>
                 <span>Добавьте свободные слоты, чтобы клиентки могли записаться.</span>
-                <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={submitWindow} type="button">
-                  <Plus size={17} /> Добавить окошко
-                </button>
               </div>
             ) : (
               <>
-                {!hasWindowsThisWeek ? (
-                  <div className="empty-state calendar-empty-state">
-                    <strong>Нет окошек на неделю</strong>
-                    <span>Ближайшие свободные места дальше, чем через 7 дней.</span>
-                    <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={() => addQuickWindow("tomorrow-morning")} type="button">
-                      <Plus size={17} /> Добавить окошко
-                    </button>
-                  </div>
-                ) : null}
               {windowsByDate.map((day) => (
                 <section key={day.dateKey} className="calendar-day">
                   <h3>{day.label}</h3>
@@ -289,50 +223,16 @@ export function AdminScheduleView({
                         ? clients.find((item) => item.id === appointment.clientId)
                         : null;
                       const isFutureWindow = isFutureDateTime(windowItem.startAt);
-                      const activeMoveAppointmentId = tapMoveAppointmentId ?? dragAppointmentId;
-                      const moveConflictReason = activeMoveAppointmentId
+                      const moveConflictReason = tapMoveAppointmentId
                         ? getMoveConflictReason(windowItem, appointment, isFutureWindow)
                         : "";
                       const canDropHere =
-                        Boolean(activeMoveAppointmentId) && !moveConflictReason;
-                      const isDragOver = dragOverWindowId === windowItem.id && canDropHere;
+                        Boolean(tapMoveAppointmentId) && !moveConflictReason;
 
                       return (
                         <article
                           key={windowItem.id}
-                          className={`calendar-slot ${windowItem.status}${canDropHere ? " droppable" : ""}${isDragOver ? " drag-over" : ""}`}
-                          draggable={Boolean(appointment)}
-                          onDragStart={() => {
-                            if (appointment) {
-                              setDragAppointmentId(appointment.id);
-                            }
-                          }}
-                          onDragEnd={() => {
-                            setDragAppointmentId(null);
-                            setDragOverWindowId(null);
-                          }}
-                          onDragOver={(event) => {
-                            if (dragAppointmentId) {
-                              autoScroll(event.clientY);
-                            }
-                            if (!canDropHere) {
-                              return;
-                            }
-                            event.preventDefault();
-                            setDragOverWindowId(windowItem.id);
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverWindowId === windowItem.id) {
-                              setDragOverWindowId(null);
-                            }
-                          }}
-                          onDrop={() => {
-                            if (canDropHere && dragAppointmentId) {
-                              scheduleMove(dragAppointmentId, windowItem.id);
-                            }
-                            setDragAppointmentId(null);
-                            setDragOverWindowId(null);
-                          }}
+                          className={`calendar-slot ${windowItem.status}${canDropHere ? " droppable" : ""}`}
                           onClick={(event) => {
                             if (!tapMoveAppointmentId || appointment || moveConflictReason) {
                               return;
@@ -340,52 +240,6 @@ export function AdminScheduleView({
 
                             event.stopPropagation();
                             scheduleMove(tapMoveAppointmentId, windowItem.id);
-                          }}
-                          onTouchStart={(event) => {
-                            if (!appointment) {
-                              return;
-                            }
-                            const touch = event.touches[0];
-                            setDragAppointmentId(appointment.id);
-                              setDragPreview({
-                                x: touch.clientX,
-                                y: touch.clientY,
-                              label: `${client?.name ?? "Клиентка"} · ${formatTimeRange(windowItem.startAt, windowItem.endAt)}`,
-                            });
-                          }}
-                          onTouchMove={(event) => {
-                            if (!dragAppointmentId) {
-                              return;
-                            }
-                            const touch = event.touches[0];
-                            autoScroll(touch.clientY);
-                            setDragPreview((current) =>
-                              current ? { ...current, x: touch.clientX, y: touch.clientY } : null,
-                            );
-                            const target = document.elementFromPoint(touch.clientX, touch.clientY);
-                            const slot = target?.closest("[data-window-id]") as HTMLElement | null;
-                            setDragOverWindowId(slot?.dataset.windowId ?? null);
-                            event.preventDefault();
-                          }}
-                          onTouchEnd={() => {
-                            if (dragAppointmentId && dragOverWindowId) {
-                              const targetWindow = visibleWindows.find((item) => item.id === dragOverWindowId);
-                              const targetAppointment = targetWindow
-                                ? findAppointmentForWindow(targetWindow) ?? null
-                                : null;
-                              const targetIsFuture = targetWindow
-                                ? isFutureDateTime(targetWindow.startAt)
-                                : false;
-                              if (
-                                targetWindow &&
-                                !getMoveConflictReason(targetWindow, targetAppointment, targetIsFuture)
-                              ) {
-                                scheduleMove(dragAppointmentId, dragOverWindowId);
-                              }
-                            }
-                            setDragAppointmentId(null);
-                            setDragOverWindowId(null);
-                            setDragPreview(null);
                           }}
                           data-window-id={windowItem.id}
                         >
@@ -401,12 +255,11 @@ export function AdminScheduleView({
                               </small>
                             </div>
                           ) : (
-                            <div className="slot-body">Свободно</div>
+                            <div className="slot-body">{getEmptyWindowText(windowItem.status)}</div>
                           )}
                           <div className="slot-actions">
                             {appointment ? (
                               <div className="slot-action-stack">
-                                <span className="slot-hint">Перетащи или выбери перенос.</span>
                                 <button
                                   className={
                                     tapMoveAppointmentId === appointment.id ? "primary-button" : "secondary-button"
@@ -437,40 +290,63 @@ export function AdminScheduleView({
                                   Отменить
                                 </button>
                               </div>
-                            ) : windowItem.status === "available" ? (
+                            ) : tapMoveAppointmentId ? (
                               moveConflictReason ? (
                                 <div className="slot-conflict-note">{moveConflictReason}</div>
-                              ) : tapMoveAppointmentId ? (
-                                <button className="primary-button" type="button">
-                                  Перенести сюда
-                                </button>
                               ) : (
                                 <button
-                                  className="secondary-button"
-                                  disabled={Boolean(busyActionKey)}
-                                  onClick={() =>
-                                    void runScheduleAction(`window:${windowItem.id}:blocked`, () =>
-                                      updateWindowStatus(windowItem.id, "blocked"),
-                                    )
-                                  }
+                                  className="primary-button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    scheduleMove(tapMoveAppointmentId, windowItem.id);
+                                  }}
                                   type="button"
                                 >
-                                  Закрыть
+                                  Сюда
                                 </button>
                               )
-                            ) : windowItem.status === "blocked" ? (
+                            ) : windowItem.status === "available" ? (
                               <button
                                 className="secondary-button"
                                 disabled={Boolean(busyActionKey)}
                                 onClick={() =>
-                                  void runScheduleAction(`window:${windowItem.id}:available`, () =>
-                                    updateWindowStatus(windowItem.id, "available"),
+                                  void runScheduleAction(`window:${windowItem.id}:blocked`, () =>
+                                    updateWindowStatus(windowItem.id, "blocked"),
                                   )
                                 }
                                 type="button"
                               >
-                                Открыть
+                                Закрыть
                               </button>
+                            ) : windowItem.status === "blocked" ? (
+                              <div className="slot-action-stack">
+                                <button
+                                  className="secondary-button"
+                                  disabled={Boolean(busyActionKey)}
+                                  onClick={() =>
+                                    void runScheduleAction(`window:${windowItem.id}:available`, () =>
+                                      updateWindowStatus(windowItem.id, "available"),
+                                    )
+                                  }
+                                  type="button"
+                                >
+                                  Открыть
+                                </button>
+                                <button
+                                  className="danger-button"
+                                  disabled={Boolean(busyActionKey)}
+                                  onClick={() => {
+                                    if (globalThis.confirm("Удалить это окошко?")) {
+                                      void runScheduleAction(`window:${windowItem.id}:delete`, () =>
+                                        deleteTimeWindow(windowItem.id),
+                                      );
+                                    }
+                                  }}
+                                  type="button"
+                                >
+                                  Удалить
+                                </button>
+                              </div>
                             ) : (
                               <div className="slot-conflict-note">
                                 {moveConflictReason || "Недоступно: слот уже не свободен."}
@@ -516,77 +392,22 @@ export function AdminScheduleView({
             </div>
           ) : null}
 
-          {dragPreview ? (
-            <div className="drag-preview" style={{ left: dragPreview.x + 10, top: dragPreview.y + 10 }}>
-              {dragPreview.label}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="admin-overview-grid admin-overview-grid-compact">
-          <article className="panel admin-preview-panel">
-            <div className="section-inline-title">
-              <strong>Ближайшие записи</strong>
-            </div>
-            <div className="admin-preview-list">
-              {upcomingAppointments.length === 0 ? (
-                <div className="empty-state">Активных записей пока нет.</div>
-              ) : (
-                upcomingAppointments.map((appointment) => {
-                  const client = clients.find((item) => item.id === appointment.clientId);
-                  return (
-                    <article className="admin-preview-item" key={appointment.id}>
-                      <span className="status confirmed">Запись</span>
-                      <strong>
-                        {client?.name ?? "Клиентка"} · {getServiceTitle(services, appointment.service)}
-                      </strong>
-                      <small>{formatDateTime(appointment.startAt)}</small>
-                    </article>
-                  );
-                })
-              )}
-            </div>
-          </article>
-
-          <article className="panel admin-preview-panel">
-            <div className="section-inline-title">
-              <strong>Свободные окошки</strong>
-            </div>
-            <div className="admin-preview-list">
-              {nextAvailableDays.length === 0 ? (
-                <div className="empty-state">Все ближайшие окошки уже заняты или закрыты.</div>
-              ) : (
-                nextAvailableDays.map((day) => (
-                  <article className="admin-preview-item" key={day.key}>
-                    <strong>{day.label}</strong>
-                    <small>{day.availableCount} свободных слотов</small>
-                  </article>
-                ))
-              )}
-            </div>
-          </article>
         </section>
       </section>
     </>
   );
 }
 
-type QuickWindowPreset = "tomorrow-morning" | "tomorrow-evening" | "weekend";
+function getEmptyWindowText(status: TimeWindow["status"]) {
+  if (status === "blocked") {
+    return "Закрыто";
+  }
 
-function makeQuickWindow(preset: QuickWindowPreset) {
-  const date = preset === "weekend" ? getNextWeekendDateKey() : getRelativeDateKey(1);
-  const times: Record<QuickWindowPreset, { start: string; end: string }> = {
-    "tomorrow-morning": { start: "10:00", end: "13:00" },
-    "tomorrow-evening": { start: "18:00", end: "21:00" },
-    weekend: { start: "11:00", end: "14:00" },
-  };
-  const time = times[preset];
+  if (status === "offered") {
+    return "Ждёт решения по заявке";
+  }
 
-  return {
-    date,
-    start: time.start,
-    end: time.end,
-  };
+  return "Свободно";
 }
 
 function getMoveConflictReason(

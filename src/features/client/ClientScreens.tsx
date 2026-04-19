@@ -184,14 +184,12 @@ export function ClientRequestsScreen({
   lastRequestLookupStatus,
   confirmClientWindow,
   refreshLastRequest,
-  openBookingFlow,
 }: {
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
   lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
-  openBookingFlow: () => void;
 }) {
   return (
     <>
@@ -206,7 +204,6 @@ export function ClientRequestsScreen({
         lastRequestLookupStatus={lastRequestLookupStatus}
         confirmClientWindow={confirmClientWindow}
         refreshLastRequest={refreshLastRequest}
-        onBookAgain={openBookingFlow}
       />
     </>
   );
@@ -268,7 +265,6 @@ export function ClientStatusPanel({
   lastRequestLookupStatus,
   confirmClientWindow,
   refreshLastRequest,
-  onBookAgain,
   compact = false,
 }: {
   lastRequestInfo: PublicBookingRequest | null;
@@ -276,7 +272,6 @@ export function ClientStatusPanel({
   lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
-  onBookAgain: () => void;
   compact?: boolean;
 }) {
   const timelineIndex = getClientTimelineIndex(lastRequestInfo);
