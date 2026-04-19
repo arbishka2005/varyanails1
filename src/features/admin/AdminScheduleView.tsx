@@ -132,18 +132,21 @@ export function AdminScheduleView({
     <>
       <AdminScreenHeader
         eyebrow="окошки"
-        title="Работаем, Варвара Александровна"
+        title="Окошки для записи"
       />
 
       <section className="admin-screen-stack">
         <section className="panel calendar-panel">
-          <div className="section-title">
-            <CalendarClock size={22} />
+          <div className="section-title calendar-panel-title">
+            <span className="calendar-panel-icon">
+              <CalendarClock size={21} />
+            </span>
             <div>
-              <h2>Кто и когда</h2>
+              <h2>Расписание</h2>
+              <p>Свободные и занятые слоты по дням.</p>
             </div>
             {!isWindowFormOpen ? (
-              <button className="secondary-button" onClick={() => setIsWindowFormOpen(true)} type="button">
+              <button className="secondary-button calendar-add-button" onClick={() => setIsWindowFormOpen(true)} type="button">
                 <Plus size={17} /> Добавить окно
               </button>
             ) : null}
@@ -215,7 +218,10 @@ export function AdminScheduleView({
               <>
               {windowsByDate.map((day) => (
                 <section key={day.dateKey} className="calendar-day">
-                  <h3>{day.label}</h3>
+                  <div className="calendar-day-header">
+                    <h3>{day.label}</h3>
+                    <span>{day.items.length}</span>
+                  </div>
                   <div className="calendar-grid">
                     {day.items.map((windowItem) => {
                       const appointment = findAppointmentForWindow(windowItem) ?? null;
