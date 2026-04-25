@@ -44,7 +44,7 @@
   display: grid;
   align-content: end;
   gap: 26px;
-  padding: clamp(26px, 6vw, 58px);
+  padding: 44px;
   border-color: rgba(255, 255, 255, 0.56);
   background:
     radial-gradient(circle at 14% 18%, rgba(216, 167, 177, 0.22), transparent 34%),
@@ -70,11 +70,13 @@
 
 .client-home-entry-glow {
   position: absolute;
-  inset: auto -12% -32% 28%;
-  height: 360px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.56), transparent 66%);
-  filter: blur(24px);
+  inset: auto 0 0;
+  height: 44%;
+  border-radius: 0;
+  background:
+    linear-gradient(0deg, rgba(255, 255, 255, 0.26), transparent 76%),
+    linear-gradient(104deg, rgba(203, 123, 155, 0.08), transparent 48%, rgba(145, 170, 198, 0.1));
+  filter: none;
   pointer-events: none;
 }
 
@@ -88,16 +90,16 @@
 
 .client-home-entry-main h1 {
   max-width: 12ch;
-  font-size: clamp(48px, 11vw, 112px);
+  font-size: 68px;
   line-height: 0.9;
-  letter-spacing: -0.06em;
+  letter-spacing: 0;
 }
 
 .client-home-entry-main p:not(.eyebrow) {
   max-width: 38ch;
   margin: 0;
   color: var(--color-muted);
-  font-size: clamp(16px, 2.4vw, 22px);
+  font-size: 18px;
   line-height: 1.46;
 }
 

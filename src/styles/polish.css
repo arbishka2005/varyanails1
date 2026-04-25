@@ -18,12 +18,12 @@
 .panel::after {
   content: "";
   position: absolute;
-  inset: auto -10% -18% auto;
-  width: 34%;
-  aspect-ratio: 1;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(214, 177, 155, 0.08), rgba(214, 177, 155, 0));
-  filter: blur(28px);
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(118deg, rgba(255, 255, 255, 0.22), transparent 32%, rgba(255, 255, 255, 0.1) 72%, transparent),
+    linear-gradient(0deg, rgba(214, 177, 155, 0.055), transparent 56%);
+  filter: none;
   pointer-events: none;
   z-index: 0;
 }
@@ -41,21 +41,20 @@
 
 .admin-topbar {
   background:
-    radial-gradient(circle at 16% 22%, rgba(216, 167, 177, 0.1), transparent 24%),
-    radial-gradient(circle at 84% 16%, rgba(174, 190, 209, 0.1), transparent 28%),
-    radial-gradient(circle at 78% 80%, rgba(226, 212, 200, 0.08), transparent 22%),
+    linear-gradient(124deg, rgba(216, 167, 177, 0.1), transparent 42%, rgba(174, 190, 209, 0.1)),
+    linear-gradient(0deg, rgba(226, 212, 200, 0.055), transparent 58%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08) 100%);
 }
 
 .hero-visual::after {
   content: "";
   position: absolute;
-  inset: auto 16px 16px auto;
-  width: 120px;
-  height: 120px;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgba(214, 177, 155, 0.1), rgba(214, 177, 155, 0));
-  filter: blur(26px);
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(130deg, transparent, rgba(255, 255, 255, 0.16) 48%, transparent),
+    linear-gradient(0deg, rgba(214, 177, 155, 0.07), transparent 54%);
+  filter: none;
   pointer-events: none;
 }
 
@@ -67,9 +66,14 @@
 
 .client-hero::before,
 .client-hero::after {
-  content: "✦";
-  color: rgba(128, 114, 137, 0.14);
-  font-size: 20px;
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    linear-gradient(116deg, rgba(255, 255, 255, 0.18), transparent 36%, rgba(255, 255, 255, 0.08) 72%, transparent),
+    linear-gradient(0deg, rgba(216, 167, 177, 0.055), transparent 58%);
 }
 
 .client-screen-header,
@@ -219,10 +223,10 @@
 
 h1 {
   font-family: var(--font-display);
-  font-size: clamp(52px, 5vw, 76px);
+  font-size: 52px;
   font-weight: 700;
   line-height: 0.92;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 
 h2 {

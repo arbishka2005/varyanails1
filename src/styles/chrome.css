@@ -26,31 +26,28 @@ p {
 h1 {
   max-width: 720px;
   margin-bottom: 0;
-  font-family: var(--font-body);
   font-size: 52px;
   font-weight: var(--font-weight-heavy);
-  line-height: 1.04;
+  line-height: 0.98;
   letter-spacing: 0;
 }
 
 h2 {
   margin-bottom: 4px;
-  font-family: var(--font-body);
-  font-size: 28px;
+  font-size: 32px;
   font-weight: var(--font-weight-strong);
-  line-height: 1.12;
+  line-height: 1.04;
   letter-spacing: 0;
 }
 
 h3 {
   margin: 8px 0 0;
-  font-family: var(--font-body);
-  font-size: 21px;
+  font-size: 23px;
   font-weight: var(--font-weight-strong);
-  line-height: 1.2;
+  line-height: 1.12;
   letter-spacing: 0;
 }
 
 p {
-  line-height: 1.6;
+  line-height: 1.58;
 }

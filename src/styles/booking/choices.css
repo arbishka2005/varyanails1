@@ -113,28 +113,27 @@
   gap: 16px;
   overflow: hidden;
   min-height: 430px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  border-radius: calc(var(--radius-md) + 8px);
-  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.64);
+  border-radius: calc(var(--radius-lg) - 4px);
+  padding: 20px;
   background:
-    radial-gradient(circle at 18% 16%, rgba(216, 167, 177, 0.16), transparent 34%),
-    radial-gradient(circle at 86% 24%, rgba(174, 190, 209, 0.16), transparent 36%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.7), rgba(247, 242, 237, 0.44) 46%, rgba(235, 239, 244, 0.32) 100%);
-  box-shadow: 0 22px 46px rgba(112, 97, 122, 0.1);
+    linear-gradient(148deg, rgba(255, 255, 255, 0.82), rgba(249, 244, 249, 0.56) 48%, rgba(231, 237, 247, 0.38)),
+    radial-gradient(circle at 18% 16%, rgba(203, 123, 155, 0.16), transparent 34%),
+    radial-gradient(circle at 86% 24%, rgba(145, 170, 198, 0.18), transparent 36%);
+  box-shadow: var(--product-glow);
 }
 
 .format-question-orbit {
   position: absolute;
-  inset: auto -80px -92px auto;
-  width: 230px;
-  height: 230px;
-  border-radius: 50%;
+  inset: auto 0 0;
+  width: auto;
+  height: 38%;
+  border-radius: 0;
   background:
-    radial-gradient(circle, rgba(255, 255, 255, 0.38), transparent 36%),
-    radial-gradient(circle, rgba(184, 178, 200, 0.24), transparent 70%);
-  filter: blur(2px);
+    linear-gradient(0deg, rgba(184, 178, 200, 0.16), transparent 76%),
+    linear-gradient(104deg, rgba(255, 255, 255, 0.28), transparent 44%, rgba(203, 123, 155, 0.08));
+  filter: none;
   pointer-events: none;
-  animation: format-orbit 8s ease-in-out infinite alternate;
 }
 
 .format-question-topline {
@@ -194,7 +193,7 @@
 
 .format-question-copy h3 {
   margin-bottom: 0;
-  font-size: clamp(26px, 5vw, 38px);
+  font-size: 34px;
 }
 
 .format-question-copy p {
@@ -268,16 +267,17 @@
   display: grid;
   gap: 7px;
   min-height: 112px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: calc(var(--radius-md) + 6px);
-  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: calc(var(--radius-md) + 4px);
+  padding: 16px 18px;
   color: var(--color-ink);
   text-align: left;
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.52), transparent 34%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.78), rgba(248, 244, 240, 0.54) 44%, rgba(236, 240, 245, 0.38) 100%);
-  box-shadow: 0 18px 34px rgba(112, 97, 122, 0.1);
-  backdrop-filter: blur(20px);
+    linear-gradient(148deg, rgba(255, 255, 255, 0.82), rgba(249, 244, 249, 0.56) 48%, rgba(232, 237, 247, 0.42)),
+    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.14), transparent 36%),
+    radial-gradient(circle at 90% 16%, rgba(145, 170, 198, 0.16), transparent 42%);
+  box-shadow: var(--product-shadow), var(--product-inset);
+  backdrop-filter: blur(22px) saturate(118%);
   transition:
     transform var(--motion-quick),
     box-shadow var(--motion-quick),
@@ -309,21 +309,22 @@
 
 .service-option-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 28px 42px rgba(112, 97, 122, 0.14);
+  box-shadow: var(--product-shadow-lifted), var(--product-inset);
 }
 
 .service-option-card.active {
-  border-color: rgba(174, 160, 192, 0.52);
+  border-color: rgba(255, 255, 255, 0.8);
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.56), transparent 34%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.92), rgba(246, 241, 236, 0.72) 44%, rgba(233, 238, 245, 0.58) 100%);
-  box-shadow: 0 24px 42px rgba(112, 97, 122, 0.16);
+    linear-gradient(148deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 250, 0.68) 48%, rgba(235, 240, 248, 0.54)),
+    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.2), transparent 36%),
+    radial-gradient(circle at 90% 16%, rgba(145, 170, 198, 0.18), transparent 42%);
+  box-shadow: var(--product-glow);
 }
 
 .service-option-card:nth-child(2n) {
   background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.48), transparent 34%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.76), rgba(244, 236, 229, 0.7) 46%, rgba(237, 228, 221, 0.5) 100%);
+    linear-gradient(148deg, rgba(255, 255, 255, 0.8), rgba(250, 242, 239, 0.58) 48%, rgba(239, 232, 225, 0.42)),
+    radial-gradient(circle at top right, rgba(229, 210, 196, 0.16), transparent 36%);
 }
 
 .booking-pill-group {
@@ -351,9 +352,11 @@
   gap: 8px;
   min-height: 52px;
   padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.56);
+  border: 1px solid rgba(255, 255, 255, 0.66);
+  border-radius: var(--radius-pill);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.56) 52%, rgba(232, 237, 247, 0.44)),
+    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.08), transparent 40%);
   color: var(--color-ink);
   font-size: 13px;
   font-weight: var(--font-weight-strong);
@@ -370,9 +373,11 @@
 
 .booking-pill-button.active,
 .booking-contact-choice.active {
-  border-color: rgba(174, 160, 192, 0.5);
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.92), rgba(246, 241, 236, 0.72) 44%, rgba(233, 238, 245, 0.58) 100%);
-  box-shadow: 0 18px 30px rgba(112, 97, 122, 0.14);
+  border-color: rgba(255, 255, 255, 0.82);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 250, 0.7) 52%, rgba(235, 240, 248, 0.58)),
+    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.14), transparent 40%);
+  box-shadow: var(--product-glow);
 }
 
 .booking-pill-button-rich {
@@ -421,10 +426,12 @@
 .booking-selection-note,
 .booking-review-card,
 .booking-upload-card {
-  border: 1px solid rgba(255, 255, 255, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.64);
   border-radius: calc(var(--radius-md) + 4px);
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.76), rgba(247, 242, 237, 0.48) 46%, rgba(235, 239, 244, 0.34) 100%);
-  box-shadow: 0 16px 30px rgba(112, 97, 122, 0.08);
+  background:
+    linear-gradient(148deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.52) 48%, rgba(232, 237, 247, 0.38)),
+    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.1), transparent 36%);
+  box-shadow: var(--product-shadow), var(--product-inset);
 }
 
 .booking-inline-card {

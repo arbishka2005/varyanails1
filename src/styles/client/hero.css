@@ -3,38 +3,38 @@
   min-height: 360px;
   overflow: hidden;
   align-items: stretch;
-  border: 1px solid rgba(255, 255, 255, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.66);
   border-radius: var(--radius-lg);
   padding: 40px 54px;
   background:
-    radial-gradient(circle at 14% 20%, rgba(216, 167, 177, 0.12), transparent 30%),
-    radial-gradient(circle at 82% 18%, rgba(174, 190, 209, 0.1), transparent 32%),
-    radial-gradient(circle at 66% 82%, rgba(226, 212, 200, 0.08), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08) 100%),
-    var(--gradient-beauty);
-  box-shadow: var(--shadow-soft);
-  backdrop-filter: blur(18px) saturate(104%);
+    linear-gradient(150deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.56) 48%, rgba(230, 236, 247, 0.38)),
+    radial-gradient(circle at 14% 20%, rgba(203, 123, 155, 0.16), transparent 32%),
+    radial-gradient(circle at 82% 18%, rgba(145, 170, 198, 0.18), transparent 34%),
+    radial-gradient(circle at 66% 82%, rgba(229, 210, 196, 0.14), transparent 28%);
+  box-shadow: var(--product-glow);
+  backdrop-filter: blur(24px) saturate(126%);
 }
 
 .client-hero::before,
 .client-hero::after {
-  content: "✦";
+  content: "";
   position: absolute;
-  color: rgba(155, 128, 165, 0.18);
-  font-size: 22px;
-  line-height: 1;
-  text-shadow: 0 0 18px rgba(255, 255, 255, 0.8);
+  pointer-events: none;
 }
 
 .client-hero::before {
-  top: 28px;
-  right: 28px;
+  inset: 1px;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.38), transparent 28%, rgba(255, 255, 255, 0.16) 70%, transparent),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 44%);
+  opacity: 0.76;
 }
 
 .client-hero::after {
-  bottom: 28px;
-  left: 28px;
-  font-size: 18px;
+  inset: auto 0 0 0;
+  height: 46%;
+  background: linear-gradient(0deg, rgba(100, 57, 88, 0.08), transparent 74%);
 }
 
 .hero-copy {
@@ -56,10 +56,13 @@
   display: grid;
   gap: 6px;
   padding: 14px 15px;
-  border: 1px solid rgba(255, 255, 255, 0.58);
-  border-radius: 8px;
-  background: var(--gradient-control-subtle);
-  backdrop-filter: blur(18px);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: var(--radius-md);
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(249, 244, 249, 0.48) 52%, rgba(232, 237, 247, 0.36)),
+    radial-gradient(circle at 14% 10%, rgba(203, 123, 155, 0.1), transparent 40%);
+  box-shadow: var(--product-inset), 0 12px 28px rgba(93, 74, 93, 0.08);
+  backdrop-filter: blur(20px) saturate(118%);
 }
 
 .hero-stat span {
@@ -79,7 +82,7 @@
   margin: 14px 0 0;
   color: var(--color-muted);
   font-size: 15px;
-  line-height: 1.72;
+  line-height: 1.66;
 }
 
 .hero-visual {
@@ -94,7 +97,7 @@
   min-height: 280px;
   object-fit: cover;
   border-radius: var(--radius-lg);
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  box-shadow: var(--shadow-floating);
-  filter: saturate(0.92) contrast(0.96) brightness(1.02);
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  box-shadow: var(--shadow-floating), inset 0 1px 0 rgba(255, 255, 255, 0.24);
+  filter: saturate(0.94) contrast(0.98) brightness(1.02);
 }
