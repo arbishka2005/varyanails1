@@ -6,11 +6,7 @@
   border: 1px solid rgba(255, 255, 255, 0.66);
   border-radius: var(--radius-lg);
   padding: 40px 54px;
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.56) 48%, rgba(230, 236, 247, 0.38)),
-    radial-gradient(circle at 14% 20%, rgba(203, 123, 155, 0.16), transparent 32%),
-    radial-gradient(circle at 82% 18%, rgba(145, 170, 198, 0.18), transparent 34%),
-    radial-gradient(circle at 66% 82%, rgba(229, 210, 196, 0.14), transparent 28%);
+  background: var(--product-surface-hero);
   box-shadow: var(--product-glow);
   backdrop-filter: blur(24px) saturate(126%);
 }
@@ -25,16 +21,14 @@
 .client-hero::before {
   inset: 1px;
   border-radius: inherit;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.38), transparent 28%, rgba(255, 255, 255, 0.16) 70%, transparent),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 44%);
-  opacity: 0.76;
+  background: var(--gradient-light);
+  opacity: 0.84;
 }
 
 .client-hero::after {
   inset: auto 0 0 0;
   height: 46%;
-  background: linear-gradient(0deg, rgba(100, 57, 88, 0.08), transparent 74%);
+  background: var(--surface-glow);
 }
 
 .hero-copy {
@@ -58,10 +52,8 @@
   padding: 14px 15px;
   border: 1px solid rgba(255, 255, 255, 0.62);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.7), rgba(249, 244, 249, 0.48) 52%, rgba(232, 237, 247, 0.36)),
-    radial-gradient(circle at 14% 10%, rgba(203, 123, 155, 0.1), transparent 40%);
-  box-shadow: var(--product-inset), 0 12px 28px rgba(93, 74, 93, 0.08);
+  background: var(--product-control-soft);
+  box-shadow: var(--product-inset), 0 12px 28px rgba(243, 154, 107, 0.08), 0 8px 22px rgba(168, 199, 232, 0.06);
   backdrop-filter: blur(20px) saturate(118%);
 }
 
@@ -99,5 +91,5 @@
   border-radius: var(--radius-lg);
   border: 1px solid rgba(255, 255, 255, 0.62);
   box-shadow: var(--shadow-floating), inset 0 1px 0 rgba(255, 255, 255, 0.24);
-  filter: saturate(0.94) contrast(0.98) brightness(1.02);
+  filter: saturate(1.03) contrast(0.98) brightness(1.03);
 }

@@ -35,8 +35,8 @@
   border-color: rgba(100, 57, 88, 0.38);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.94),
-    0 0 0 4px rgba(203, 123, 155, 0.16),
-    0 20px 38px rgba(100, 77, 96, 0.12);
+    0 0 0 4px rgba(168, 199, 232, 0.2),
+    0 20px 42px rgba(246, 176, 140, 0.14);
 }
 
 :where(input, select, textarea):focus-visible {
@@ -44,15 +44,13 @@
   border-color: rgba(100, 57, 88, 0.38);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.94),
-    0 0 0 4px rgba(203, 123, 155, 0.12),
-    0 20px 40px rgba(84, 62, 84, 0.1);
+    0 0 0 4px rgba(168, 199, 232, 0.16),
+    0 20px 42px rgba(168, 199, 232, 0.12);
 }
 
 :where(input, select, textarea)[aria-invalid="true"] {
   border-color: rgba(155, 109, 120, 0.44);
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.2), transparent 30%),
-    linear-gradient(160deg, rgba(255, 255, 255, 0.54), rgba(247, 238, 239, 0.44) 44%, rgba(243, 229, 233, 0.34) 100%);
+  background: var(--product-control);
   box-shadow:
     0 0 0 3px rgba(155, 109, 120, 0.08),
     0 14px 28px rgba(121, 106, 136, 0.08);
@@ -64,10 +62,10 @@
 
 :where(button, input, select, textarea):disabled {
   opacity: 0.62;
-  filter: saturate(0.72);
+  filter: saturate(0.92);
 }
 
-:where(.primary-button, .secondary-button, .success-button, .danger-button):disabled {
+:where(.primary-button, .secondary-button, .ghost-button, .success-button, .danger-button, .icon-button, .action-button):disabled {
   transform: none;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
@@ -106,8 +104,9 @@ input[type="file"]:disabled::file-selector-button {
 .error-panel {
   backdrop-filter: blur(24px) saturate(118%);
   box-shadow:
-    0 22px 46px rgba(100, 77, 96, 0.12),
-    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+    0 22px 50px rgba(243, 154, 107, 0.1),
+    0 12px 32px rgba(168, 199, 232, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
 }
 
 .error-text {
@@ -117,12 +116,11 @@ input[type="file"]:disabled::file-selector-button {
   width: fit-content;
   max-width: 100%;
   padding: 12px 14px;
-  border: 1px solid rgba(161, 101, 128, 0.22);
+  border: 1px solid rgba(168, 199, 232, 0.28);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.8), rgba(248, 239, 243, 0.56) 48%, rgba(243, 231, 237, 0.42)),
-    radial-gradient(circle at 14% 12%, rgba(161, 101, 128, 0.14), transparent 36%);
-  box-shadow: 0 18px 34px rgba(121, 106, 136, 0.08), var(--product-inset);
+  background: var(--product-control-soft);
+  color: var(--color-ink);
+  box-shadow: 0 18px 34px rgba(168, 199, 232, 0.08), var(--product-inset);
 }
 
 .field-hint {
@@ -145,9 +143,7 @@ input[type="file"]:disabled::file-selector-button {
 }
 
 .request-form[aria-busy="true"] input[type="file"] {
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.24), transparent 28%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.82), rgba(246, 241, 236, 0.58) 46%, rgba(234, 239, 244, 0.42) 100%);
+  background: var(--product-control);
 }
 
 .survey-panel.is-loading,
@@ -157,36 +153,15 @@ input[type="file"]:disabled::file-selector-button {
 }
 
 .survey-panel.is-loading {
-  background:
-    radial-gradient(circle at 14% 18%, rgba(174, 190, 209, 0.14), transparent 32%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.78), rgba(247, 242, 237, 0.52) 44%, rgba(235, 239, 244, 0.42) 100%);
+  background: var(--product-surface);
 }
 
 .survey-panel.is-error {
-  background:
-    radial-gradient(circle at 16% 18%, rgba(216, 167, 177, 0.14), transparent 30%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.78), rgba(247, 239, 236, 0.56) 44%, rgba(242, 229, 233, 0.42) 100%);
+  background: var(--product-surface);
 }
 
 .survey-panel.is-submitted {
-  background:
-    radial-gradient(circle at 14% 18%, rgba(189, 204, 193, 0.14), transparent 30%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.78), rgba(243, 247, 241, 0.56) 44%, rgba(232, 240, 236, 0.42) 100%);
-}
-
-.rating-button {
-  transition:
-    transform var(--motion-quick),
-    box-shadow var(--motion-quick),
-    background var(--motion-quick),
-    color var(--motion-quick),
-    border-color var(--motion-quick);
-}
-
-.rating-button:hover,
-.rating-button:focus-visible {
-  transform: translateY(-1px);
-  box-shadow: 0 12px 24px rgba(111, 92, 104, 0.1);
+  background: var(--product-surface);
 }
 
 .client-status-panel.compact {

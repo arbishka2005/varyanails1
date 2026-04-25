@@ -12,7 +12,7 @@ import {
   type FormState,
 } from "../features/booking/formState";
 import { lengthLabels } from "../lib/bookingPresentation";
-import { isFutureDateTime } from "../lib/dateTime";
+import { getCurrentIsoTimestamp, isFutureDateTime } from "../lib/dateTime";
 import { readFileAsDataUrl } from "../lib/file";
 import { toStoredPhone } from "../lib/phone";
 import { allowsLengthSelection, getLengthDurationBoost, normalizeLengthForService } from "../lib/services";
@@ -380,7 +380,7 @@ export function useClientBookingFlow({
 
     const draft: BookingDraft = {
       version: 1,
-      savedAt: new Date().toISOString(),
+      savedAt: getCurrentIsoTimestamp(),
       form,
       ui: bookingDraftUi,
     };
@@ -477,7 +477,7 @@ export function useClientBookingFlow({
       estimatedMinutes,
       estimatedPriceFrom,
       status: "new",
-      createdAt: new Date().toISOString(),
+      createdAt: getCurrentIsoTimestamp(),
     };
 
     try {

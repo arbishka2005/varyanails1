@@ -3,9 +3,7 @@
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.4), transparent 32%),
-    var(--gradient-luxe);
+  background: var(--product-surface);
   box-shadow: var(--shadow-card);
   backdrop-filter: blur(24px) saturate(118%);
   animation: soft-rise 820ms cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -97,7 +95,7 @@ textarea {
   min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.68);
   border-radius: var(--radius-md);
-  background: var(--gradient-control);
+  background: var(--product-control);
   color: var(--color-ink);
   outline: none;
   padding: 14px 16px;
@@ -114,7 +112,7 @@ textarea::placeholder {
 input[type="date"],
 input[type="time"] {
   min-height: 54px;
-  background: var(--gradient-control);
+  background: var(--product-control);
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator,
@@ -127,7 +125,7 @@ input[type="time"]::-webkit-calendar-picker-indicator {
 input[type="file"] {
   padding: 10px 12px;
   min-height: 54px;
-  background: var(--gradient-control);
+  background: var(--product-control);
 }
 
 input[type="file"]::file-selector-button {
@@ -173,7 +171,7 @@ input[type="radio"]::after {
 
 input[type="radio"]:checked {
   border-color: rgba(142, 124, 152, 0.44);
-  background: linear-gradient(135deg, #c8a18f 0%, #aa87a0 55%, #8ea5ba 100%);
+  background: var(--product-accent);
   box-shadow: 0 10px 18px rgba(122, 108, 136, 0.16);
 }
 
@@ -188,7 +186,7 @@ select {
   min-height: 54px;
   background-color: rgba(255, 255, 255, 0.88);
   background-image:
-    var(--gradient-control),
+    var(--product-control),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%23735d76' stroke-width='2.1' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: left top, right 16px center;
@@ -205,7 +203,7 @@ input:focus,
 select:focus,
 textarea:focus {
   border-color: rgba(146, 127, 159, 0.54);
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.92), rgba(248, 244, 240, 0.8) 46%, rgba(236, 240, 245, 0.68) 100%);
+  background: var(--product-control);
   box-shadow: 0 0 0 4px rgba(165, 153, 193, 0.14), 0 14px 28px rgba(121, 106, 136, 0.1);
 }
 
@@ -224,7 +222,7 @@ textarea:focus {
   border: 1px solid rgba(142, 124, 152, 0.14);
   border-radius: var(--radius-md);
   padding: 14px 16px;
-  background: var(--gradient-control-subtle);
+  background: var(--product-control-soft);
   transition: border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
 }
 
@@ -254,7 +252,7 @@ textarea:focus {
 
 .checkbox-line input:checked {
   border-color: rgba(142, 124, 152, 0.44);
-  background: linear-gradient(135deg, #c8a18f 0%, #aa87a0 55%, #8ea5ba 100%);
+  background: var(--product-accent);
   box-shadow: 0 10px 18px rgba(122, 108, 136, 0.16);
 }
 
@@ -269,7 +267,7 @@ textarea:focus {
 
 .checkbox-line:hover {
   border-color: rgba(142, 124, 152, 0.24);
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.76), rgba(248, 243, 239, 0.54) 46%, rgba(236, 240, 245, 0.4) 100%);
+  background: var(--product-control);
 }
 
 .checkbox-copy {
@@ -294,7 +292,7 @@ textarea:focus {
 
 .first-visit-toggle {
   justify-content: flex-start;
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.8), rgba(248, 244, 240, 0.72) 46%, rgba(236, 240, 245, 0.6) 100%);
+  background: var(--product-control);
   box-shadow: 0 14px 30px rgba(121, 106, 136, 0.08);
 }
 

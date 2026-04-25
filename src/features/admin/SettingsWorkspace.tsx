@@ -220,14 +220,14 @@ export function SettingsWorkspace({
 
                 {usedCount > 0 ? (
                   <div className="notice-inline">
-                    <AlertTriangle size={16} /> Услуга уже есть в истории. Название меняет отображение старых карточек, длительность и цена в заявках сохраняются отдельно.
+                    <AlertTriangle size={16} /> Услуга уже есть в истории.
                   </div>
                 ) : null}
 
                 <ServiceEditorFields draft={draft} onChange={(patch) => updateDraft(service.id, patch)} />
 
                 <div className="settings-actions">
-                  <button className="secondary-button" onClick={() => resetService(service)} type="button">
+                  <button className="ghost-button" onClick={() => resetService(service)} type="button">
                     <RotateCcw size={16} /> Отменить
                   </button>
                   <button className="primary-button" onClick={() => saveService(service.id)} type="button">
@@ -298,7 +298,6 @@ function ServiceEditorFields({
             />
             <span className="checkbox-copy">
               <strong>Фото рук</strong>
-              <small>Попросим клиентку приложить фото перед отправкой заявки.</small>
             </span>
           </label>
 
@@ -310,7 +309,6 @@ function ServiceEditorFields({
             />
             <span className="checkbox-copy">
               <strong>Референс</strong>
-              <small>Попросим картинку дизайна или желаемого настроения.</small>
             </span>
           </label>
         </div>

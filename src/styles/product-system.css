@@ -5,48 +5,44 @@
 */
 
 :root {
-  --color-ink: #312836;
-  --color-text: rgba(49, 40, 54, 0.9);
-  --color-muted: rgba(98, 88, 104, 0.76);
-  --color-soft: rgba(123, 113, 129, 0.74);
-  --color-bg: #f4edf2;
-  --color-accent: #cb7b9b;
-  --color-accent-strong: #643958;
-  --color-accent-soft: rgba(229, 207, 220, 0.52);
-  --color-sage: #72867b;
-  --color-sage-soft: rgba(228, 236, 230, 0.78);
-  --color-warning: #9b7569;
-  --color-warning-soft: rgba(245, 233, 226, 0.84);
-  --color-danger: #a16580;
-  --color-danger-soft: rgba(245, 230, 236, 0.9);
-  --product-line: rgba(255, 255, 255, 0.56);
-  --product-line-strong: rgba(100, 57, 88, 0.2);
-  --product-surface:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.82), rgba(249, 243, 248, 0.56) 48%, rgba(232, 237, 247, 0.42)),
-    radial-gradient(circle at 16% 12%, rgba(203, 123, 155, 0.16), transparent 38%),
-    radial-gradient(circle at 90% 14%, rgba(145, 170, 198, 0.2), transparent 42%),
-    radial-gradient(circle at 56% 100%, rgba(227, 210, 196, 0.16), transparent 34%);
-  --product-surface-soft:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.72), rgba(249, 244, 249, 0.48) 52%, rgba(234, 227, 243, 0.26)),
-    radial-gradient(circle at 10% 10%, rgba(255, 241, 226, 0.28), transparent 34%),
-    radial-gradient(circle at 100% 0%, rgba(145, 170, 198, 0.16), transparent 42%);
-  --product-control:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.88), rgba(251, 246, 251, 0.64) 48%, rgba(236, 240, 248, 0.48)),
-    radial-gradient(circle at 18% 0%, rgba(203, 123, 155, 0.1), transparent 36%);
-  --product-control-soft:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.76), rgba(250, 246, 251, 0.48) 48%, rgba(236, 240, 248, 0.36)),
-    radial-gradient(circle at 100% 0%, rgba(145, 170, 198, 0.12), transparent 42%);
+  --color-ink: #302e36;
+  --color-text: rgba(48, 46, 54, 0.92);
+  --color-muted: rgba(82, 78, 92, 0.68);
+  --color-soft: rgba(112, 106, 126, 0.66);
+  --color-bg: #f5efe9;
+  --color-accent: #f39a6b;
+  --color-accent-strong: #5b4a63;
+  --color-accent-soft: rgba(243, 154, 107, 0.22);
+  --color-sage: #5f9788;
+  --color-sage-soft: rgba(169, 209, 198, 0.34);
+  --color-warning: #b76d43;
+  --color-warning-soft: rgba(243, 154, 107, 0.18);
+  --color-danger: #bf4f7f;
+  --color-danger-soft: rgba(219, 121, 145, 0.18);
+  --product-line: rgba(255, 255, 255, 0.68);
+  --product-line-strong: rgba(168, 199, 232, 0.28);
+  --product-surface-hero: var(--surface-hero);
+  --product-surface: var(--surface-primary);
+  --product-surface-soft: var(--surface-secondary);
+  --product-control: var(--surface-control);
+  --product-control-soft: var(--surface-control-subtle);
   --product-accent:
-    linear-gradient(136deg, rgba(203, 123, 155, 0.98) 0%, rgba(192, 133, 164, 0.95) 42%, rgba(145, 170, 198, 0.94) 100%),
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.68), transparent 34%);
+    linear-gradient(135deg, #f39a6b 0%, #c5b6e6 56%, #a8c7e8 100%),
+    radial-gradient(ellipse 72% 74% at 16% 8%, rgba(255, 255, 255, 0.5), transparent 56%);
   --product-accent-hover:
-    linear-gradient(136deg, rgba(210, 126, 158, 1) 0%, rgba(198, 136, 168, 0.98) 42%, rgba(151, 177, 205, 0.96) 100%),
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.74), transparent 34%);
-  --product-shadow: 0 24px 64px rgba(84, 62, 84, 0.11), 0 8px 22px rgba(84, 62, 84, 0.05);
-  --product-shadow-lifted: 0 30px 76px rgba(84, 62, 84, 0.15), 0 10px 26px rgba(84, 62, 84, 0.07);
-  --product-glow: 0 0 0 1px rgba(255, 255, 255, 0.62), 0 26px 62px rgba(203, 123, 155, 0.16), 0 14px 38px rgba(145, 170, 198, 0.12);
-  --product-inset: inset 0 1px 0 rgba(255, 255, 255, 0.84), inset 0 -20px 36px rgba(100, 57, 88, 0.04);
-  --product-blur: blur(22px) saturate(122%);
+    linear-gradient(135deg, #f6a06f 0%, #c5b6e6 54%, #a8c7e8 100%),
+    radial-gradient(ellipse 72% 74% at 16% 8%, rgba(255, 255, 255, 0.58), transparent 56%);
+  --product-success: var(--gradient-success);
+  --product-danger: var(--gradient-danger);
+  --product-shadow-hero: 0 36px 92px rgba(243, 154, 107, 0.2), 0 18px 46px rgba(168, 199, 232, 0.14);
+  --product-shadow-primary: 0 24px 62px rgba(243, 154, 107, 0.12), 0 12px 30px rgba(168, 199, 232, 0.09);
+  --product-shadow-secondary: 0 16px 42px rgba(243, 154, 107, 0.07), 0 8px 22px rgba(168, 199, 232, 0.06);
+  --product-shadow-control: 0 10px 24px rgba(243, 154, 107, 0.06), 0 6px 18px rgba(168, 199, 232, 0.05);
+  --product-shadow: var(--product-shadow-primary);
+  --product-shadow-lifted: 0 28px 72px rgba(243, 154, 107, 0.18), 0 14px 34px rgba(168, 199, 232, 0.14);
+  --product-glow: 0 0 0 1px rgba(255, 255, 255, 0.72), 0 28px 70px rgba(243, 154, 107, 0.18), 0 16px 44px rgba(168, 199, 232, 0.16);
+  --product-inset: inset 0 1px 0 rgba(255, 255, 255, 0.86), inset 0 -18px 30px rgba(243, 154, 107, 0.035);
+  --product-blur: blur(24px) saturate(136%);
   --space-screen: 26px;
   --space-card: var(--space-5);
   --space-card-mobile: 20px;
@@ -54,34 +50,26 @@
 }
 
 body {
-  background:
-    radial-gradient(ellipse 132% 72% at 4% -8%, rgba(203, 123, 155, 0.16), transparent 58%),
-    radial-gradient(ellipse 116% 76% at 100% -10%, rgba(145, 170, 198, 0.2), transparent 60%),
-    linear-gradient(142deg, rgba(255, 250, 253, 0.74), rgba(246, 239, 245, 0.72) 46%, rgba(235, 229, 237, 0.82)),
-    linear-gradient(138deg, #f7f1f5 0%, #f6f1f4 42%, #ece4ea 100%);
+  background: var(--gradient-beauty);
 }
 
 body::before {
-  background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.2), transparent 32%, rgba(255, 255, 255, 0.14) 68%, transparent),
-    radial-gradient(ellipse 126% 70% at 0% 0%, rgba(203, 123, 155, 0.16), transparent 58%),
-    radial-gradient(ellipse 118% 68% at 100% 0%, rgba(145, 170, 198, 0.16), transparent 60%);
-  opacity: 0.34;
+  background: var(--gradient-light);
+  opacity: 1;
 }
 
 body::after {
   background:
-    linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.18) 54%, transparent 100%),
-    radial-gradient(ellipse 136% 76% at 50% 100%, rgba(229, 210, 196, 0.18), transparent 64%);
-  opacity: 0.3;
+    linear-gradient(180deg, rgba(255, 255, 255, 0.14), transparent 40%, rgba(255, 255, 255, 0.12) 100%);
+  opacity: 0.72;
 }
 
 .app-shell::before {
   background:
-    linear-gradient(125deg, rgba(255, 255, 255, 0.22), transparent 42%, rgba(255, 255, 255, 0.16) 68%, transparent),
-    radial-gradient(circle at 1px 1px, rgba(92, 83, 96, 0.13) 0, rgba(92, 83, 96, 0.13) 0.7px, transparent 1.1px);
+    linear-gradient(125deg, rgba(255, 255, 255, 0.34), transparent 40%, rgba(255, 255, 255, 0.2) 68%, transparent),
+    radial-gradient(circle at 1px 1px, rgba(168, 199, 232, 0.12) 0, rgba(168, 199, 232, 0.12) 0.7px, transparent 1.1px);
   background-size: auto, 7px 7px;
-  opacity: 0.045;
+  opacity: 0.07;
 }
 
 .app-shell {
@@ -155,10 +143,8 @@ body::after {
   pointer-events: none;
   border-radius: inherit;
   background:
-    linear-gradient(118deg, rgba(255, 255, 255, 0.48), transparent 28%, rgba(255, 255, 255, 0.24) 68%, transparent),
-    radial-gradient(circle at 18% 18%, rgba(203, 123, 155, 0.1), transparent 38%),
-    radial-gradient(circle at 90% 10%, rgba(145, 170, 198, 0.12), transparent 40%);
-  opacity: 0.88;
+    linear-gradient(118deg, rgba(255, 255, 255, 0.5), transparent 30%, rgba(255, 255, 255, 0.2) 72%, transparent);
+  opacity: 0.82;
 }
 
 .client-home-entry-glow {
@@ -167,11 +153,9 @@ body::after {
   inset: auto 0 0;
   height: 44%;
   pointer-events: none;
-  background:
-    linear-gradient(0deg, rgba(203, 123, 155, 0.12), transparent 72%),
-    linear-gradient(104deg, rgba(255, 255, 255, 0.24), transparent 44%, rgba(145, 170, 198, 0.12));
+  background: var(--surface-glow);
   filter: none;
-  opacity: 0.72;
+  opacity: 0.84;
 }
 
 .request-form,
@@ -196,20 +180,164 @@ body::after {
   align-content: start;
   gap: 20px;
   padding: 30px 24px;
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.74), rgba(250, 244, 249, 0.48) 52%, rgba(229, 236, 247, 0.36)),
-    radial-gradient(circle at 12% 18%, rgba(203, 123, 155, 0.16), transparent 44%),
-    radial-gradient(circle at 92% 12%, rgba(145, 170, 198, 0.2), transparent 44%);
-  box-shadow: var(--product-glow);
+  background: var(--product-surface-hero);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.74),
+    0 36px 92px rgba(243, 154, 107, 0.2),
+    0 18px 46px rgba(168, 199, 232, 0.14),
+    var(--product-inset);
+  backdrop-filter: blur(30px) saturate(142%);
+}
+
+.admin-topbar,
+.client-screen-header,
+.admin-screen-header {
+  background: var(--product-surface-hero);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 30px 78px rgba(243, 154, 107, 0.16),
+    0 16px 40px rgba(168, 199, 232, 0.12),
+    var(--product-inset);
 }
 
 .client-home-entry.needs-confirmation,
 .client-home-entry.is-boarding-pass,
 .admin-today-hero {
-  background:
-    linear-gradient(150deg, rgba(255, 255, 255, 0.7), rgba(249, 244, 250, 0.46) 52%, rgba(226, 233, 247, 0.36)),
-    radial-gradient(circle at 12% 18%, rgba(239, 122, 173, 0.14), transparent 42%),
-    radial-gradient(circle at 92% 12%, rgba(168, 178, 203, 0.17), transparent 44%);
+  background: var(--product-surface-hero);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72),
+    0 30px 78px rgba(243, 154, 107, 0.16),
+    0 16px 40px rgba(168, 199, 232, 0.12),
+    var(--product-inset);
+}
+
+.surface-hero,
+.client-hero,
+.client-home-entry,
+.client-screen-header,
+.admin-screen-header,
+.admin-topbar,
+.format-question-shell,
+.client-status-panel,
+.admin-today-console > .admin-preview-panel:first-of-type {
+  background: var(--product-surface-hero);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.72),
+    var(--product-shadow-hero),
+    var(--product-inset);
+  backdrop-filter: blur(30px) saturate(142%);
+}
+
+.surface-primary,
+.request-form,
+.calendar-panel,
+.admin-inbox-card,
+.admin-preview-panel,
+.client-profile-card,
+.client-card,
+.settings-create-card {
+  background: var(--product-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    var(--product-shadow-primary),
+    var(--product-inset);
+  backdrop-filter: var(--product-blur);
+}
+
+.surface-secondary,
+.summary-panel,
+.client-services-preview,
+.client-focus-panel,
+.client-empty-state-panel,
+.client-filters,
+.settings-item,
+.notice-panel,
+.error-panel,
+.notice-inline,
+.admin-inbox-card.is-limited,
+.admin-today-console > .admin-preview-panel:not(:first-of-type) {
+  background: var(--product-surface-soft);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.5),
+    var(--product-shadow-secondary),
+    var(--product-inset);
+  backdrop-filter: blur(20px) saturate(126%);
+}
+
+.settings-item.settings-create-card {
+  background: var(--product-surface);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.62),
+    var(--product-shadow-primary),
+    var(--product-inset);
+}
+
+.surface-hero::after,
+.client-home-entry::after,
+.client-screen-header::after,
+.admin-screen-header::after,
+.format-question-shell::after,
+.client-status-panel::after,
+.admin-today-console > .admin-preview-panel:first-of-type::after {
+  opacity: 0.9;
+}
+
+.surface-primary::after,
+.request-form::after,
+.calendar-panel::after,
+.admin-inbox-card::after,
+.admin-preview-panel::after,
+.client-profile-card::after,
+.client-card::after,
+.settings-create-card::after {
+  opacity: 0.58;
+}
+
+.surface-secondary::after,
+.summary-panel::after,
+.client-focus-panel::after,
+.client-empty-state-panel::after,
+.client-filters::after,
+.settings-item::after,
+.notice-panel::after,
+.error-panel::after,
+.notice-inline::after,
+.admin-inbox-card.is-limited::after,
+.admin-today-console > .admin-preview-panel:not(:first-of-type)::after {
+  opacity: 0.34;
+}
+
+.settings-item.settings-create-card::after {
+  opacity: 0.58;
+}
+
+.surface-control,
+.admin-preview-item,
+.admin-next-appointment-card,
+.admin-money-card,
+.admin-focus-stat,
+.admin-quick-message,
+.admin-warning-item,
+.admin-mini-stat,
+.window-item,
+.client-history,
+.client-memory-panel,
+.info-item,
+.booking-inline-card,
+.booking-review-card,
+.booking-upload-card,
+.booking-slot-button,
+.calendar-custom-button,
+.booking-day-pill,
+.service-option-card,
+.booking-pill-button,
+.booking-contact-choice,
+.calendar-slot,
+.summary-progress,
+.summary-story,
+.empty-state {
+  background: var(--product-control-soft);
+  box-shadow: var(--product-inset), var(--product-shadow-control);
 }
 
 .client-home-entry-main {
@@ -220,12 +348,13 @@ body::after {
   max-width: 14ch;
   font-family: var(--font-display);
   font-size: 56px;
-  font-weight: 700;
+  font-weight: 600;
   line-height: 0.98;
   letter-spacing: 0;
 }
 
 .app-shell :where(h1, h2, h3) {
+  color: rgba(47, 42, 45, 0.85);
   letter-spacing: 0;
 }
 
@@ -239,7 +368,7 @@ body::after {
   .summary-panel h2
 ) {
   font-family: var(--font-display);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .app-shell :where(button, input, select, textarea, small, p, label, span, strong) {
@@ -321,6 +450,7 @@ body::after {
 .booking-review-card,
 .booking-upload-card,
 .booking-slot-button,
+.calendar-custom-button,
 .booking-day-pill,
 .service-option-card,
 .booking-pill-button,
@@ -329,6 +459,7 @@ body::after {
 .admin-review-progress button,
 .admin-review-screen,
 .admin-review-window-list button,
+.client-memory-tags button,
 .admin-review-summary,
 .photo-list span,
 .summary-progress,
@@ -338,8 +469,8 @@ body::after {
   border: 1px solid var(--product-line);
   border-radius: var(--radius-md);
   background: var(--product-control-soft);
-  box-shadow: var(--product-inset), 0 10px 26px rgba(86, 72, 96, 0.06);
-  backdrop-filter: blur(16px) saturate(104%);
+  box-shadow: var(--product-inset), 0 10px 24px rgba(243, 154, 107, 0.06), 0 6px 18px rgba(168, 199, 232, 0.05);
+  backdrop-filter: blur(18px) saturate(122%);
 }
 
 .admin-preview-item,
@@ -347,6 +478,7 @@ body::after {
 .admin-quick-message,
 .admin-warning-item,
 .booking-slot-button,
+.calendar-custom-button,
 .booking-day-pill,
 .service-option-card,
 .booking-pill-button,
@@ -367,6 +499,7 @@ body::after {
 .admin-quick-message:hover,
 .admin-warning-item:hover,
 .booking-slot-button:hover,
+.calendar-custom-button:hover,
 .booking-day-pill:hover,
 .service-option-card:hover,
 .booking-pill-button:hover,
@@ -382,6 +515,7 @@ body::after {
 .admin-review-progress button.is-active,
 .admin-review-window-list button.active,
 .booking-slot-button.active,
+.calendar-custom-button.active,
 .booking-day-pill.active,
 .service-option-card.active,
 .booking-pill-button.active,
@@ -398,13 +532,14 @@ body::after {
 .booking-pill-button.active,
 .booking-contact-choice.active,
 .booking-slot-button.active,
+.calendar-custom-button.active,
 .booking-day-pill.active {
   color: var(--color-ink);
-  border-color: rgba(255, 255, 255, 0.7);
+  border-color: rgba(255, 255, 255, 0.82);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(250, 243, 249, 0.52) 48%, rgba(226, 236, 248, 0.46)),
-    radial-gradient(circle at 18% 14%, rgba(239, 122, 173, 0.2), transparent 36%);
-  box-shadow: 0 0 0 2px rgba(239, 122, 173, 0.08), 0 14px 30px rgba(168, 178, 203, 0.12), var(--product-inset);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(255, 255, 255, 0.22)),
+    radial-gradient(ellipse 82% 60% at 18% 8%, rgba(243, 154, 107, 0.16), transparent 58%);
+  box-shadow: 0 0 0 2px rgba(246, 176, 140, 0.11), 0 18px 38px rgba(246, 176, 140, 0.13), 0 12px 30px rgba(168, 199, 232, 0.12), var(--product-inset);
 }
 
 input,
@@ -421,9 +556,9 @@ textarea,
 input:focus,
 select:focus,
 textarea:focus {
-  border-color: rgba(142, 111, 122, 0.42);
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.86), rgba(249, 245, 248, 0.68) 48%, rgba(239, 244, 246, 0.56) 100%);
-  box-shadow: 0 0 0 4px rgba(142, 111, 122, 0.12), var(--product-shadow);
+  border-color: rgba(168, 199, 232, 0.48);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.26));
+  box-shadow: 0 0 0 4px rgba(168, 199, 232, 0.16), var(--product-shadow);
 }
 
 .checkbox-line {
@@ -433,10 +568,9 @@ textarea:focus {
   padding: 14px 16px;
   border-color: rgba(255, 255, 255, 0.58);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(249, 244, 250, 0.48) 52%, rgba(232, 237, 248, 0.36)),
-    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.09), transparent 42%);
-  box-shadow: var(--product-inset), 0 12px 28px rgba(86, 72, 96, 0.055);
-  backdrop-filter: blur(16px) saturate(112%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.36), rgba(255, 255, 255, 0.14));
+  box-shadow: var(--product-inset), 0 12px 30px rgba(246, 176, 140, 0.08);
+  backdrop-filter: blur(18px) saturate(124%);
 }
 
 .checkbox-line input[type="checkbox"] {
@@ -446,8 +580,7 @@ textarea:focus {
   border: 1px solid rgba(92, 51, 88, 0.16);
   border-radius: var(--radius-md);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.86), rgba(250, 245, 251, 0.62) 58%, rgba(232, 237, 248, 0.42)),
-    radial-gradient(circle at 20% 14%, rgba(255, 255, 255, 0.72), transparent 42%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.24));
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     inset 0 -10px 18px rgba(92, 51, 88, 0.025),
@@ -475,14 +608,13 @@ textarea:focus {
 }
 
 .checkbox-line input[type="checkbox"]:checked {
-  border-color: rgba(196, 138, 169, 0.42);
+  border-color: rgba(168, 199, 232, 0.52);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(250, 244, 250, 0.62) 58%, rgba(235, 239, 248, 0.48)),
-    radial-gradient(circle at 16% 12%, rgba(239, 122, 173, 0.18), transparent 42%),
-    radial-gradient(circle at 90% 88%, rgba(168, 178, 203, 0.16), transparent 44%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0.28)),
+    radial-gradient(ellipse 82% 60% at 18% 8%, rgba(243, 154, 107, 0.12), transparent 58%);
   box-shadow:
-    0 0 0 3px rgba(239, 122, 173, 0.065),
-    0 10px 22px rgba(168, 178, 203, 0.085),
+    0 0 0 3px rgba(168, 199, 232, 0.1),
+    0 10px 24px rgba(168, 199, 232, 0.12),
     inset 0 1px 0 rgba(255, 255, 255, 0.86),
     inset 0 -10px 18px rgba(92, 51, 88, 0.025);
 }
@@ -496,8 +628,7 @@ textarea:focus {
 .checkbox-line:hover {
   border-color: rgba(255, 255, 255, 0.76);
   background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(250, 245, 251, 0.54) 52%, rgba(232, 237, 248, 0.42)),
-    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.12), transparent 42%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.18));
   box-shadow: var(--product-shadow), var(--product-inset);
 }
 
@@ -521,8 +652,15 @@ textarea:focus {
 
 .primary-button,
 .secondary-button,
+.ghost-button,
 .success-button,
-.danger-button {
+.danger-button,
+.icon-button,
+.action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   min-height: 52px;
   border-radius: var(--radius-pill);
   border: 1px solid rgba(255, 255, 255, 0.58);
@@ -541,10 +679,33 @@ textarea:focus {
     color var(--motion-quick);
 }
 
+.primary-button::before,
+.secondary-button::before,
+.ghost-button::before,
+.success-button::before,
+.danger-button::before,
+.icon-button::before,
+.action-button::before {
+  content: "";
+  display: block;
+  position: absolute;
+  inset: -1px;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(116deg, rgba(255, 255, 255, 0.28), transparent 42%, rgba(168, 199, 232, 0.16) 76%, transparent),
+    radial-gradient(ellipse 70% 78% at 12% 8%, rgba(255, 255, 255, 0.34), transparent 56%);
+  opacity: 0.58;
+}
+
 .primary-button::after,
 .secondary-button::after,
+.ghost-button::after,
 .success-button::after,
-.danger-button::after {
+.danger-button::after,
+.icon-button::after,
+.action-button::after {
   content: "";
   display: block;
   position: absolute;
@@ -560,8 +721,11 @@ textarea:focus {
 
 .primary-button :where(svg, span, strong, small),
 .secondary-button :where(svg, span, strong, small),
+.ghost-button :where(svg, span, strong, small),
 .success-button :where(svg, span, strong, small),
-.danger-button :where(svg, span, strong, small) {
+.danger-button :where(svg, span, strong, small),
+.icon-button :where(svg, span, strong, small),
+.action-button :where(svg, span, strong, small) {
   position: relative;
   z-index: 1;
 }
@@ -570,55 +734,82 @@ textarea:focus {
   color: #fff;
   background: var(--product-accent);
   box-shadow:
-    0 26px 58px rgba(203, 123, 155, 0.26),
-    0 14px 34px rgba(145, 170, 198, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.72),
-    inset 0 -20px 32px rgba(100, 57, 88, 0.1);
-  text-shadow: 0 1px 14px rgba(100, 57, 88, 0.22);
+    0 10px 30px rgba(243, 154, 107, 0.28),
+    0 4px 12px rgba(168, 199, 232, 0.25),
+    0 26px 58px rgba(243, 154, 107, 0.18),
+    0 0 0 1px rgba(255, 255, 255, 0.54),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82),
+    inset 0 -20px 34px rgba(91, 74, 99, 0.14);
+  text-shadow: 0 1px 16px rgba(91, 74, 99, 0.24);
+}
+
+.primary-button svg {
+  color: #fff;
+  stroke: currentColor;
 }
 
 .primary-button:hover:not(:disabled) {
   background: var(--product-accent-hover);
   box-shadow:
-    0 28px 58px rgba(203, 123, 155, 0.24),
-    0 14px 34px rgba(145, 170, 198, 0.16),
-    inset 0 1px 0 rgba(255, 255, 255, 0.76),
-    inset 0 -20px 32px rgba(100, 57, 88, 0.1);
+    0 12px 34px rgba(243, 154, 107, 0.32),
+    0 6px 16px rgba(168, 199, 232, 0.28),
+    0 30px 64px rgba(243, 154, 107, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.86),
+    inset 0 -20px 34px rgba(91, 74, 99, 0.14);
   transform: translateY(-2px);
 }
 
 .secondary-button {
   color: var(--color-ink);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(249, 244, 250, 0.58) 52%, rgba(232, 237, 248, 0.48)),
-    radial-gradient(circle at 12% 12%, rgba(203, 123, 155, 0.12), transparent 40%),
-    radial-gradient(circle at 92% 20%, rgba(145, 170, 198, 0.14), transparent 44%);
+  background: var(--product-control);
   box-shadow:
-    0 16px 36px rgba(84, 62, 84, 0.09),
+    0 16px 38px rgba(246, 176, 140, 0.1),
+    0 10px 28px rgba(168, 199, 232, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
     inset 0 -18px 28px rgba(100, 57, 88, 0.04);
 }
 
 .secondary-button:hover:not(:disabled) {
   border-color: rgba(255, 255, 255, 0.76);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(250, 245, 251, 0.64) 52%, rgba(234, 239, 248, 0.54)),
-    radial-gradient(circle at 12% 12%, rgba(203, 123, 155, 0.16), transparent 40%),
-    radial-gradient(circle at 92% 20%, rgba(145, 170, 198, 0.16), transparent 44%);
+  background: var(--product-control);
   box-shadow: var(--product-glow);
   transform: translateY(-2px);
 }
 
+.ghost-button {
+  min-height: 46px;
+  padding: 11px 16px;
+  color: var(--color-accent-strong);
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 10px 24px rgba(168, 199, 232, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.ghost-button::before,
+.ghost-button::after {
+  opacity: 0.28;
+}
+
+.ghost-button:hover:not(:disabled) {
+  color: var(--color-ink);
+  border-color: rgba(255, 255, 255, 0.72);
+  background: var(--product-control-soft);
+  box-shadow: var(--product-shadow-secondary), var(--product-inset);
+  transform: translateY(-1px);
+}
+
 .client-screen-header .secondary-button,
-.admin-screen-header .secondary-button {
+.admin-screen-header .secondary-button,
+.client-screen-header .ghost-button,
+.admin-screen-header .ghost-button {
   justify-self: start;
   min-height: 44px;
   padding: 11px 15px;
   color: var(--color-accent-strong);
   font-size: 14px;
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.72), rgba(250, 243, 249, 0.5) 52%, rgba(232, 238, 248, 0.42)),
-    radial-gradient(circle at 12% 10%, rgba(239, 122, 173, 0.16), transparent 38%);
+  background: var(--product-control-soft);
 }
 
 .client-home-entry-action {
@@ -631,24 +822,117 @@ textarea:focus {
 
 .success-button {
   color: #fff;
-  background:
-    linear-gradient(135deg, rgba(129, 154, 142, 0.94), rgba(105, 132, 122, 0.94)),
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.5), transparent 34%);
+  background: var(--product-success);
   box-shadow:
-    0 18px 38px rgba(105, 132, 122, 0.18),
+    0 18px 42px rgba(169, 209, 198, 0.22),
     inset 0 1px 0 rgba(255, 255, 255, 0.62),
     inset 0 -18px 30px rgba(52, 70, 62, 0.08);
 }
 
 .danger-button {
   color: #fff;
-  background:
-    linear-gradient(135deg, rgba(198, 122, 150, 0.94), rgba(154, 95, 118, 0.94)),
-    radial-gradient(circle at 18% 14%, rgba(255, 255, 255, 0.48), transparent 34%);
+  background: var(--product-danger);
   box-shadow:
-    0 18px 38px rgba(154, 95, 118, 0.18),
+    0 18px 42px rgba(219, 121, 145, 0.18),
     inset 0 1px 0 rgba(255, 255, 255, 0.62),
     inset 0 -18px 30px rgba(92, 51, 88, 0.08);
+}
+
+.icon-button,
+.admin-lightbox-close,
+.photo-lightbox-close {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  min-height: 42px;
+  padding: 0;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-strong);
+  background: var(--product-control);
+  box-shadow:
+    0 14px 28px rgba(243, 154, 107, 0.1),
+    0 8px 22px rgba(168, 199, 232, 0.08),
+    var(--product-inset);
+}
+
+.icon-button:hover:not(:disabled),
+.admin-lightbox-close:hover:not(:disabled),
+.photo-lightbox-close:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: var(--product-glow);
+}
+
+.action-button,
+.admin-inbox-card-summary,
+.admin-preview-item,
+.photo-thumb {
+  border-radius: var(--radius-md);
+  transition:
+    transform var(--motion-quick),
+    border-color var(--motion-quick),
+    box-shadow var(--motion-quick),
+    background var(--motion-quick),
+    color var(--motion-quick);
+}
+
+.action-button:hover:not(:disabled),
+.admin-inbox-card-summary:hover:not(:disabled),
+button.admin-preview-item:hover:not(:disabled),
+.photo-thumb:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.78);
+  box-shadow: var(--product-shadow-lifted), var(--product-inset);
+}
+
+.primary-button:active:not(:disabled),
+.secondary-button:active:not(:disabled),
+.ghost-button:active:not(:disabled),
+.success-button:active:not(:disabled),
+.danger-button:active:not(:disabled),
+.icon-button:active:not(:disabled),
+.action-button:active:not(:disabled),
+.admin-lightbox-close:active:not(:disabled),
+.photo-lightbox-close:active:not(:disabled),
+.admin-inbox-card-summary:active:not(:disabled),
+button.admin-preview-item:active:not(:disabled),
+.photo-thumb:active:not(:disabled) {
+  transform: translateY(0) scale(0.99);
+}
+
+.primary-button:focus-visible,
+.secondary-button:focus-visible,
+.ghost-button:focus-visible,
+.success-button:focus-visible,
+.danger-button:focus-visible,
+.icon-button:focus-visible,
+.action-button:focus-visible,
+.admin-lightbox-close:focus-visible,
+.photo-lightbox-close:focus-visible,
+.admin-inbox-card-summary:focus-visible,
+button.admin-preview-item:focus-visible,
+.photo-thumb:focus-visible,
+.booking-progress-item[aria-current="step"] {
+  outline: none;
+  border-color: rgba(168, 199, 232, 0.58);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.94),
+    0 0 0 4px rgba(168, 199, 232, 0.18),
+    var(--product-shadow-secondary),
+    var(--product-inset);
+}
+
+.primary-button:disabled,
+.secondary-button:disabled,
+.ghost-button:disabled,
+.success-button:disabled,
+.danger-button:disabled,
+.icon-button:disabled,
+.action-button:disabled {
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.58;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
 }
 
 .status,
@@ -658,11 +942,9 @@ textarea:focus {
   padding: 7px 12px;
   border: 1px solid var(--product-line);
   border-radius: var(--radius-md);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.62), rgba(249, 244, 250, 0.42)),
-    radial-gradient(circle at 0% 0%, rgba(239, 122, 173, 0.1), transparent 42%);
+  background: var(--product-control-soft);
   color: var(--color-accent-strong);
-  box-shadow: var(--product-inset), 0 8px 18px rgba(86, 72, 96, 0.06);
+  box-shadow: var(--product-inset), 0 8px 20px rgba(246, 176, 140, 0.09);
 }
 
 .status.new {
@@ -673,12 +955,12 @@ textarea:focus {
 
 .status.confirmed {
   color: #fff;
-  background: linear-gradient(135deg, rgba(129, 154, 142, 0.94), rgba(105, 132, 122, 0.94));
+  background: var(--product-success);
 }
 
 .status.declined {
   color: #fff;
-  background: linear-gradient(135deg, rgba(198, 122, 150, 0.94), rgba(154, 95, 118, 0.94));
+  background: var(--product-danger);
 }
 
 .status.waiting_client,
@@ -708,6 +990,25 @@ textarea:focus {
   color: var(--color-muted);
 }
 
+.notice-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-md);
+  color: var(--color-warning);
+  font-size: 13px;
+  font-weight: var(--font-weight-strong);
+  line-height: 1.35;
+}
+
+.notice-inline svg {
+  flex: 0 0 auto;
+}
+
 .client-text {
   border-left: 0;
   border: 1px solid var(--product-line);
@@ -718,27 +1019,55 @@ textarea:focus {
 .client-bottom-nav,
 .admin-bottom-nav {
   border: 1px solid rgba(255, 255, 255, 0.62);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(249, 243, 249, 0.58) 52%, rgba(233, 238, 248, 0.52)),
-    radial-gradient(circle at 12% 0%, rgba(203, 123, 155, 0.16), transparent 38%),
-    radial-gradient(circle at 88% 0%, rgba(145, 170, 198, 0.18), transparent 42%);
-  box-shadow: 0 22px 46px rgba(73, 60, 70, 0.16), var(--product-inset);
-  backdrop-filter: blur(22px) saturate(124%);
+  background: var(--product-surface);
+  box-shadow: 0 22px 50px rgba(243, 154, 107, 0.12), 0 12px 34px rgba(168, 199, 232, 0.1), var(--product-inset);
+  backdrop-filter: blur(24px) saturate(136%);
+}
+
+.client-bottom-nav button,
+.admin-bottom-nav button {
+  position: relative;
+  overflow: hidden;
+  color: var(--color-muted);
+  border: 1px solid transparent;
+  background: transparent;
+  transition:
+    transform var(--motion-quick),
+    border-color var(--motion-quick),
+    box-shadow var(--motion-quick),
+    background var(--motion-quick),
+    color var(--motion-quick);
 }
 
 .client-bottom-nav button.active,
 .admin-bottom-nav button.active {
   color: var(--color-ink);
   border: 1px solid rgba(255, 255, 255, 0.72);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.82), rgba(249, 243, 250, 0.58)),
-    radial-gradient(circle at 12% 0%, rgba(203, 123, 155, 0.16), transparent 40%);
-  box-shadow: var(--product-inset), 0 14px 28px rgba(92, 76, 91, 0.14);
+  background: var(--product-control);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.7),
+    0 16px 34px rgba(243, 154, 107, 0.16),
+    0 10px 26px rgba(168, 199, 232, 0.12),
+    var(--product-inset);
+}
+
+.client-bottom-nav button.active::after,
+.admin-bottom-nav button.active::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 22px;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--product-accent);
+  transform: translateX(-50%);
+  box-shadow: 0 6px 14px rgba(243, 154, 107, 0.22);
 }
 
 .admin-bottom-nav-badge,
 .client-bottom-nav-badge {
-  background: linear-gradient(135deg, #cc8288, #5c3358);
+  background: var(--product-accent);
 }
 
 .form-navigation {
@@ -757,6 +1086,54 @@ textarea:focus {
   background: transparent;
   box-shadow: none;
   backdrop-filter: none;
+}
+
+.booking-progress-item.is-active {
+  color: var(--color-ink);
+  border-color: rgba(255, 255, 255, 0.76);
+  background: var(--product-control);
+  box-shadow: var(--product-shadow-control), var(--product-inset);
+}
+
+.booking-progress-item.is-complete {
+  color: var(--color-accent-strong);
+}
+
+.booking-progress-item.is-active span,
+.booking-progress-item.is-complete span,
+.format-question-dots span.is-active,
+.format-question-dots span.is-complete {
+  color: #fff;
+  background: var(--product-accent);
+  box-shadow: 0 10px 18px rgba(243, 154, 107, 0.16);
+}
+
+.format-question-dots span.is-active {
+  width: 24px;
+}
+
+.booking-slot-button.active::after {
+  content: "";
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--product-accent);
+  box-shadow: 0 0 0 4px rgba(168, 199, 232, 0.12);
+}
+
+.format-question-back,
+.booking-pill-button-soft {
+  background: rgba(255, 255, 255, 0.18);
+  box-shadow: var(--product-inset), 0 10px 24px rgba(168, 199, 232, 0.06);
+}
+
+.format-question-back:hover,
+.booking-pill-button-soft:hover {
+  background: var(--product-control-soft);
+  box-shadow: var(--product-shadow-secondary), var(--product-inset);
 }
 
 .booking-progress-copy {

@@ -115,7 +115,7 @@ export function AdminScreenHeader({
         {description ? <p>{description}</p> : null}
       </div>
       {actionLabel && onAction ? (
-        <button className="secondary-button" onClick={onAction} type="button">
+        <button className="ghost-button" onClick={onAction} type="button">
           <Sparkles size={17} /> {actionLabel}
         </button>
       ) : null}

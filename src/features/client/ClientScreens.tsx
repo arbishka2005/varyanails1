@@ -54,7 +54,7 @@ export function ClientScreenHeader({
         {description ? <p>{description}</p> : null}
       </div>
       {actionLabel && onAction ? (
-        <button className="secondary-button" onClick={onAction} type="button">
+        <button className="ghost-button" onClick={onAction} type="button">
           <Sparkles size={17} /> {actionLabel}
         </button>
       ) : null}
@@ -127,7 +127,6 @@ export function ClientHomeScreen({
             <>
               <p className="eyebrow">минутку</p>
               <h1>Проверяю заявку</h1>
-              <p>Если запись уже закрыта, здесь можно будет начать новую.</p>
             </>
           ) : !hasRequest ? (
             <>
@@ -213,7 +212,6 @@ export function ClientProfileScreen({
   form,
   telegramUser,
   openBookingFlow,
-  openRequests,
 }: {
   form: FormState;
   telegramUser: TelegramUser | undefined;
@@ -231,8 +229,6 @@ export function ClientProfileScreen({
       <ClientScreenHeader
         eyebrow="данные"
         title="Контакты для записи"
-        actionLabel="Статус"
-        onAction={openRequests}
       />
 
       <section className="client-profile-grid">
@@ -285,7 +281,6 @@ export function ClientStatusPanel({
         <div className="client-status-heading">
           <span className="status new">Проверяю</span>
           <h3>Ищу последнюю заявку</h3>
-          <p>Если она уже закрыта, начнём новую запись.</p>
         </div>
       </div>
     );
@@ -307,13 +302,6 @@ export function ClientStatusPanel({
           <h3>Заявка {lastSubmittedRequestId}</h3>
         </div>
         <ClientRequestTimeline activeIndex={timelineIndex} />
-        {!compact ? (
-          <div className="action-row">
-            <button className="secondary-button" disabled type="button">
-              <History size={17} /> Ждём ответ
-            </button>
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -340,7 +328,7 @@ export function ClientStatusPanel({
             </button>
           ) : null}
           <button
-            className="secondary-button"
+            className="ghost-button"
             onClick={() => {
               if (lastRequestInfo.request.publicToken) {
                 void refreshLastRequest(lastRequestInfo.request.publicToken);

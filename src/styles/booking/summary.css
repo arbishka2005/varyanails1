@@ -4,7 +4,7 @@
   border: 1px solid rgba(255, 255, 255, 0.56);
   border-radius: var(--radius-md);
   padding: 12px;
-  background: var(--gradient-control-subtle);
+  background: var(--product-control-soft);
 }
 
 .summary-progress span {
@@ -24,9 +24,7 @@
   display: grid;
   gap: 18px;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.46), transparent 30%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.62), rgba(248, 244, 240, 0.34) 44%, rgba(236, 240, 245, 0.28) 100%);
+  background: var(--product-surface);
 }
 
 .summary-panel::after {
@@ -36,7 +34,7 @@
   width: 124px;
   height: 124px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(214, 223, 236, 0.34), rgba(214, 223, 236, 0));
+  background: var(--surface-glow);
   pointer-events: none;
 }
 
@@ -64,7 +62,7 @@
   padding: 7px 12px;
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.52);
+  background: var(--product-control-soft);
   color: var(--color-accent-strong);
   font-size: 11px;
   font-weight: var(--font-weight-strong);
@@ -80,7 +78,7 @@
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.56);
   border-radius: 8px;
-  background: var(--gradient-control-subtle);
+  background: var(--product-control-soft);
 }
 
 .summary-story span {

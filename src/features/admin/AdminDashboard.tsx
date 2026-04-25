@@ -178,7 +178,7 @@ export function AdminDashboard({
 
             <div className="action-row">
               <button
-                className="secondary-button"
+                className="ghost-button"
                 onClick={() => {
                   setFocusedAppointmentId(null);
                   onNavigate("schedule");

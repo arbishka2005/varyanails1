@@ -36,7 +36,6 @@ type StepDefinition = {
   id: ClientFormStep;
   label: string;
   title: string;
-  description: string;
   cta: string;
 };
 
@@ -133,14 +132,12 @@ export function ClientRequestForm({
           id: "service",
           label: "Формат",
           title: "Что делаем?",
-          description: canSelectLength ? "Выберите услугу и длину. Остальное подстроим дальше." : "Выберите услугу. Длина здесь не меняется.",
           cta: "Выбрать время",
         },
         {
           id: "time",
           label: "Время",
           title: "Когда удобно?",
-          description: "Выберите свободный слот.",
           cta: needsPhotoStep ? "Дальше" : "Контакты",
         },
         ...(needsPhotoStep
@@ -149,7 +146,6 @@ export function ClientRequestForm({
                 id: "photos",
                 label: "Фото",
                 title: "Добавьте фото",
-                description: "Так мастер быстрее поймёт задачу и ответит точнее.",
                 cta: "Контакты",
               },
             ] satisfies StepDefinition[])
@@ -158,7 +154,6 @@ export function ClientRequestForm({
           id: "contact",
           label: "Контакт",
           title: "Куда ответить?",
-          description: "Оставьте короткий контакт и отправляйте заявку.",
           cta: "Отправить заявку",
         },
       ] satisfies StepDefinition[],
@@ -244,14 +239,6 @@ export function ClientRequestForm({
         : formatQuestion === "visit"
           ? "Вы уже были у мастера?"
           : "Есть пожелание?";
-  const currentFormatQuestionHint =
-    formatQuestion === "service"
-      ? "Нажмите на подходящий вариант."
-      : formatQuestion === "length" && canSelectLength
-        ? "По умолчанию стоит средняя."
-        : formatQuestion === "visit"
-          ? "От этого зависит, нужны ли фото рук."
-          : "Можно пропустить и сразу выбрать время.";
   const primaryActionLabel =
     currentStep === "service" ? (formatQuestion === "details" ? activeStep.cta : "Далее") : activeStep.cta;
 
@@ -450,7 +437,6 @@ export function ClientRequestForm({
               Шаг {stepIndex + 1} из {steps.length}
             </p>
             <h2>{activeStep.title}</h2>
-            <p>{activeStep.description}</p>
           </div>
 
           <div aria-hidden="true" className="booking-progress-track">
@@ -493,7 +479,6 @@ export function ClientRequestForm({
               <div className="format-question-card" key={formatQuestion}>
                 <div className="format-question-copy">
                   <h3>{currentFormatQuestionTitle}</h3>
-                  <p>{currentFormatQuestionHint}</p>
                 </div>
 
                 {formatQuestion === "service" ? (
@@ -584,7 +569,7 @@ export function ClientRequestForm({
 
               {formatQuestionIndex > 0 ? (
                 <button
-                  className="format-question-back"
+                  className="ghost-button format-question-back"
                   onClick={moveToPreviousStep}
                   type="button"
                 >
@@ -757,7 +742,6 @@ export function ClientRequestForm({
             <section className="booking-choice-section">
               <div className="booking-subtitle-row">
                 <span>Куда удобнее ответить</span>
-                <small>Оставьте один основной канал</small>
               </div>
 
               <div className="booking-pill-group booking-pill-group-split">
@@ -803,7 +787,6 @@ export function ClientRequestForm({
             <div className="booking-review-card">
               <div className="booking-subtitle-row">
                 <span>Почти готово</span>
-                <small>Проверять отдельным экраном уже не нужно</small>
               </div>
 
               <div className="info-grid booking-review-grid">
@@ -821,7 +804,7 @@ export function ClientRequestForm({
         <div className={`form-navigation${stepIndex === 0 ? " single-action" : ""}`}>
           {stepIndex > 0 ? (
             <button
-              className="secondary-button"
+              className="ghost-button"
               disabled={isBusy}
               onClick={moveToPreviousStep}
               type="button"

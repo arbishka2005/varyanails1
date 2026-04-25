@@ -1,5 +1,5 @@
 import type { Client } from "../../src/types.js";
-import { getTimestamp } from "../../src/lib/dateTime.js";
+import { getCurrentIsoTimestamp, getTimestamp } from "../../src/lib/dateTime.js";
 import { formatDateTimeRange } from "../../src/lib/displayTime.js";
 import type { Repository } from "../repositories/types.js";
 import {
@@ -53,14 +53,14 @@ export function startAppointmentScheduler(options: {
         if (!appointment.reminder24hSentAt && isWithinWindow(diffMs, 24) && client?.telegramUserId) {
           const sent = await notifyClient(client, buildReminder24hPayload(timeLabel, client.name));
           if (sent) {
-            await repository.markAppointmentReminder(appointment.id, "24h", new Date().toISOString());
+            await repository.markAppointmentReminder(appointment.id, "24h", getCurrentIsoTimestamp());
           }
         }
 
         if (!appointment.reminder3hSentAt && isWithinWindow(diffMs, 3) && client?.telegramUserId) {
           const sent = await notifyClient(client, buildReminder3hPayload(timeLabel));
           if (sent) {
-            await repository.markAppointmentReminder(appointment.id, "3h", new Date().toISOString());
+            await repository.markAppointmentReminder(appointment.id, "3h", getCurrentIsoTimestamp());
           }
         }
 
@@ -74,7 +74,7 @@ export function startAppointmentScheduler(options: {
           const surveyUrl = `${appBaseUrl.replace(/\/$/, "")}/#/survey?appointment=${appointment.publicToken}`;
           const sent = await notifyClient(client, buildSurveyPayload(surveyUrl));
           if (sent) {
-            await repository.markAppointmentSurveySent(appointment.id, new Date().toISOString());
+            await repository.markAppointmentSurveySent(appointment.id, getCurrentIsoTimestamp());
           }
         }
       }

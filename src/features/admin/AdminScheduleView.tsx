@@ -143,10 +143,9 @@ export function AdminScheduleView({
             </span>
             <div>
               <h2>Расписание</h2>
-              <p>Свободные и занятые слоты по дням.</p>
             </div>
             {!isWindowFormOpen ? (
-              <button className="secondary-button calendar-add-button" onClick={() => setIsWindowFormOpen(true)} type="button">
+              <button className="primary-button calendar-add-button" onClick={() => setIsWindowFormOpen(true)} type="button">
                 <Plus size={17} /> Добавить окно
               </button>
             ) : null}
@@ -155,7 +154,7 @@ export function AdminScheduleView({
           {tapMoveAppointmentId ? (
             <div className="calendar-move-mode">
               Выбери свободное окошко для переноса.
-              <button className="secondary-button" onClick={() => setTapMoveAppointmentId(null)} type="button">
+              <button className="ghost-button" onClick={() => setTapMoveAppointmentId(null)} type="button">
                 Отменить
               </button>
             </div>
@@ -189,7 +188,7 @@ export function AdminScheduleView({
               </label>
               <div className="calendar-toolbar-actions">
                 <button
-                  className="secondary-button"
+                  className="ghost-button"
                   disabled={Boolean(busyActionKey)}
                   onClick={() => setIsWindowFormOpen(false)}
                   type="button"
@@ -212,7 +211,6 @@ export function AdminScheduleView({
             {windowsByDate.length === 0 ? (
               <div className="empty-state calendar-empty-state">
                 <strong>Нет окошек на ближайшие дни</strong>
-                <span>Добавьте свободные слоты, чтобы клиентки могли записаться.</span>
               </div>
             ) : (
               <>
@@ -229,6 +227,7 @@ export function AdminScheduleView({
                         ? clients.find((item) => item.id === appointment.clientId)
                         : null;
                       const isFutureWindow = isFutureDateTime(windowItem.startAt);
+                      const canMoveAppointment = appointment ? isFutureDateTime(appointment.startAt) : false;
                       const moveConflictReason = tapMoveAppointmentId
                         ? getMoveConflictReason(windowItem, appointment, isFutureWindow)
                         : "";
@@ -266,21 +265,23 @@ export function AdminScheduleView({
                           <div className="slot-actions">
                             {appointment ? (
                               <div className="slot-action-stack">
-                                <button
-                                  className={
-                                    tapMoveAppointmentId === appointment.id ? "primary-button" : "secondary-button"
-                                  }
-                                  disabled={Boolean(busyActionKey)}
-                                  onClick={(event) => {
-                                    event.stopPropagation();
-                                    setTapMoveAppointmentId((current) =>
-                                      current === appointment.id ? null : appointment.id,
-                                    );
-                                  }}
-                                  type="button"
-                                >
-                                  {tapMoveAppointmentId === appointment.id ? "Выбрано" : "Перенести"}
-                                </button>
+                                {canMoveAppointment ? (
+                                  <button
+                                    className={
+                                      tapMoveAppointmentId === appointment.id ? "primary-button" : "secondary-button"
+                                    }
+                                    disabled={Boolean(busyActionKey)}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setTapMoveAppointmentId((current) =>
+                                        current === appointment.id ? null : appointment.id,
+                                      );
+                                    }}
+                                    type="button"
+                                  >
+                                    {tapMoveAppointmentId === appointment.id ? "Выбрано" : "Перенести"}
+                                  </button>
+                                ) : null}
                                 <button
                                   className="danger-button"
                                   disabled={Boolean(busyActionKey)}
@@ -326,18 +327,22 @@ export function AdminScheduleView({
                               </button>
                             ) : windowItem.status === "blocked" ? (
                               <div className="slot-action-stack">
-                                <button
-                                  className="secondary-button"
-                                  disabled={Boolean(busyActionKey)}
-                                  onClick={() =>
-                                    void runScheduleAction(`window:${windowItem.id}:available`, () =>
-                                      updateWindowStatus(windowItem.id, "available"),
-                                    )
-                                  }
-                                  type="button"
-                                >
-                                  Открыть
-                                </button>
+                                {isFutureWindow ? (
+                                  <button
+                                    className="secondary-button"
+                                    disabled={Boolean(busyActionKey)}
+                                    onClick={() =>
+                                      void runScheduleAction(`window:${windowItem.id}:available`, () =>
+                                        updateWindowStatus(windowItem.id, "available"),
+                                      )
+                                    }
+                                    type="button"
+                                  >
+                                    Открыть
+                                  </button>
+                                ) : (
+                                  <div className="slot-conflict-note">Окошко уже началось.</div>
+                                )}
                                 <button
                                   className="danger-button"
                                   disabled={Boolean(busyActionKey)}
@@ -391,7 +396,7 @@ export function AdminScheduleView({
                 <button className="primary-button" disabled={Boolean(busyActionKey)} onClick={executeMove} type="button">
                   Подтвердить
                 </button>
-                <button className="secondary-button" disabled={Boolean(busyActionKey)} onClick={() => setPendingMove(null)} type="button">
+                <button className="ghost-button" disabled={Boolean(busyActionKey)} onClick={() => setPendingMove(null)} type="button">
                   Отменить
                 </button>
               </div>

@@ -30,7 +30,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: var(--gradient-accent);
+  background: var(--product-accent);
   box-shadow: 0 12px 22px rgba(118, 101, 128, 0.22);
   transition: width var(--motion-soft);
 }
@@ -80,22 +80,6 @@
   white-space: nowrap;
 }
 
-.booking-progress-item.is-active {
-  color: var(--color-ink);
-  border-color: rgba(173, 160, 193, 0.32);
-  background: rgba(255, 255, 255, 0.4);
-}
-
-.booking-progress-item.is-active span,
-.booking-progress-item.is-complete span {
-  color: #fff;
-  background: var(--gradient-accent);
-}
-
-.booking-progress-item.is-complete {
-  color: var(--color-soft);
-}
-
 .booking-stage {
   display: grid;
   gap: 18px;
@@ -116,10 +100,7 @@
   border: 1px solid rgba(255, 255, 255, 0.64);
   border-radius: calc(var(--radius-lg) - 4px);
   padding: 20px;
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.82), rgba(249, 244, 249, 0.56) 48%, rgba(231, 237, 247, 0.38)),
-    radial-gradient(circle at 18% 16%, rgba(203, 123, 155, 0.16), transparent 34%),
-    radial-gradient(circle at 86% 24%, rgba(145, 170, 198, 0.18), transparent 36%);
+  background: var(--product-surface-hero);
   box-shadow: var(--product-glow);
 }
 
@@ -129,9 +110,7 @@
   width: auto;
   height: 38%;
   border-radius: 0;
-  background:
-    linear-gradient(0deg, rgba(184, 178, 200, 0.16), transparent 76%),
-    linear-gradient(104deg, rgba(255, 255, 255, 0.28), transparent 44%, rgba(203, 123, 155, 0.08));
+  background: var(--surface-glow);
   filter: none;
   pointer-events: none;
 }
@@ -166,16 +145,6 @@
   background: rgba(255, 255, 255, 0.72);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
   transition: width var(--motion-soft), background var(--motion-soft), box-shadow var(--motion-soft);
-}
-
-.format-question-dots span.is-active,
-.format-question-dots span.is-complete {
-  background: var(--gradient-accent);
-  box-shadow: 0 10px 18px rgba(112, 97, 122, 0.14);
-}
-
-.format-question-dots span.is-active {
-  width: 24px;
 }
 
 .format-question-card {
@@ -226,10 +195,7 @@
   gap: 8px;
   min-height: 42px;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.52);
   border-radius: 999px;
-  color: var(--color-accent-strong);
-  background: rgba(255, 255, 255, 0.48);
   font-size: 12px;
   font-weight: var(--font-weight-strong);
 }
@@ -267,22 +233,9 @@
   display: grid;
   gap: 7px;
   min-height: 112px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
   border-radius: calc(var(--radius-md) + 4px);
   padding: 16px 18px;
-  color: var(--color-ink);
   text-align: left;
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.82), rgba(249, 244, 249, 0.56) 48%, rgba(232, 237, 247, 0.42)),
-    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.14), transparent 36%),
-    radial-gradient(circle at 90% 16%, rgba(145, 170, 198, 0.16), transparent 42%);
-  box-shadow: var(--product-shadow), var(--product-inset);
-  backdrop-filter: blur(22px) saturate(118%);
-  transition:
-    transform var(--motion-quick),
-    box-shadow var(--motion-quick),
-    border-color var(--motion-quick),
-    background var(--motion-quick);
 }
 
 .service-option-card span {
@@ -305,26 +258,6 @@
   color: var(--color-muted);
   font-size: 13px;
   line-height: 1.45;
-}
-
-.service-option-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--product-shadow-lifted), var(--product-inset);
-}
-
-.service-option-card.active {
-  border-color: rgba(255, 255, 255, 0.8);
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 250, 0.68) 48%, rgba(235, 240, 248, 0.54)),
-    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.2), transparent 36%),
-    radial-gradient(circle at 90% 16%, rgba(145, 170, 198, 0.18), transparent 42%);
-  box-shadow: var(--product-glow);
-}
-
-.service-option-card:nth-child(2n) {
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.8), rgba(250, 242, 239, 0.58) 48%, rgba(239, 232, 225, 0.42)),
-    radial-gradient(circle at top right, rgba(229, 210, 196, 0.16), transparent 36%);
 }
 
 .booking-pill-group {
@@ -352,32 +285,10 @@
   gap: 8px;
   min-height: 52px;
   padding: 12px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.66);
   border-radius: var(--radius-pill);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.56) 52%, rgba(232, 237, 247, 0.44)),
-    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.08), transparent 40%);
-  color: var(--color-ink);
   font-size: 13px;
   font-weight: var(--font-weight-strong);
   text-align: center;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.58);
-  transition: transform var(--motion-quick), box-shadow var(--motion-quick), border-color var(--motion-quick), background var(--motion-quick);
-}
-
-.booking-pill-button:hover,
-.booking-contact-choice:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 16px 28px rgba(112, 97, 122, 0.12);
-}
-
-.booking-pill-button.active,
-.booking-contact-choice.active {
-  border-color: rgba(255, 255, 255, 0.82);
-  background:
-    linear-gradient(145deg, rgba(255, 255, 255, 0.92), rgba(250, 245, 250, 0.7) 52%, rgba(235, 240, 248, 0.58)),
-    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.14), transparent 40%);
-  box-shadow: var(--product-glow);
 }
 
 .booking-pill-button-rich {
@@ -404,7 +315,6 @@
 .booking-pill-button-soft {
   min-height: 46px;
   padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.46);
 }
 
 .booking-contact-choice {
@@ -428,9 +338,7 @@
 .booking-upload-card {
   border: 1px solid rgba(255, 255, 255, 0.64);
   border-radius: calc(var(--radius-md) + 4px);
-  background:
-    linear-gradient(148deg, rgba(255, 255, 255, 0.8), rgba(249, 244, 249, 0.52) 48%, rgba(232, 237, 247, 0.38)),
-    radial-gradient(circle at 14% 12%, rgba(203, 123, 155, 0.1), transparent 36%);
+  background: var(--product-control-soft);
   box-shadow: var(--product-shadow), var(--product-inset);
 }
 
@@ -468,7 +376,7 @@
 }
 
 .booking-inline-card-soft {
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.84), rgba(246, 241, 236, 0.58) 46%, rgba(233, 238, 245, 0.4) 100%);
+  background: var(--product-control);
 }
 
 .booking-selection-note {
@@ -489,7 +397,7 @@
 
 .booking-upload-card.is-filled {
   border-color: rgba(174, 160, 192, 0.52);
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.88), rgba(245, 240, 234, 0.66) 46%, rgba(232, 239, 243, 0.5) 100%);
+  background: var(--product-control);
 }
 
 .booking-upload-card.is-invalid {
@@ -497,7 +405,7 @@
 }
 
 .booking-upload-card.is-optional {
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.72), rgba(248, 244, 240, 0.4) 46%, rgba(236, 240, 245, 0.28) 100%);
+  background: var(--product-control-soft);
 }
 
 .booking-upload-input {

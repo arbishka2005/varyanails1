@@ -212,15 +212,12 @@
     padding: 12px;
     border: 1px solid rgba(255, 255, 255, 0.6);
     border-radius: var(--radius-lg);
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.84), rgba(249, 243, 249, 0.6) 52%, rgba(233, 238, 248, 0.5)),
-      radial-gradient(circle at 12% 0%, rgba(203, 123, 155, 0.16), transparent 38%),
-      radial-gradient(circle at 88% 0%, rgba(145, 170, 198, 0.18), transparent 42%);
-    box-shadow: 0 24px 52px rgba(100, 77, 96, 0.18), var(--product-inset);
-    backdrop-filter: blur(24px) saturate(124%);
+    background: var(--product-surface);
+    box-shadow: 0 22px 50px rgba(243, 154, 107, 0.12), 0 12px 34px rgba(168, 199, 232, 0.1), var(--product-inset);
+    backdrop-filter: blur(24px) saturate(138%);
   }
 
-  .form-navigation :where(.primary-button, .secondary-button) {
+  .form-navigation :where(.primary-button, .secondary-button, .ghost-button) {
     min-height: 46px;
     padding: 10px 14px;
     border-radius: var(--radius-pill);
@@ -228,7 +225,7 @@
     line-height: 1.15;
   }
 
-  .form-navigation :where(.primary-button, .secondary-button) svg {
+  .form-navigation :where(.primary-button, .secondary-button, .ghost-button) svg {
     width: 16px;
     height: 16px;
   }

@@ -82,6 +82,12 @@ ALLOW_DEV_AUTH=false
 
 Фронтенд и API собираются контейнерами, поэтому для обновления сервера больше не нужна отдельная папка `dist`.
 
+Перед коммитом и деплоем локально прогнать release-проверку:
+
+```bash
+npm run release:check
+```
+
 1. Подтянуть код:
 
 ```bash
@@ -100,25 +106,7 @@ docker compose up -d --build
 curl https://vvrnailss.ru/health
 ```
 
-## Деплой на Render
-
-В репозитории уже есть `render.yaml`. Для деплоя:
-
-1. Создай новый Render Blueprint из этого репозитория.
-2. В сервисе `varyanails-api` добавь переменную `TELEGRAM_BOT_TOKEN` вручную.
-3. Убедись, что `MASTER_TELEGRAM_IDS=872647068`.
-4. API сам загрузит стартовые данные при первом запуске (idempotent seed).
-
-5. В @BotFather укажи Web App URL:
-`https://varyanails-web.onrender.com`
-
-После первого старта можно заполнить базу начальными данными:
-
-```bash
-curl -X POST http://127.0.0.1:4000/api/bootstrap
-```
-
-Основной снимок данных:
+Основной снимок данных для диагностики:
 
 ```bash
 curl http://127.0.0.1:4000/api/snapshot

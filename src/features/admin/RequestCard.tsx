@@ -145,7 +145,7 @@ export function RequestCard({
             {cardState.primaryAction.label}
           </button>
         ) : (
-          <button className="secondary-button" disabled={isResolving} onClick={() => setIsExpanded((value) => !value)} type="button">
+          <button className="ghost-button" disabled={isResolving} onClick={() => setIsExpanded((value) => !value)} type="button">
             <MessageCircle size={17} /> Проверить
           </button>
         )}
@@ -213,7 +213,7 @@ export function RequestCard({
           <div className="action-row admin-inbox-secondary-actions">
             {canSaveWindow ? (
               <button
-                className="secondary-button"
+                className="ghost-button"
                 disabled={isResolving || !selectedProposalWindow}
                 onClick={() => {
                   if (!selectedProposalWindow) {
@@ -233,7 +233,7 @@ export function RequestCard({
 
             {cardState.secondaryActions.includes("clarify") ? (
               <button
-                className="secondary-button"
+                className="ghost-button"
                 disabled={isResolving}
                 onClick={() => void runAction(() => updateStatus(request.id, "needs_clarification"))}
                 type="button"
@@ -280,7 +280,7 @@ function getRequestCardState({
   const isClosed = request.status === "confirmed" || request.status === "declined";
   const isLegacy = request.status === "waiting_client";
   const canConfirm =
-    request.status === "new" &&
+    (request.status === "new" || request.status === "waiting_client") &&
     selectedWindow !== null &&
     hasFutureWindow &&
     selectedWindow.status === "offered";

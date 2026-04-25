@@ -24,12 +24,4 @@
   min-width: 48px;
   padding: 8px 12px;
   border-radius: 8px;
-  background: #f0ecf2;
-  color: #2b1d28;
 }
-
-.rating-button.active {
-  background: #2b1d28;
-  color: #fff;
-}
-

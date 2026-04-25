@@ -27,7 +27,7 @@ import {
 import { generatePublicToken } from "../lib/publicTokens.js";
 import { DomainError } from "../lib/domainErrors.js";
 import { makeWindowLabel } from "../../src/lib/displayTime.js";
-import { isFutureDateTime } from "../../src/lib/dateTime.js";
+import { getCurrentIsoTimestamp, isFutureDateTime } from "../../src/lib/dateTime.js";
 import { assertBookingRequestMatchesService } from "../services/bookingValidation.js";
 
 const legacyServiceTuples = new Map([
@@ -502,6 +502,8 @@ export async function deleteService(id: string) {
 }
 
 export async function createTimeWindow(window: TimeWindow) {
+  await cleanupStaleTimeWindows();
+
   if (window.status !== "available") {
     throw new DomainError("Новое окошко можно создать только свободным.");
   }
@@ -635,6 +637,10 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
       return null;
     }
 
+    if (!isFutureDateTime(appointment.startAt)) {
+      throw new DomainError("Перенести можно только будущую запись.", 409);
+    }
+
     const targetResult = await client.query(
       "SELECT * FROM time_windows WHERE id = $1 FOR UPDATE",
       [windowId],
@@ -649,7 +655,7 @@ export async function moveAppointment(appointmentId: string, windowId: string) {
       return { item: appointment, changed: false };
     }
 
-    if (targetWindow.status !== "available") {
+    if (targetWindow.status !== "available" || !isFutureDateTime(targetWindow.startAt)) {
       throw new DomainError("Перенести можно только в свободное окошко.");
     }
 
@@ -690,7 +696,7 @@ export async function updateAppointmentStatus(id: string, status: "cancelled") {
       throw new DomainError(transitionError);
     }
 
-    const cancelledAt = status === "cancelled" ? new Date().toISOString() : null;
+    const cancelledAt = status === "cancelled" ? getCurrentIsoTimestamp() : null;
     const updated = await client.query(
       `UPDATE appointments
         SET status = $2,
@@ -701,11 +707,12 @@ export async function updateAppointmentStatus(id: string, status: "cancelled") {
     );
 
     if (status === "cancelled") {
+      const releasedWindowStatus: TimeWindowStatus = isFutureDateTime(appointment.startAt) ? "available" : "blocked";
       await client.query(
         `UPDATE time_windows
-          SET status = 'available'
+          SET status = $3
         WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
-        [appointment.startAt, appointment.endAt],
+        [appointment.startAt, appointment.endAt, releasedWindowStatus],
       );
       await client.query(
         `UPDATE booking_requests
@@ -733,7 +740,8 @@ export async function deleteAppointment(id: string) {
     let cancelledAppointment = appointment;
 
     if (changed) {
-      const cancelledAt = new Date().toISOString();
+      const cancelledAt = getCurrentIsoTimestamp();
+      const releasedWindowStatus: TimeWindowStatus = isFutureDateTime(appointment.startAt) ? "available" : "blocked";
       await client.query(
         `UPDATE appointments
           SET status = 'cancelled',
@@ -743,9 +751,9 @@ export async function deleteAppointment(id: string) {
       );
       await client.query(
         `UPDATE time_windows
-            SET status = 'available'
+            SET status = $3
           WHERE start_at = $1 AND end_at = $2 AND status = 'reserved'`,
-        [appointment.startAt, appointment.endAt],
+        [appointment.startAt, appointment.endAt, releasedWindowStatus],
       );
       await client.query(
         `UPDATE booking_requests
@@ -1377,6 +1385,10 @@ async function getManualWindowStatusError(
   window: TimeWindow,
   nextStatus: TimeWindowStatus,
 ) {
+  if (nextStatus === "available" && !isFutureDateTime(window.startAt)) {
+    return "Прошедшее окошко нельзя открыть для записи.";
+  }
+
   if (window.status === nextStatus) {
     return "";
   }

@@ -20,9 +20,7 @@
   gap: 14px;
   align-items: end;
   padding: 20px;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.38), transparent 34%),
-    linear-gradient(156deg, rgba(255, 255, 255, 0.64), rgba(247, 242, 237, 0.3) 46%, rgba(235, 239, 244, 0.24) 100%);
+  background: var(--product-surface);
 }
 
 .filter-summary {
@@ -44,9 +42,7 @@
 .client-card {
   display: grid;
   gap: 16px;
-  background:
-    radial-gradient(circle at top right, rgba(255, 255, 255, 0.42), transparent 34%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.6), rgba(255, 246, 250, 0.32));
+  background: var(--product-surface);
 }
 
 .admin-overview-grid-compact {
@@ -64,10 +60,7 @@
   padding: 16px;
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: var(--radius-lg);
-  background:
-    radial-gradient(circle at 14% 10%, rgba(216, 167, 177, 0.16), transparent 32%),
-    radial-gradient(circle at 90% 10%, rgba(174, 190, 209, 0.14), transparent 30%),
-    linear-gradient(145deg, rgba(255, 255, 255, 0.58), rgba(247, 242, 237, 0.24));
+  background: var(--product-control-soft);
   box-shadow:
     0 16px 34px rgba(112, 97, 122, 0.07),
     inset 0 1px 0 rgba(255, 255, 255, 0.34);
@@ -82,33 +75,9 @@
 .client-memory-tags button {
   min-height: 36px;
   padding: 8px 11px;
-  border: 1px solid rgba(255, 255, 255, 0.56);
   border-radius: var(--radius-pill);
-  background:
-    radial-gradient(circle at top left, rgba(255, 255, 255, 0.28), transparent 42%),
-    rgba(255, 255, 255, 0.2);
-  color: var(--color-soft);
   font-size: 12px;
   font-weight: var(--font-weight-strong);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.28);
-  transition:
-    transform var(--motion-soft),
-    background var(--motion-soft),
-    border-color var(--motion-soft),
-    color var(--motion-soft);
-}
-
-.client-memory-tags button:hover {
-  transform: translateY(-1px);
-  border-color: rgba(255, 255, 255, 0.74);
-}
-
-.client-memory-tags button.active {
-  border-color: rgba(196, 138, 150, 0.34);
-  background:
-    radial-gradient(circle at 16% 14%, rgba(255, 255, 255, 0.42), transparent 42%),
-    linear-gradient(135deg, rgba(216, 167, 177, 0.24), rgba(174, 190, 209, 0.18));
-  color: var(--color-text);
 }
 
 .client-history {
@@ -117,7 +86,7 @@
   border: 1px solid rgba(255, 255, 255, 0.56);
   border-radius: var(--radius-md);
   padding: 16px;
-  background: linear-gradient(156deg, rgba(255, 255, 255, 0.5), rgba(247, 242, 237, 0.24) 46%, rgba(235, 239, 244, 0.18) 100%);
+  background: var(--product-control-soft);
 }
 
 .client-history strong {

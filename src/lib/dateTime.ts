@@ -30,6 +30,10 @@ export function getTodayDateKey(now = new Date()) {
   return getLocalDateKey(now);
 }
 
+export function getCurrentIsoTimestamp(now = new Date()) {
+  return now.toISOString();
+}
+
 export function shiftDateKey(dateKey: string, days: number) {
   const [year, month, day] = dateKey.split("-").map(Number);
   const shiftedDate = new Date(Date.UTC(year, month - 1, day + days, 12));

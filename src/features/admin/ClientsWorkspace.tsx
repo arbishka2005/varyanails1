@@ -9,6 +9,7 @@ import {
   getServiceTitle,
   statusLabels,
 } from "../../lib/bookingPresentation";
+import { compareDateTimeDesc } from "../../lib/dateTime";
 import {
   clientMemoryTags,
   getClientMemoryLabels,
@@ -62,14 +63,30 @@ function normalizeContact(value: string | undefined) {
 }
 
 function sortByCreatedAtDesc(left: BookingRequest, right: BookingRequest) {
-  return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+  return compareDateTimeDesc(left.createdAt, right.createdAt);
 }
 
 function sortAppointmentsDesc(
   left: AppSnapshot["appointments"][number],
   right: AppSnapshot["appointments"][number],
 ) {
-  return new Date(right.startAt).getTime() - new Date(left.startAt).getTime();
+  return compareDateTimeDesc(left.startAt, right.startAt);
+}
+
+function sortByLatestActivityDesc(left: ClientRow, right: ClientRow) {
+  if (!left.latestActivityAt && !right.latestActivityAt) {
+    return 0;
+  }
+
+  if (!left.latestActivityAt) {
+    return 1;
+  }
+
+  if (!right.latestActivityAt) {
+    return -1;
+  }
+
+  return compareDateTimeDesc(left.latestActivityAt, right.latestActivityAt);
 }
 
 export function ClientsWorkspace({
@@ -150,7 +167,7 @@ export function ClientsWorkspace({
             hasDuplicateContact,
           };
         })
-        .sort((left, right) => new Date(right.latestActivityAt).getTime() - new Date(left.latestActivityAt).getTime()),
+        .sort(sortByLatestActivityDesc),
     [appointments, clients, duplicateContactKeys, photos, requests],
   );
 
@@ -235,7 +252,7 @@ export function ClientsWorkspace({
             {archivedCount > 0 ? ` · в архиве ${archivedCount}` : ""}
           </span>
           <button
-            className="secondary-button"
+            className="ghost-button"
             disabled={!hasActiveFilters}
             onClick={() => {
               setSearchQuery("");
