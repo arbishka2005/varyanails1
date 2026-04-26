@@ -1,19 +1,23 @@
 .client-bottom-nav {
   position: fixed;
-  left: 50%;
-  bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
   z-index: 30;
-  transform: translateX(-50%);
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
-  width: min(100% - 20px, 720px);
+  width: auto;
+  max-width: 720px;
+  margin: 0 auto;
   padding: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.42);
-  border-radius: 8px;
-  background: var(--product-surface);
-  box-shadow: 0 22px 48px rgba(246, 176, 140, 0.14), 0 12px 32px rgba(168, 199, 232, 0.1);
-  backdrop-filter: blur(18px) saturate(106%);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(20px) saturate(120%);
 }
 
 .client-bottom-nav button {

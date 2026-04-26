@@ -23,6 +23,7 @@ export function SettingsWorkspace({
   deleteService: (id: ServiceKind) => void;
 }) {
   const [serviceDrafts, setServiceDrafts] = useState<Record<string, ServiceEditorState>>({});
+  const [pendingDeleteService, setPendingDeleteService] = useState<ServicePreset | null>(null);
   const [createForm, setCreateForm] = useState<ServiceEditorState>({
     title: "",
     durationMinutes: "120",
@@ -58,6 +59,21 @@ export function SettingsWorkspace({
       Object.fromEntries(services.map((service) => [service.id, toServiceEditorState(service)])),
     );
   }, [services]);
+
+  useEffect(() => {
+    if (!pendingDeleteService) {
+      return undefined;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPendingDeleteService(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [pendingDeleteService]);
 
   const updateDraft = (serviceId: string, patch: Partial<ServiceEditorState>) => {
     const service = services.find((item) => item.id === serviceId);
@@ -149,6 +165,34 @@ export function SettingsWorkspace({
     deleteService(serviceId);
   };
 
+  const requestRemoveService = (service: ServicePreset) => {
+    const usage = serviceUsage.get(service.id);
+    const usedCount = (usage?.requests ?? 0) + (usage?.appointments ?? 0);
+
+    if (services.length <= 1) {
+      setServiceError("Нужна хотя бы одна услуга, чтобы онлайн-запись продолжала работать.");
+      return;
+    }
+
+    if (usedCount > 0) {
+      setServiceError("Эта услуга уже есть в истории. Удаление отключено, чтобы не ломать прошлые записи.");
+      return;
+    }
+
+    setServiceError(null);
+    setServiceWarning(null);
+    setPendingDeleteService(service);
+  };
+
+  const confirmRemoveService = () => {
+    if (!pendingDeleteService) {
+      return;
+    }
+
+    removeService(pendingDeleteService.id);
+    setPendingDeleteService(null);
+  };
+
   return (
     <section className="settings-layout">
       <AdminScreenHeader
@@ -200,7 +244,7 @@ export function SettingsWorkspace({
 
             return (
               <article className="settings-item" key={service.id}>
-                <div className="settings-item-header">
+                <div className="settings-item-header settings-service-header">
                   <div>
                     <h3>{service.title}</h3>
                     <p className="settings-meta">
@@ -209,11 +253,11 @@ export function SettingsWorkspace({
                   </div>
 
                   <button
-                    className="danger-button settings-delete-button"
+                    className="icon-button danger-icon-button settings-delete-button"
                     disabled={services.length <= 1 || usedCount > 0}
-                    aria-label={`Удалить услугу ${service.title}`}
-                    title="Удалить услугу"
-                    onClick={() => removeService(service.id)}
+                    aria-label={`Удалить услугу «${service.title}»`}
+                    title={usedCount > 0 ? "Нельзя удалить: услуга есть в истории" : "Удалить услугу"}
+                    onClick={() => requestRemoveService(service)}
                     type="button"
                   >
                     <Trash2 size={17} />
@@ -241,6 +285,43 @@ export function SettingsWorkspace({
           })}
         </div>
       </div>
+
+      {pendingDeleteService ? (
+        <div
+          className="settings-confirm-backdrop"
+          onMouseDown={(event) => {
+            if (event.currentTarget === event.target) {
+              setPendingDeleteService(null);
+            }
+          }}
+          role="presentation"
+        >
+          <section
+            aria-describedby="delete-service-description"
+            aria-labelledby="delete-service-title"
+            aria-modal="true"
+            className="panel settings-confirm-dialog"
+            role="dialog"
+          >
+            <div className="settings-confirm-icon" aria-hidden="true">
+              <Trash2 size={18} />
+            </div>
+            <div>
+              <p className="eyebrow">Удаление</p>
+              <h3 id="delete-service-title">Удалить услугу «{pendingDeleteService.title}»?</h3>
+              <p id="delete-service-description">Это действие нельзя отменить.</p>
+            </div>
+            <div className="action-row settings-confirm-actions">
+              <button className="ghost-button" onClick={() => setPendingDeleteService(null)} type="button">
+                Отмена
+              </button>
+              <button className="danger-button" onClick={confirmRemoveService} type="button">
+                <Trash2 size={17} /> Удалить
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </section>
   );
 }

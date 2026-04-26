@@ -87,6 +87,7 @@ export function App() {
               lastSubmittedRequestId={client.lastSubmittedRequestId}
               lastRequestLookupStatus={client.lastRequestLookupStatus}
               confirmClientWindow={client.confirmClientWindow}
+              openBookingFlow={() => client.openBookingFlow()}
               refreshLastRequest={client.refreshLastRequest}
             />
           ) : null}

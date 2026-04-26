@@ -13,6 +13,7 @@ import heroMainImage from "../../assets/hero-main.jpg";
 import { Info } from "../../components/Info";
 import { contactLabels, statusLabels } from "../../lib/bookingPresentation";
 import { isFutureDateTime, isPastDateTime } from "../../lib/dateTime";
+import { formatDayLabel } from "../../lib/displayTime";
 import type { ClientSection, TelegramUser } from "../../app/navigation";
 import type { FormState } from "../booking/formState";
 import type { PublicBookingRequest, TimeWindow } from "../../types";
@@ -183,12 +184,14 @@ export function ClientRequestsScreen({
   lastSubmittedRequestId,
   lastRequestLookupStatus,
   confirmClientWindow,
+  openBookingFlow,
   refreshLastRequest,
 }: {
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
   lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
+  openBookingFlow: () => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
 }) {
   return (
@@ -203,6 +206,7 @@ export function ClientRequestsScreen({
         lastSubmittedRequestId={lastSubmittedRequestId}
         lastRequestLookupStatus={lastRequestLookupStatus}
         confirmClientWindow={confirmClientWindow}
+        openBookingFlow={openBookingFlow}
         refreshLastRequest={refreshLastRequest}
       />
     </>
@@ -261,6 +265,7 @@ export function ClientStatusPanel({
   lastSubmittedRequestId,
   lastRequestLookupStatus,
   confirmClientWindow,
+  openBookingFlow,
   refreshLastRequest,
   compact = false,
 }: {
@@ -268,14 +273,16 @@ export function ClientStatusPanel({
   lastSubmittedRequestId: string | null;
   lastRequestLookupStatus: LastRequestLookupStatus;
   confirmClientWindow: (requestToken: string) => void;
+  openBookingFlow: () => void;
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
   compact?: boolean;
 }) {
-  const timelineIndex = getClientTimelineIndex(lastRequestInfo);
-  const request = lastRequestInfo?.request ?? null;
-  const windowLabel = lastRequestInfo?.window?.label ?? request?.customWindowText ?? "";
-  const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
-  const isFinished = isFinishedClientVisit(lastRequestInfo);
+  const currentRequestInfo = isActiveClientRequestInfo(lastRequestInfo) ? lastRequestInfo : null;
+  const completedVisitInfo = isFinishedClientVisit(lastRequestInfo) ? lastRequestInfo : null;
+  const timelineIndex = getClientTimelineIndex(currentRequestInfo);
+  const request = currentRequestInfo?.request ?? null;
+  const windowLabel = currentRequestInfo?.window?.label ?? request?.customWindowText ?? "";
+  const canConfirmWindow = canConfirmClientWindow(request?.status, currentRequestInfo?.window, request?.publicToken);
 
   if (lastRequestLookupStatus === "loading" && !lastRequestInfo) {
     return (
@@ -288,15 +295,39 @@ export function ClientStatusPanel({
     );
   }
 
-  if (!lastRequestInfo && !lastSubmittedRequestId) {
+  if (!currentRequestInfo && !lastSubmittedRequestId) {
     return (
-      <div className="panel client-empty-state-panel">
-        <h3>{lastRequestLookupStatus === "stale" ? "Старая запись уже недоступна" : "Записей пока нет"}</h3>
-      </div>
+      <>
+        <ClientNoActiveVisitPanel
+          title={lastRequestLookupStatus === "stale" ? "Старая запись уже недоступна" : "Активных записей нет"}
+          openBookingFlow={openBookingFlow}
+          compact={compact}
+        />
+        <ClientVisitHistoryPanel lastRequestInfo={completedVisitInfo} />
+      </>
     );
   }
 
-  if (!lastRequestInfo) {
+  if (!currentRequestInfo) {
+    if (completedVisitInfo) {
+      return (
+        <>
+          <ClientNoActiveVisitPanel title="Активных записей нет" openBookingFlow={openBookingFlow} compact={compact} />
+          <ClientVisitHistoryPanel lastRequestInfo={completedVisitInfo} />
+        </>
+      );
+    }
+
+    if (lastRequestInfo) {
+      return (
+        <ClientNoActiveVisitPanel
+          title={lastRequestLookupStatus === "stale" ? "Старая запись уже недоступна" : "Активных записей нет"}
+          openBookingFlow={openBookingFlow}
+          compact={compact}
+        />
+      );
+    }
+
     return (
       <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
         <div className="client-status-heading">
@@ -311,8 +342,8 @@ export function ClientStatusPanel({
   return (
     <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
       <div className="client-status-heading">
-        <span className={`status ${lastRequestInfo.request.status}`}>{isFinished ? "Визит прошёл" : statusLabels[lastRequestInfo.request.status]}</span>
-        <h3>{isFinished ? "Предыдущая запись" : "Запись к мастеру"}</h3>
+        <span className={`status ${currentRequestInfo.request.status}`}>{statusLabels[currentRequestInfo.request.status]}</span>
+        <h3>Запись к мастеру</h3>
         {windowLabel ? <p>{windowLabel}</p> : null}
       </div>
 
@@ -332,8 +363,8 @@ export function ClientStatusPanel({
           <button
             className="ghost-button"
             onClick={() => {
-              if (lastRequestInfo.request.publicToken) {
-                void refreshLastRequest(lastRequestInfo.request.publicToken);
+              if (currentRequestInfo.request.publicToken) {
+                void refreshLastRequest(currentRequestInfo.request.publicToken);
               }
             }}
             type="button"
@@ -343,6 +374,43 @@ export function ClientStatusPanel({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function ClientNoActiveVisitPanel({
+  compact,
+  openBookingFlow,
+  title,
+}: {
+  compact: boolean;
+  openBookingFlow: () => void;
+  title: string;
+}) {
+  return (
+    <div className={`panel client-empty-state-panel${compact ? " compact" : ""}`}>
+      <h3>{title}</h3>
+      {!compact ? (
+        <button className="primary-button" onClick={openBookingFlow} type="button">
+          <Send size={17} /> Записаться снова
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ClientVisitHistoryPanel({ lastRequestInfo }: { lastRequestInfo: PublicBookingRequest | null }) {
+  if (!lastRequestInfo?.window) {
+    return null;
+  }
+
+  return (
+    <section className="panel client-status-history-panel">
+      <p className="eyebrow">История</p>
+      <div className="client-status-history-item">
+        <strong>{formatDayLabel(lastRequestInfo.window.startAt)}</strong>
+        <span>визит прошёл</span>
+      </div>
+    </section>
   );
 }
 
@@ -357,10 +425,6 @@ const clientTimelineSteps = [
 function getClientTimelineIndex(lastRequestInfo: PublicBookingRequest | null) {
   if (!lastRequestInfo) {
     return 1;
-  }
-
-  if (isFinishedClientVisit(lastRequestInfo)) {
-    return 4;
   }
 
   if (lastRequestInfo.request.status === "waiting_client") {
@@ -380,6 +444,24 @@ function isFinishedClientVisit(lastRequestInfo: PublicBookingRequest | null) {
       lastRequestInfo.window &&
       isPastDateTime(lastRequestInfo.window.endAt),
   );
+}
+
+function isActiveClientRequestInfo(lastRequestInfo: PublicBookingRequest | null) {
+  if (!lastRequestInfo || lastRequestInfo.request.status === "declined") {
+    return false;
+  }
+
+  const isPastWindow = Boolean(lastRequestInfo.window && isPastDateTime(lastRequestInfo.window.endAt));
+
+  if (isPastWindow) {
+    return false;
+  }
+
+  if (lastRequestInfo.request.status === "confirmed") {
+    return Boolean(lastRequestInfo.window);
+  }
+
+  return true;
 }
 
 function canConfirmClientWindow(

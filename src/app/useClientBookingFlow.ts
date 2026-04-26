@@ -280,10 +280,11 @@ export function useClientBookingFlow({
     [windows],
   );
   const lastSubmittedRequestId = lastRequestAccess?.requestId ?? lastRequestInfo?.request.id ?? null;
+  const lastRequestWindowIsPast = Boolean(lastRequestInfo?.window && isPastDateTime(lastRequestInfo.window.endAt));
   const hasActiveLastRequest = lastRequestInfo
     ? lastRequestInfo.request.status === "confirmed"
-      ? Boolean(lastRequestInfo.window && !isPastDateTime(lastRequestInfo.window.endAt))
-      : lastRequestInfo.request.status !== "declined"
+      ? Boolean(lastRequestInfo.window && !lastRequestWindowIsPast)
+      : lastRequestInfo.request.status !== "declined" && !lastRequestWindowIsPast
     : false;
   const hasClientRequest = Boolean(hasActiveLastRequest || (lastRequestAccess && !lastRequestInfo));
 

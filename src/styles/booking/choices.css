@@ -476,10 +476,6 @@
   font-size: 12px;
 }
 
-.booking-upload-card .photo-thumb-meta small {
-  display: none;
-}
-
 .booking-review-card {
   display: grid;
   gap: 14px;

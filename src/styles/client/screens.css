@@ -228,6 +228,28 @@
   color: var(--color-muted);
 }
 
+.client-status-history-panel {
+  display: grid;
+  gap: 12px;
+  padding: 20px 22px;
+}
+
+.client-status-history-panel .eyebrow {
+  margin: 0;
+}
+
+.client-status-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-muted);
+}
+
+.client-status-history-item strong {
+  color: var(--color-text);
+}
+
 .client-request-timeline {
   position: relative;
   display: grid;

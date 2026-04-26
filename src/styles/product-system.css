@@ -863,6 +863,26 @@ textarea:focus {
   box-shadow: var(--product-glow);
 }
 
+.danger-icon-button.icon-button {
+  color: var(--color-danger);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0.16)),
+    var(--color-danger-soft);
+  box-shadow:
+    0 12px 28px rgba(219, 121, 145, 0.12),
+    var(--product-inset);
+}
+
+.danger-icon-button.icon-button:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.72);
+  background: var(--product-danger);
+  box-shadow:
+    0 16px 34px rgba(219, 121, 145, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    inset 0 -16px 24px rgba(92, 51, 88, 0.1);
+}
+
 .action-button,
 .admin-inbox-card-summary,
 .admin-preview-item,
@@ -1018,10 +1038,26 @@ button.admin-preview-item:focus-visible,
 
 .client-bottom-nav,
 .admin-bottom-nav {
-  border: 1px solid rgba(255, 255, 255, 0.62);
-  background: var(--product-surface);
-  box-shadow: 0 22px 50px rgba(243, 154, 107, 0.12), 0 12px 34px rgba(168, 199, 232, 0.1), var(--product-inset);
-  backdrop-filter: blur(24px) saturate(136%);
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom) + 12px);
+  width: auto;
+  margin: 0 auto;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.35);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.05);
+  backdrop-filter: blur(20px) saturate(120%);
+}
+
+.client-bottom-nav {
+  max-width: 720px;
+}
+
+.admin-bottom-nav {
+  max-width: 760px;
 }
 
 .client-bottom-nav button,

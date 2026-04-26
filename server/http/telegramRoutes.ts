@@ -43,7 +43,7 @@ telegramRoutes.post("/api/telegram/webhook", async (request, response) => {
 
     await sendTelegramMessage(
       String(chatId),
-      ["Кабинет мастера открыт.", "", "Нажмите кнопку ниже, чтобы посмотреть записи, окошки и клиенток."].join("\n"),
+      ["Кабинет мастера", "", "Кнопка ниже откроет записи, окошки и клиенток."].join("\n"),
       buildLaunchReplyMarkup("admin"),
     );
     response.json({ ok: true });

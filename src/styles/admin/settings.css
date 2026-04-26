@@ -34,14 +34,23 @@
 }
 
 .settings-item-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   justify-content: space-between;
-  flex-wrap: wrap;
   gap: 12px;
 }
 
+.settings-item-header > div {
+  min-width: 0;
+}
+
+.settings-service-header {
+  align-items: start;
+}
+
 .settings-item h3 {
+  margin-right: 4px;
   font-size: 22px;
 }
 
@@ -77,14 +86,67 @@
   gap: 10px;
 }
 
-.settings-delete-button {
+.settings-delete-button.icon-button {
   flex: 0 0 auto;
-  width: 46px;
-  min-width: 46px;
-  height: 46px;
-  min-height: 46px;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  min-height: 42px;
   padding: 0;
   border-radius: var(--radius-pill);
+}
+
+.settings-confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 50% 35%, rgba(255, 255, 255, 0.24), transparent 48%),
+    rgba(47, 42, 45, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.settings-confirm-dialog {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 16px;
+  width: min(100%, 420px);
+  padding: 20px;
+}
+
+.settings-confirm-dialog h3,
+.settings-confirm-dialog p {
+  margin: 0;
+}
+
+.settings-confirm-dialog h3 {
+  margin-top: 6px;
+  line-height: 1.2;
+}
+
+.settings-confirm-dialog p:not(.eyebrow) {
+  margin-top: 8px;
+  color: var(--color-muted);
+}
+
+.settings-confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(255, 255, 255, 0.62);
+  border-radius: var(--radius-pill);
+  color: var(--color-danger);
+  background: var(--color-danger-soft);
+  box-shadow: var(--product-inset);
+}
+
+.settings-confirm-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
 }
 
 .settings-meta,
