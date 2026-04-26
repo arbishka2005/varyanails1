@@ -7,7 +7,7 @@
 
 export function buildReminder24hPayload(timeLabel: string, clientName?: string): NotificationPayload {
   return {
-    title: "Завтра у вас запись",
+    title: "Ты записана завтра 💅",
     accent: "\uD83D\uDC85",
     lines: [
       "Напоминаю о вашей записи на ногти.",
@@ -20,7 +20,7 @@ export function buildReminder24hPayload(timeLabel: string, clientName?: string):
 
 export function buildReminder3hPayload(timeLabel: string): NotificationPayload {
   return {
-    title: "Скоро встречаемся",
+    title: "Скоро встречаемся ✨",
     accent: "\uD83D\uDCC5",
     lines: [
       "До записи осталось около 3 часов.",

@@ -41,8 +41,80 @@
 
 .client-card {
   display: grid;
-  gap: 16px;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
   background: var(--product-surface);
+}
+
+.client-card-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: auto;
+  padding: 18px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  text-align: left;
+}
+
+.client-card-summary:hover,
+.client-card-summary:focus-visible {
+  background: rgba(255, 255, 255, 0.24);
+  transform: none;
+}
+
+.client-card-summary h3 {
+  margin: 10px 0 4px;
+}
+
+.client-card-summary small {
+  color: var(--color-muted);
+  font-weight: var(--font-weight-medium);
+  overflow-wrap: anywhere;
+}
+
+.client-card-summary-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: var(--font-weight-strong);
+}
+
+.client-card-summary-meta span {
+  padding: 7px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: var(--radius-pill);
+  background: var(--product-control-soft);
+}
+
+.client-card-chevron {
+  color: var(--color-accent-strong);
+  transition: transform var(--motion-soft);
+}
+
+.client-card.is-expanded .client-card-chevron {
+  transform: rotate(180deg);
+}
+
+.client-card-details {
+  display: grid;
+  gap: 16px;
+  padding: 0 18px 18px;
+}
+
+.client-card-expanded-actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .admin-overview-grid-compact {
@@ -172,5 +244,16 @@
 .section-inline-title span {
   color: var(--color-muted);
   font-size: 13px;
+}
+
+@media (max-width: 560px) {
+  .client-card-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .client-card-summary-meta,
+  .client-card-expanded-actions {
+    justify-content: flex-start;
+  }
 }
 

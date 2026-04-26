@@ -11,7 +11,7 @@ function getAdminNavItems(newRequestsCount: number) {
     },
     {
       section: "requests" as const,
-      label: "Заявки",
+      label: "Входящие",
       icon: <ClipboardList size={18} />,
       badge: newRequestsCount,
     },

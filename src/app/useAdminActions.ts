@@ -38,7 +38,7 @@ export function useAdminActions({
       await refreshSnapshot();
       return true;
     } catch (error) {
-      setApiError(getApiErrorMessage(error, "Не удалось обновить статус заявки"));
+      setApiError(getApiErrorMessage(error, "Не удалось обновить запись"));
       await refreshSnapshot();
       return false;
     }
@@ -263,7 +263,7 @@ export function useAdminActions({
       await refreshSnapshot();
       return true;
     } catch (error) {
-      setApiError(getApiErrorMessage(error, "Не удалось подтвердить заявку"));
+      setApiError(getApiErrorMessage(error, "Не удалось подтвердить запись"));
       await refreshSnapshot();
       return false;
     }

@@ -118,7 +118,7 @@ export function SettingsWorkspace({
     setServiceWarning(
       parsed.warning ??
         (isUsed && durationChanged
-          ? "Длительность изменится для новых заявок. Старые заявки и записи сохраняют свою длительность."
+          ? "Длительность изменится для новых записей. История останется как была."
           : null),
     );
     updateService(serviceId, parsed.service);
@@ -141,7 +141,7 @@ export function SettingsWorkspace({
     }
 
     if (usedCount > 0) {
-      setServiceError("Эта услуга уже есть в истории. Удаление отключено, чтобы не ломать заявки и записи.");
+      setServiceError("Эта услуга уже есть в истории. Удаление отключено, чтобы не ломать прошлые записи.");
       return;
     }
 
@@ -204,17 +204,19 @@ export function SettingsWorkspace({
                   <div>
                     <h3>{service.title}</h3>
                     <p className="settings-meta">
-                      ID: {service.id} · {usedCount > 0 ? `в истории ${usedCount}` : "ещё не использовалась"}
+                      {usedCount > 0 ? `В истории ${usedCount}` : "Ещё не использовалась"}
                     </p>
                   </div>
 
                   <button
                     className="danger-button settings-delete-button"
                     disabled={services.length <= 1 || usedCount > 0}
+                    aria-label={`Удалить услугу ${service.title}`}
+                    title="Удалить услугу"
                     onClick={() => removeService(service.id)}
                     type="button"
                   >
-                    <Trash2 size={16} /> Удалить
+                    <Trash2 size={17} />
                   </button>
                 </div>
 

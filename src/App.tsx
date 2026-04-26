@@ -73,6 +73,7 @@ export function App() {
                 setFormatQuestion={client.setBookingDraftFormatQuestion}
                 submitRequest={client.submitRequest}
                 uploadPhoto={client.uploadPhoto}
+                removePhoto={client.removePhoto}
                 uploading={client.uploading}
                 uploadError={client.uploadError}
                 isSubmitting={client.isSubmittingRequest}
@@ -114,14 +115,15 @@ export function App() {
           {adminAccessDenied ? (
             <div className="panel notice-panel">
               Админ-панель доступна только в Telegram Mini App для аккаунта мастера. Откройте приложение через кнопку в боте или проверьте, что ваш Telegram ID добавлен в список мастеров.
-              <div className="notice-details">
+              <details className="notice-details">
+                <summary>Детали для настройки доступа</summary>
                 <div>Telegram WebApp: {telegram.isTelegramMiniApp ? "yes" : "no"}</div>
                 <div>InitData length: {telegram.telegramInitData.length}</div>
                 <div>User ID: {telegram.telegramUser?.id ?? "n/a"}</div>
                 <div>Start param: {telegram.startParam || "n/a"}</div>
                 <div>Path: {telegram.locationPath || "/"}</div>
                 <div>Hash: {telegram.locationHash || "n/a"}</div>
-              </div>
+              </details>
               <div className="action-row">
                 <button className="secondary-button" onClick={() => navigateTo("/")} type="button">
                   Перейти к клиентской части

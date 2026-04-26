@@ -12,7 +12,7 @@ import {
 import heroMainImage from "../../assets/hero-main.jpg";
 import { Info } from "../../components/Info";
 import { contactLabels, statusLabels } from "../../lib/bookingPresentation";
-import { isFutureDateTime } from "../../lib/dateTime";
+import { isFutureDateTime, isPastDateTime } from "../../lib/dateTime";
 import type { ClientSection, TelegramUser } from "../../app/navigation";
 import type { FormState } from "../booking/formState";
 import type { PublicBookingRequest, TimeWindow } from "../../types";
@@ -83,11 +83,12 @@ export function ClientHomeScreen({
   const isCheckingStoredRequest = hasRequest && !request && lastRequestLookupStatus === "loading";
   const isStaleStoredRequest = !hasRequest && lastRequestLookupStatus === "stale";
   const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
-  const isConfirmed = request?.status === "confirmed";
+  const isFinished = isFinishedClientVisit(lastRequestInfo);
+  const isConfirmed = request?.status === "confirmed" && !isFinished;
   const statusLabel = request
     ? statusLabels[request.status]
     : isCheckingStoredRequest
-      ? "Проверяю заявку"
+      ? "Проверяю запись"
       : "Запись";
   const windowLabel =
     lastRequestInfo?.window?.label ?? request?.customWindowText ?? (isConfirmed ? "Время уточняется" : "");
@@ -126,13 +127,13 @@ export function ClientHomeScreen({
           {isCheckingStoredRequest ? (
             <>
               <p className="eyebrow">минутку</p>
-              <h1>Проверяю заявку</h1>
+              <h1>Проверяю запись</h1>
             </>
           ) : !hasRequest ? (
             <>
               <p className="eyebrow">vvrnailss</p>
               <h1>Привет, хочешь записаться?</h1>
-              {isStaleStoredRequest ? <p>Старая ссылка на заявку уже не актуальна.</p> : null}
+              {isStaleStoredRequest ? <p>Старая ссылка на запись уже не актуальна.</p> : null}
             </>
           ) : canConfirmWindow ? (
             <>
@@ -144,13 +145,13 @@ export function ClientHomeScreen({
             <>
               <p className="eyebrow">ближайший визит</p>
               <h1>{windowLabel}</h1>
-              <p>{request?.desiredResult || "Запись подтверждена"}</p>
+              <p>{request?.desiredResult || "Вы записаны"}</p>
             </>
           ) : (
             <>
-              <p className="eyebrow">текущая заявка</p>
+              <p className="eyebrow">текущая запись</p>
               <h1>{statusLabel}</h1>
-              <p>{windowLabel || `Заявка ${lastSubmittedRequestId ?? request?.id ?? ""}`.trim()}</p>
+              <p>{windowLabel || (lastSubmittedRequestId || request?.id ? "Вы отправили заявку" : "")}</p>
             </>
           )}
         </div>
@@ -162,8 +163,8 @@ export function ClientHomeScreen({
               <strong>Подтверждена</strong>
             </div>
             <div>
-              <span>Заявка</span>
-              <strong>{request?.id ?? lastSubmittedRequestId ?? "-"}</strong>
+              <span>Запись</span>
+              <strong>Подтверждена</strong>
             </div>
           </div>
         ) : null}
@@ -194,7 +195,7 @@ export function ClientRequestsScreen({
     <>
       <ClientScreenHeader
         eyebrow="мои записи"
-        title="Статус заявки"
+        title="Моя запись"
       />
 
       <ClientStatusPanel
@@ -274,13 +275,14 @@ export function ClientStatusPanel({
   const request = lastRequestInfo?.request ?? null;
   const windowLabel = lastRequestInfo?.window?.label ?? request?.customWindowText ?? "";
   const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
+  const isFinished = isFinishedClientVisit(lastRequestInfo);
 
   if (lastRequestLookupStatus === "loading" && !lastRequestInfo) {
     return (
       <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
         <div className="client-status-heading">
           <span className="status new">Проверяю</span>
-          <h3>Ищу последнюю заявку</h3>
+          <h3>Ищу последнюю запись</h3>
         </div>
       </div>
     );
@@ -289,7 +291,7 @@ export function ClientStatusPanel({
   if (!lastRequestInfo && !lastSubmittedRequestId) {
     return (
       <div className="panel client-empty-state-panel">
-        <h3>{lastRequestLookupStatus === "stale" ? "Старая заявка уже недоступна" : "Записей пока нет"}</h3>
+        <h3>{lastRequestLookupStatus === "stale" ? "Старая запись уже недоступна" : "Записей пока нет"}</h3>
       </div>
     );
   }
@@ -298,8 +300,8 @@ export function ClientStatusPanel({
     return (
       <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
         <div className="client-status-heading">
-          <span className="status new">Заявка отправлена</span>
-          <h3>Заявка {lastSubmittedRequestId}</h3>
+          <span className="status new">Вы отправили заявку</span>
+          <h3>{lastSubmittedRequestId ? "Мастер скоро ответит" : "Вы отправили заявку"}</h3>
         </div>
         <ClientRequestTimeline activeIndex={timelineIndex} />
       </div>
@@ -309,8 +311,8 @@ export function ClientStatusPanel({
   return (
     <div className={`panel notice-panel booking-celebration client-status-panel${compact ? " compact" : ""}`}>
       <div className="client-status-heading">
-        <span className={`status ${lastRequestInfo.request.status}`}>{statusLabels[lastRequestInfo.request.status]}</span>
-        <h3>Заявка {lastRequestInfo.request.id}</h3>
+        <span className={`status ${lastRequestInfo.request.status}`}>{isFinished ? "Визит прошёл" : statusLabels[lastRequestInfo.request.status]}</span>
+        <h3>{isFinished ? "Предыдущая запись" : "Запись к мастеру"}</h3>
         {windowLabel ? <p>{windowLabel}</p> : null}
       </div>
 
@@ -345,16 +347,20 @@ export function ClientStatusPanel({
 }
 
 const clientTimelineSteps = [
-  "Заявка отправлена",
-  "Мастер смотрит",
+  "Вы отправили заявку",
+  "Мастер скоро ответит",
   "Предложено время",
-  "Подтверждено",
+  "Вы записаны",
   "Визит завершён",
 ] as const;
 
 function getClientTimelineIndex(lastRequestInfo: PublicBookingRequest | null) {
   if (!lastRequestInfo) {
     return 1;
+  }
+
+  if (isFinishedClientVisit(lastRequestInfo)) {
+    return 4;
   }
 
   if (lastRequestInfo.request.status === "waiting_client") {
@@ -366,6 +372,14 @@ function getClientTimelineIndex(lastRequestInfo: PublicBookingRequest | null) {
   }
 
   return 1;
+}
+
+function isFinishedClientVisit(lastRequestInfo: PublicBookingRequest | null) {
+  return Boolean(
+    lastRequestInfo?.request.status === "confirmed" &&
+      lastRequestInfo.window &&
+      isPastDateTime(lastRequestInfo.window.endAt),
+  );
 }
 
 function canConfirmClientWindow(

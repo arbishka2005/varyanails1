@@ -12,7 +12,7 @@ import {
   type FormState,
 } from "../features/booking/formState";
 import { lengthLabels } from "../lib/bookingPresentation";
-import { getCurrentIsoTimestamp, isFutureDateTime } from "../lib/dateTime";
+import { getCurrentIsoTimestamp, isFutureDateTime, isPastDateTime } from "../lib/dateTime";
 import { readFileAsDataUrl } from "../lib/file";
 import { toStoredPhone } from "../lib/phone";
 import { allowsLengthSelection, getLengthDurationBoost, normalizeLengthForService } from "../lib/services";
@@ -89,8 +89,14 @@ function normalizeDraftForm(value: unknown): FormState | null {
       : initialForm.optionIds,
     length,
     desiredResult: typeof value.desiredResult === "string" ? value.desiredResult : initialForm.desiredResult,
-    handPhoto: isPhotoAttachmentDraft(value.handPhoto) ? value.handPhoto : null,
-    referencePhoto: isPhotoAttachmentDraft(value.referencePhoto) ? value.referencePhoto : null,
+    handPhotos: [
+      ...(Array.isArray(value.handPhotos) ? value.handPhotos.filter(isPhotoAttachmentDraft) : []),
+      ...(isPhotoAttachmentDraft(value.handPhoto) ? [value.handPhoto] : []),
+    ],
+    referencePhotos: [
+      ...(Array.isArray(value.referencePhotos) ? value.referencePhotos.filter(isPhotoAttachmentDraft) : []),
+      ...(isPhotoAttachmentDraft(value.referencePhoto) ? [value.referencePhoto] : []),
+    ],
     preferredWindowId:
       typeof value.preferredWindowId === "string" && value.preferredWindowId
         ? value.preferredWindowId
@@ -241,7 +247,7 @@ export function useClientBookingFlow({
   const [uploadError, setUploadError] = useState({ hands: "", reference: "" });
   const submitInFlightRef = useRef(false);
   const clientConfirmInFlightRef = useRef(new Set<string>());
-  const uploadSequenceRef = useRef<Record<"hands" | "reference", number>>({ hands: 0, reference: 0 });
+  const uploadInFlightCountRef = useRef<Record<"hands" | "reference", number>>({ hands: 0, reference: 0 });
   const [isSubmittingRequest, setIsSubmittingRequest] = useState(false);
 
   const selectedService = useMemo(
@@ -274,7 +280,12 @@ export function useClientBookingFlow({
     [windows],
   );
   const lastSubmittedRequestId = lastRequestAccess?.requestId ?? lastRequestInfo?.request.id ?? null;
-  const hasClientRequest = Boolean(lastRequestInfo || lastRequestAccess);
+  const hasActiveLastRequest = lastRequestInfo
+    ? lastRequestInfo.request.status === "confirmed"
+      ? Boolean(lastRequestInfo.window && !isPastDateTime(lastRequestInfo.window.endAt))
+      : lastRequestInfo.request.status !== "declined"
+    : false;
+  const hasClientRequest = Boolean(hasActiveLastRequest || (lastRequestAccess && !lastRequestInfo));
 
   const setBookingDraftStep = (value: ClientFormStep | ((current: ClientFormStep) => ClientFormStep)) => {
     setBookingDraftUi((current) => ({
@@ -316,7 +327,7 @@ export function useClientBookingFlow({
       }
 
       setLastRequestLookupStatus("idle");
-      setApiError(getApiErrorMessage(error, "Не удалось обновить статус заявки"));
+      setApiError(getApiErrorMessage(error, "Не удалось обновить запись"));
       return null;
     }
   };
@@ -460,9 +471,7 @@ export function useClientBookingFlow({
       contactHandle: form.contactHandle.trim(),
       firstVisit: form.isNewClient,
     };
-    const newPhotos: PhotoAttachment[] = [form.handPhoto, form.referencePhoto].filter(
-      (photo): photo is PhotoAttachment => Boolean(photo),
-    );
+    const newPhotos: PhotoAttachment[] = [...form.handPhotos, ...form.referencePhotos];
     const request: BookingRequest = {
       id: makeClientScopedId("REQ"),
       clientId: client.id,
@@ -491,7 +500,7 @@ export function useClientBookingFlow({
       navigateToClientSection("requests");
       return true;
     } catch (error) {
-      const message = getApiErrorMessage(error, "Не удалось отправить заявку");
+      const message = getApiErrorMessage(error, "Не удалось отправить запись");
       const refreshedConfig = await refreshPublicConfig();
       const refreshedWindows = refreshedConfig?.windows ?? [];
       const stillAvailable = refreshedWindows.some(
@@ -533,10 +542,8 @@ export function useClientBookingFlow({
 
   const uploadPhoto = async (kind: PhotoAttachment["kind"], file: File) => {
     const key = kind === "hands" ? "hands" : "reference";
-    const uploadId = uploadSequenceRef.current[key] + 1;
-    uploadSequenceRef.current[key] = uploadId;
-    const isLatestUpload = () => uploadSequenceRef.current[key] === uploadId;
 
+    uploadInFlightCountRef.current[key] += 1;
     setUploading((current) => ({ ...current, [key]: true }));
     setUploadError((current) => ({ ...current, [key]: "" }));
 
@@ -547,29 +554,37 @@ export function useClientBookingFlow({
         fileName: file.name,
         dataUrl,
       });
-      if (!isLatestUpload()) {
-        return null;
-      }
 
       setForm((current) => ({
         ...current,
-        handPhoto: kind === "hands" ? uploaded : current.handPhoto,
-        referencePhoto: kind === "reference" ? uploaded : current.referencePhoto,
+        handPhotos:
+          kind === "hands" && !current.handPhotos.some((photo) => photo.id === uploaded.id)
+            ? [...current.handPhotos, uploaded]
+            : current.handPhotos,
+        referencePhotos:
+          kind === "reference" && !current.referencePhotos.some((photo) => photo.id === uploaded.id)
+            ? [...current.referencePhotos, uploaded]
+            : current.referencePhotos,
       }));
       return uploaded;
     } catch (error) {
-      if (!isLatestUpload()) {
-        return null;
-      }
-
       const message = getApiErrorMessage(error, "Не удалось загрузить фото");
       setUploadError((current) => ({ ...current, [key]: message }));
       return null;
     } finally {
-      if (isLatestUpload()) {
+      uploadInFlightCountRef.current[key] = Math.max(0, uploadInFlightCountRef.current[key] - 1);
+      if (uploadInFlightCountRef.current[key] === 0) {
         setUploading((current) => ({ ...current, [key]: false }));
       }
     }
+  };
+
+  const removePhoto = (photoId: string) => {
+    setForm((current) => ({
+      ...current,
+      handPhotos: current.handPhotos.filter((photo) => photo.id !== photoId),
+      referencePhotos: current.referencePhotos.filter((photo) => photo.id !== photoId),
+    }));
   };
 
   const openBookingFlow = (serviceId?: ServiceKind) => {
@@ -602,5 +617,6 @@ export function useClientBookingFlow({
     confirmClientWindow,
     refreshLastRequest,
     uploadPhoto,
+    removePhoto,
   };
 }

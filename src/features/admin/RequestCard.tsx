@@ -256,7 +256,7 @@ export function RequestCard({
         </div>
       ) : null}
 
-      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+      <PhotoLightbox photo={selectedPhoto} photos={photos} onSelect={setSelectedPhoto} onClose={() => setSelectedPhoto(null)} />
     </article>
   );
 }
@@ -300,12 +300,12 @@ function getRequestCardState({
   let isProblem = false;
 
   if (isLegacy) {
-    note = "Legacy-заявка. Сначала проверьте вручную.";
+    note = "Старая запись из прошлого сценария. Сначала проверьте вручную.";
   } else if (request.status === "confirmed" && !linkedAppointment) {
-    note = "Заявка подтверждена, но связанной записи нет.";
+    note = "Запись подтверждена, но визит не найден.";
     isProblem = true;
   } else if (request.status === "confirmed" && (!selectedWindow || selectedWindow.status !== "reserved")) {
-    note = "Подтверждённая заявка выглядит несогласованной с окошком.";
+    note = "Подтверждённая запись не совпадает с окошком.";
     isProblem = true;
   } else if (!selectedWindow && request.status !== "needs_clarification") {
     note = "Валидное окно не выбрано.";
@@ -397,18 +397,19 @@ function getRequestTimeLabel(request: BookingRequest, selectedWindow: TimeWindow
 }
 
 function getPhotoSummary(photos: PhotoAttachment[], service: ServicePreset | null) {
-  const handPhoto = photos.some((photo) => photo.kind === "hands");
-  const referencePhoto = photos.some((photo) => photo.kind === "reference");
+  const handPhotoCount = photos.filter((photo) => photo.kind === "hands").length;
+  const referencePhotoCount = photos.filter((photo) => photo.kind === "reference").length;
+  const totalPhotoCount = handPhotoCount + referencePhotoCount;
   const requiredCount = Number(Boolean(service?.requiresHandPhoto)) + Number(Boolean(service?.requiresReference));
-  const presentCount = Number(handPhoto) + Number(referencePhoto);
+  const presentTypeCount = Number(handPhotoCount > 0) + Number(referencePhotoCount > 0);
 
-  if (presentCount === 0) {
+  if (totalPhotoCount === 0) {
     return requiredCount > 0 ? "Фото нет" : "Фото не приложены";
   }
 
-  if (requiredCount > 0 && presentCount < requiredCount) {
+  if (requiredCount > 0 && presentTypeCount < requiredCount) {
     return "Фото не все";
   }
 
-  return presentCount > 1 ? "Фото и референс есть" : "Есть одно фото";
+  return `${totalPhotoCount} фото`;
 }

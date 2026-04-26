@@ -1,5 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Archive, CalendarClock, History, MessageCircle, Phone } from "lucide-react";
+import { AlertTriangle, Archive, CalendarClock, ChevronDown, History, MessageCircle, Phone } from "lucide-react";
 import { Info } from "../../components/Info";
 import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import {
@@ -109,6 +109,8 @@ export function ClientsWorkspace({
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ClientStatusFilter>("all");
   const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
+  const [lightboxPhotos, setLightboxPhotos] = useState<PhotoAttachment[]>([]);
+  const [expandedClientId, setExpandedClientId] = useState<string | null>(null);
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase("ru-RU");
 
   const duplicateContactKeys = useMemo(() => {
@@ -208,7 +210,7 @@ export function ClientsWorkspace({
       ? "\n\nУ клиентки есть активная запись. Запись останется в расписании, но профиль уйдёт из рабочей базы."
       : "";
     const confirmed = window.confirm(
-      `Архивировать клиентку ${safeText(row.client.name, "без имени")}? История заявок, записей и фото сохранится.${activeWarning}`,
+      `Архивировать клиентку ${safeText(row.client.name, "без имени")}? История обращений, записей и фото сохранится.${activeWarning}`,
     );
 
     if (!confirmed) {
@@ -236,7 +238,7 @@ export function ClientsWorkspace({
           />
         </label>
         <label>
-          Последний статус заявки
+          Последнее состояние
           <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as ClientStatusFilter)}>
             <option value="all">Все активные</option>
             {Object.entries(statusLabels).map(([status, label]) => (
@@ -273,99 +275,130 @@ export function ClientsWorkspace({
             const { client, clientRequests, clientAppointments, clientPhotos, latestRequest, memory } = row;
             const displayName = safeText(client.name, "Без имени");
             const contactHandle = safeText(client.contactHandle, "не указан");
+            const isExpanded = expandedClientId === client.id;
 
             return (
-              <article className="panel client-card" key={client.id}>
-                <div className="card-header">
+              <article className={`panel client-card${isExpanded ? " is-expanded" : ""}`} key={client.id}>
+                <button
+                  aria-expanded={isExpanded}
+                  className="client-card-summary"
+                  onClick={() => setExpandedClientId((current) => (current === client.id ? null : client.id))}
+                  type="button"
+                >
                   <div>
                     <span className="status">{client.firstVisit ? "Первый визит" : "Постоянная клиентка"}</span>
                     <h3>{displayName}</h3>
+                    <small>{contactLabels[client.preferredContactChannel]} {contactHandle}</small>
                   </div>
-                  <div className="client-card-actions">
-                    <span className="request-id">{client.id}</span>
-                    <button className="danger-button" onClick={() => handleArchiveClient(row)} type="button">
-                      <Archive size={16} /> Архивировать
-                    </button>
+                  <div className="client-card-summary-meta">
+                    <span>{clientAppointments.length} записей</span>
+                    <span>{clientRequests.length} обращений</span>
+                    {row.hasDuplicateContact ? <AlertTriangle size={16} aria-label="Возможный дубль" /> : null}
+                    <ChevronDown className="client-card-chevron" size={18} aria-hidden="true" />
                   </div>
-                </div>
+                </button>
 
-                {row.hasDuplicateContact ? (
-                  <div className="notice-inline">
-                    <AlertTriangle size={16} /> Похоже, есть дубль по телефону или нику.
+                {isExpanded ? (
+                  <div className="client-card-details">
+                    <div className="client-card-expanded-actions">
+                      <button className="danger-button" onClick={() => handleArchiveClient(row)} type="button">
+                        <Archive size={16} /> Архивировать
+                      </button>
+                    </div>
+
+                    {row.hasDuplicateContact ? (
+                      <div className="notice-inline">
+                        <AlertTriangle size={16} /> Похоже, есть дубль по телефону или нику.
+                      </div>
+                    ) : null}
+
+                    <div className="info-grid">
+                      <Info icon={<Phone size={16} />} label="Телефон" value={safeText(client.phone, "не указан")} />
+                      <Info
+                        icon={<MessageCircle size={16} />}
+                        label="Связь"
+                        value={`${contactLabels[client.preferredContactChannel] ?? "Контакт"} ${contactHandle}`}
+                      />
+                      <Info label="Обращения" value={String(clientRequests.length)} />
+                      <Info label="Записи" value={String(clientAppointments.length)} />
+                      <Info
+                        label="Последняя услуга"
+                        value={latestRequest ? getServiceTitle(services, latestRequest.service) : "Пока нет"}
+                      />
+                      <Info
+                        label="Последнее состояние"
+                        value={latestRequest ? statusLabels[latestRequest.status] : "Пока нет"}
+                      />
+                    </div>
+
+                    <ClientMemoryPanel client={client} memory={memory} updateClientNotes={updateClientNotes} />
+
+                    <div className="client-history">
+                      <strong>
+                        <CalendarClock size={16} /> Записи
+                      </strong>
+                      {clientAppointments.length === 0 ? (
+                        <p>Подтверждённых записей пока нет.</p>
+                      ) : (
+                        clientAppointments.map((appointment) => (
+                          <div className="history-item" key={appointment.id}>
+                            <span>
+                              {getServiceTitle(services, appointment.service)} · {appointmentStatusLabels[appointment.status]}
+                            </span>
+                            <small>
+                              {safeFormatDateTime(appointment.startAt)} · {appointment.durationMinutes} мин
+                            </small>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="client-history">
+                      <strong>
+                        <History size={16} /> Обращения
+                      </strong>
+                      {clientRequests.length === 0 ? (
+                        <p>Истории пока нет.</p>
+                      ) : (
+                        clientRequests.map((request) => (
+                          <div className="history-item" key={request.id}>
+                            <span>{getServiceTitle(services, request.service)} · {statusLabels[request.status]}</span>
+                            <small>{safeFormatDateTime(request.createdAt)} · {request.estimatedMinutes} мин</small>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    <div className="client-history">
+                      <strong>Фото</strong>
+                      {clientPhotos.length === 0 ? (
+                        <p>Фото пока не приложены.</p>
+                      ) : (
+                        <PhotoGallery
+                          photos={clientPhotos}
+                          onOpen={(photo) => {
+                            setLightboxPhotos(clientPhotos);
+                            setSelectedPhoto(photo);
+                          }}
+                        />
+                      )}
+                    </div>
                   </div>
                 ) : null}
-
-                <div className="info-grid">
-                  <Info icon={<Phone size={16} />} label="Телефон" value={safeText(client.phone, "не указан")} />
-                  <Info
-                    icon={<MessageCircle size={16} />}
-                    label="Связь"
-                    value={`${contactLabels[client.preferredContactChannel] ?? "Контакт"} ${contactHandle}`}
-                  />
-                  <Info label="Заявки" value={String(clientRequests.length)} />
-                  <Info label="Записи" value={String(clientAppointments.length)} />
-                  <Info
-                    label="Последняя услуга"
-                    value={latestRequest ? getServiceTitle(services, latestRequest.service) : "Пока нет"}
-                  />
-                  <Info
-                    label="Последний статус"
-                    value={latestRequest ? statusLabels[latestRequest.status] : "Пока нет"}
-                  />
-                </div>
-
-                <ClientMemoryPanel client={client} memory={memory} updateClientNotes={updateClientNotes} />
-
-                <div className="client-history">
-                  <strong>
-                    <CalendarClock size={16} /> Записи
-                  </strong>
-                  {clientAppointments.length === 0 ? (
-                    <p>Подтверждённых записей пока нет.</p>
-                  ) : (
-                    clientAppointments.map((appointment) => (
-                      <div className="history-item" key={appointment.id}>
-                        <span>
-                          {getServiceTitle(services, appointment.service)} · {appointmentStatusLabels[appointment.status]}
-                        </span>
-                        <small>
-                          {safeFormatDateTime(appointment.startAt)} · {appointment.durationMinutes} мин
-                        </small>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="client-history">
-                  <strong>
-                    <History size={16} /> Заявки
-                  </strong>
-                  {clientRequests.length === 0 ? (
-                    <p>Заявок пока нет.</p>
-                  ) : (
-                    clientRequests.map((request) => (
-                      <div className="history-item" key={request.id}>
-                        <span>{getServiceTitle(services, request.service)} · {statusLabels[request.status]}</span>
-                        <small>{safeFormatDateTime(request.createdAt)} · {request.estimatedMinutes} мин</small>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                <div className="client-history">
-                  <strong>Фото</strong>
-                  {clientPhotos.length === 0 ? (
-                    <p>Фото пока не приложены.</p>
-                  ) : (
-                    <PhotoGallery photos={clientPhotos} onOpen={setSelectedPhoto} />
-                  )}
-                </div>
               </article>
             );
           })
         )}
       </div>
-      <PhotoLightbox photo={selectedPhoto} onClose={() => setSelectedPhoto(null)} />
+      <PhotoLightbox
+        photo={selectedPhoto}
+        photos={lightboxPhotos}
+        onSelect={setSelectedPhoto}
+        onClose={() => {
+          setSelectedPhoto(null);
+          setLightboxPhotos([]);
+        }}
+      />
     </section>
   );
 }

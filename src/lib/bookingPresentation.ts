@@ -38,11 +38,11 @@ export const lengthLabels: Record<NailLength, string> = {
 };
 
 export const statusLabels: Record<RequestStatus, string> = {
-  new: "Новая заявка",
-  needs_clarification: "Нужны уточнения",
-  waiting_client: "Ждёт подтверждения",
-  confirmed: "Подтверждена",
-  declined: "Отклонена",
+  new: "Вы отправили заявку",
+  needs_clarification: "Нужно уточнить",
+  waiting_client: "Подтвердите время",
+  confirmed: "Вы записаны",
+  declined: "Не получилось записать",
 };
 
 export const appointmentStatusLabels: Record<AppointmentStatus, string> = {
@@ -53,7 +53,7 @@ export const appointmentStatusLabels: Record<AppointmentStatus, string> = {
 };
 
 export function getServiceTitle(services: ServicePreset[], id: ServiceKind) {
-  return services.find((service) => service.id === id)?.title ?? id;
+  return services.find((service) => service.id === id)?.title ?? "Услуга";
 }
 
 export function photoKindLabel(kind: PhotoAttachment["kind"]) {

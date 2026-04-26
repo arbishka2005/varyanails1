@@ -179,6 +179,27 @@ function cleanupStaleTimeWindows(snapshot: AppSnapshot) {
   return snapshot.windows.length !== before;
 }
 
+function completePastAppointments(snapshot: AppSnapshot) {
+  let changed = false;
+
+  snapshot.appointments = snapshot.appointments.map((appointment) => {
+    if (appointment.status !== "scheduled" || !isPastDateTime(appointment.endAt)) {
+      return appointment;
+    }
+
+    changed = true;
+    return { ...appointment, status: "completed" };
+  });
+
+  return changed;
+}
+
+function runReadMaintenance(snapshot: AppSnapshot) {
+  const appointmentsChanged = completePastAppointments(snapshot);
+  const windowsChanged = cleanupStaleTimeWindows(snapshot);
+  return appointmentsChanged || windowsChanged;
+}
+
 function normalizeSnapshot(snapshot: AppSnapshot): AppSnapshot {
   return {
     ...snapshot,
@@ -524,14 +545,14 @@ export const fileRepository: Repository = {
 
   async getSnapshot() {
     return mutateSnapshot((snapshot) => {
-      cleanupStaleTimeWindows(snapshot);
+      runReadMaintenance(snapshot);
       return snapshot;
     });
   },
 
   async getPublicBookingConfig(): Promise<PublicBookingConfig> {
     return mutateSnapshot((snapshot) => {
-      cleanupStaleTimeWindows(snapshot);
+      runReadMaintenance(snapshot);
       return {
         services: snapshot.services,
         windows: snapshot.windows.filter((window) => window.status === "available" && isFutureDateTime(window.startAt)),
@@ -541,23 +562,31 @@ export const fileRepository: Repository = {
   },
 
   async getBookingRequest(id: string) {
-    const snapshot = await readSnapshot();
-    return snapshot.requests.find((request) => request.id === id) ?? null;
+    return mutateSnapshot((snapshot) => {
+      runReadMaintenance(snapshot);
+      return snapshot.requests.find((request) => request.id === id) ?? null;
+    });
   },
 
   async getBookingRequestByPublicToken(token: string) {
-    const snapshot = await readSnapshot();
-    return getUniqueRequestByPublicToken(snapshot, token);
+    return mutateSnapshot((snapshot) => {
+      runReadMaintenance(snapshot);
+      return getUniqueRequestByPublicToken(snapshot, token);
+    });
   },
 
   async getAppointment(id: string) {
-    const snapshot = await readSnapshot();
-    return getUniqueAppointmentById(snapshot, id);
+    return mutateSnapshot((snapshot) => {
+      runReadMaintenance(snapshot);
+      return getUniqueAppointmentById(snapshot, id);
+    });
   },
 
   async getAppointmentByPublicToken(token: string) {
-    const snapshot = await readSnapshot();
-    return getUniqueAppointmentByPublicToken(snapshot, token);
+    return mutateSnapshot((snapshot) => {
+      runReadMaintenance(snapshot);
+      return getUniqueAppointmentByPublicToken(snapshot, token);
+    });
   },
 
   async getTimeWindow(id: string) {

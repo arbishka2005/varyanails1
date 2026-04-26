@@ -17,8 +17,8 @@ export type FormState = {
   optionIds: ServiceOptionKind[];
   length: NailLength;
   desiredResult: string;
-  handPhoto: PhotoAttachment | null;
-  referencePhoto: PhotoAttachment | null;
+  handPhotos: PhotoAttachment[];
+  referencePhotos: PhotoAttachment[];
   preferredWindowId: string;
   customWindowText: string;
   comment: string;
@@ -55,8 +55,8 @@ export const initialForm: FormState = {
   optionIds: [],
   length: "medium",
   desiredResult: "",
-  handPhoto: null,
-  referencePhoto: null,
+  handPhotos: [],
+  referencePhotos: [],
   preferredWindowId: "",
   customWindowText: "",
   comment: "",

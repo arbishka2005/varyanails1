@@ -32,9 +32,9 @@ telegramRoutes.post("/api/telegram/webhook", async (request, response) => {
       await sendTelegramMessage(
         String(chatId),
         [
-          "Админ-панель доступна только мастеру.",
+          "Похоже, у этого Telegram нет доступа мастера.",
           "",
-          "Если вы мастер, проверьте, что ваш Telegram ID добавлен в MASTER_TELEGRAM_IDS на сервере.",
+          "Если это ваш аккаунт, проверьте Telegram ID в настройках сервера.",
         ].join("\n"),
       );
       response.json({ ok: true });
@@ -43,7 +43,7 @@ telegramRoutes.post("/api/telegram/webhook", async (request, response) => {
 
     await sendTelegramMessage(
       String(chatId),
-      ["Админ-панель готова.", "", "Нажмите кнопку ниже, чтобы открыть управление заявками, окошками и клиентками."].join("\n"),
+      ["Кабинет мастера открыт.", "", "Нажмите кнопку ниже, чтобы посмотреть записи, окошки и клиенток."].join("\n"),
       buildLaunchReplyMarkup("admin"),
     );
     response.json({ ok: true });
@@ -58,7 +58,7 @@ telegramRoutes.post("/api/telegram/webhook", async (request, response) => {
         "",
         "Что можно сделать:",
         "• открыть запись на ногти;",
-        isMaster ? "• открыть админ-панель командой /admin." : "• посмотреть статус заявки в мини-приложении.",
+        isMaster ? "• открыть кабинет мастера командой /admin." : "• посмотреть свою запись в мини-приложении.",
         "",
         isMaster ? "Вы вошли как мастер." : "Для записи нажмите кнопку ниже.",
       ].join("\n"),
@@ -74,7 +74,7 @@ telegramRoutes.post("/api/telegram/webhook", async (request, response) => {
       "Я не обрабатываю свободный текст в чате.",
       "",
       "Для записи откройте мини-приложение кнопкой ниже.",
-      isMaster ? "Для админ-панели используйте команду /admin." : "Если нужно связаться с мастером, укажите Telegram в заявке.",
+      isMaster ? "Для кабинета мастера используйте команду /admin." : "Если нужно связаться с мастером, укажите Telegram при записи.",
     ].join("\n"),
     buildLaunchReplyMarkup(),
   );

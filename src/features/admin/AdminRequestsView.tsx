@@ -41,12 +41,12 @@ export function AdminRequestsView({
 
   return (
     <>
-      <AdminScreenHeader eyebrow="Заявки" title="Разобрать заявки" />
+      <AdminScreenHeader eyebrow="входящие" title="Кому ответить" />
 
       <section className="admin-screen-stack">
         <section className="requests-stack admin-inbox-stack">
           {inboxCount === 0 ? (
-            <div className="empty-state">Сейчас заявок нет.</div>
+            <div className="empty-state">Сейчас новых обращений нет.</div>
           ) : (
             inboxGroups.map((group) =>
               group.requests.length > 0 ? (

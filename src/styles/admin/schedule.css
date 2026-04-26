@@ -1,14 +1,20 @@
 .calendar-panel-title {
+  display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   margin-bottom: 16px;
 }
 
+.calendar-panel-title > div {
+  min-width: 0;
+}
+
 .calendar-panel-title h2 {
   margin: 0;
   font-size: 30px;
   line-height: 1.05;
+  overflow-wrap: anywhere;
 }
 
 .calendar-panel-title p {
@@ -30,7 +36,7 @@
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.34);
 }
 
-.calendar-panel .section-title .calendar-add-button {
+.calendar-panel-title .calendar-add-button {
   margin-left: auto;
   min-height: 44px;
   padding: 10px 16px;
@@ -281,12 +287,12 @@
   font-weight: 600;
 }
 
-@media (max-width: 560px) {
+@media (max-width: 760px) {
   .calendar-panel-title {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .calendar-panel .section-title .calendar-add-button {
+  .calendar-panel-title .calendar-add-button {
     grid-column: 1 / -1;
     width: 100%;
   }

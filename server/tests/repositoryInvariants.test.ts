@@ -317,6 +317,7 @@ async function runCriticalRepositoryContract(repository: Repository, reset: (sna
   assert.equal(cleanedSnapshot.windows.some((window) => window.id === "old-unused"), false);
   assert.equal(cleanedSnapshot.windows.some((window) => window.id === "old-used-request"), true);
   assert.equal(cleanedSnapshot.windows.some((window) => window.id === "old-used-appointment"), true);
+  assert.equal(cleanedSnapshot.appointments.find((appointment) => appointment.id === "apt-old-used")?.status, "completed");
 
   await reset();
   await repository.createService(baseService);

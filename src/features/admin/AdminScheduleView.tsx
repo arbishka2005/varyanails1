@@ -137,7 +137,7 @@ export function AdminScheduleView({
 
       <section className="admin-screen-stack">
         <section className="panel calendar-panel">
-          <div className="section-title calendar-panel-title">
+          <div className="calendar-panel-title">
             <span className="calendar-panel-icon">
               <CalendarClock size={21} />
             </span>
@@ -415,7 +415,7 @@ function getEmptyWindowText(status: TimeWindow["status"]) {
   }
 
   if (status === "offered") {
-    return "Ждёт решения по заявке";
+    return "Ждёт ответа";
   }
 
   return "Свободно";

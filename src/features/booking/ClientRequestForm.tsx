@@ -14,12 +14,12 @@ import {
   UserRound,
 } from "lucide-react";
 import { Info } from "../../components/Info";
+import { PhotoGallery, PhotoLightbox } from "../../components/PhotoGallery";
 import {
   contactLabels,
   formatTimeRange,
   groupWindowsByDate,
   lengthLabels,
-  photoKindLabel,
 } from "../../lib/bookingPresentation";
 import { getLocalDateKey } from "../../lib/dateTime";
 import { getTelegramWebApp } from "../../app/navigation";
@@ -43,11 +43,14 @@ type UploadCardProps = {
   inputRef: RefObject<HTMLInputElement | null>;
   title: string;
   caption: string;
-  file: PhotoAttachment | null;
+  files: PhotoAttachment[];
   error: string;
   isLoading: boolean;
   isRequired: boolean;
-  onFileSelect: (file?: File) => void;
+  maxCount: number;
+  onFilesSelect: (files: File[]) => void;
+  onOpenPhoto: (photo: PhotoAttachment) => void;
+  onRemovePhoto: (photoId: string) => void;
 };
 
 const fullFormatQuestionOrder: ClientFormatQuestion[] = ["service", "length", "visit", "details"];
@@ -80,6 +83,7 @@ export function ClientRequestForm({
   setFormatQuestion,
   submitRequest,
   uploadPhoto,
+  removePhoto,
   uploading,
   uploadError,
   isSubmitting,
@@ -99,17 +103,21 @@ export function ClientRequestForm({
   setFormatQuestion: Dispatch<SetStateAction<ClientFormatQuestion>>;
   submitRequest: () => Promise<boolean>;
   uploadPhoto: (kind: PhotoAttachment["kind"], file: File) => Promise<PhotoAttachment | null>;
+  removePhoto: (photoId: string) => void;
   uploading: { hands: boolean; reference: boolean };
   uploadError: { hands: string; reference: string };
   isSubmitting: boolean;
 }) {
   const maxPhotoSizeBytes = 8 * 1024 * 1024;
+  const maxHandPhotos = 4;
+  const maxReferencePhotos = 6;
   const handInputRef = useRef<HTMLInputElement | null>(null);
   const referenceInputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const formatAdvanceTimerRef = useRef<number | null>(null);
   const didMountScrollRef = useRef(false);
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<PhotoAttachment | null>(null);
   const [fileValidationError, setFileValidationError] = useState({ hands: "", reference: "" });
   const [showErrors, setShowErrors] = useState<Record<ClientFormStep, boolean>>({
     service: false,
@@ -154,7 +162,7 @@ export function ClientRequestForm({
           id: "contact",
           label: "Контакт",
           title: "Куда ответить?",
-          cta: "Отправить заявку",
+          cta: "Записаться",
         },
       ] satisfies StepDefinition[],
     [canSelectLength, needsPhotoStep],
@@ -193,8 +201,8 @@ export function ClientRequestForm({
       uploadError.reference,
   );
   const isPhotoStepValid = Boolean(
-    (!requiresHandPhoto || form.handPhoto) &&
-      (!requiresReference || form.referencePhoto) &&
+    (!requiresHandPhoto || form.handPhotos.length > 0) &&
+      (!requiresReference || form.referencePhotos.length > 0) &&
       !hasPhotoErrors,
   );
   const isContactStepValid = Boolean(
@@ -219,7 +227,7 @@ export function ClientRequestForm({
     form.contactChannel === "phone"
       ? form.phone || "Телефон"
       : `${contactLabels[form.contactChannel]} ${form.contactHandle.trim()}`.trim();
-  const photosCount = Number(Boolean(form.handPhoto)) + Number(Boolean(form.referencePhoto));
+  const photosCount = form.handPhotos.length + form.referencePhotos.length;
   const photoStepHint =
     requiresHandPhoto && requiresReference
       ? "Нужны фото рук и пример дизайна."
@@ -369,25 +377,47 @@ export function ClientRequestForm({
     [],
   );
 
-  const handlePhotoChange = (kind: PhotoAttachment["kind"], file?: File) => {
+  const handlePhotoFiles = async (kind: PhotoAttachment["kind"], files: File[]) => {
     const key = kind === "hands" ? "hands" : "reference";
+    const currentCount = kind === "hands" ? form.handPhotos.length : form.referencePhotos.length;
+    const maxCount = kind === "hands" ? maxHandPhotos : maxReferencePhotos;
+    const slotsLeft = Math.max(0, maxCount - currentCount);
 
-    if (!file) {
+    if (files.length === 0) {
       return;
     }
 
-    if (file.type && !file.type.startsWith("image/")) {
-      setFileValidationError((current) => ({ ...current, [key]: "Загрузите изображение: JPG, PNG или WEBP." }));
+    if (slotsLeft === 0) {
+      setFileValidationError((current) => ({ ...current, [key]: `Можно добавить до ${maxCount} фото.` }));
       return;
     }
 
-    if (file.size > maxPhotoSizeBytes) {
-      setFileValidationError((current) => ({ ...current, [key]: "Фото тяжелее 8 МБ. Выберите файл поменьше." }));
-      return;
+    const acceptedFiles: File[] = [];
+    const errors: string[] = [];
+
+    for (const file of files.slice(0, slotsLeft)) {
+      if (file.type && !file.type.startsWith("image/")) {
+        errors.push(`${file.name}: нужен JPG, PNG или WEBP.`);
+        continue;
+      }
+
+      if (file.size > maxPhotoSizeBytes) {
+        errors.push(`${file.name}: больше 8 МБ.`);
+        continue;
+      }
+
+      acceptedFiles.push(file);
     }
 
-    setFileValidationError((current) => ({ ...current, [key]: "" }));
-    void uploadPhoto(kind, file);
+    if (files.length > slotsLeft) {
+      errors.push(`Добавлено только ${slotsLeft}: максимум ${maxCount} фото.`);
+    }
+
+    setFileValidationError((current) => ({ ...current, [key]: errors.join(" ") }));
+
+    for (const file of acceptedFiles) {
+      await uploadPhoto(kind, file);
+    }
   };
 
   const moveToNextStep = () => {
@@ -672,32 +702,38 @@ export function ClientRequestForm({
 
             <div className="booking-upload-grid">
               <UploadCard
-                caption={requiresHandPhoto ? "обязательно" : "по желанию"}
+                caption={requiresHandPhoto ? `минимум 1 · до ${maxHandPhotos}` : `по желанию · до ${maxHandPhotos}`}
                 error={
-                  (showErrors.photos && requiresHandPhoto && !form.handPhoto ? "Нужно фото рук." : "") ||
+                  (showErrors.photos && requiresHandPhoto && form.handPhotos.length === 0 ? "Нужно фото рук." : "") ||
                   fileValidationError.hands ||
                   uploadError.hands
                 }
-                file={form.handPhoto}
+                files={form.handPhotos}
                 inputRef={handInputRef}
                 isLoading={uploading.hands}
                 isRequired={requiresHandPhoto}
-                onFileSelect={(file) => handlePhotoChange("hands", file)}
+                maxCount={maxHandPhotos}
+                onFilesSelect={(files) => void handlePhotoFiles("hands", files)}
+                onOpenPhoto={setSelectedPhoto}
+                onRemovePhoto={removePhoto}
                 title={requiresHandPhoto ? "Фото рук" : "Фото рук, если есть нюансы"}
               />
 
               <UploadCard
-                caption={requiresReference ? "обязательно" : "по желанию"}
+                caption={requiresReference ? `минимум 1 · до ${maxReferencePhotos}` : `по желанию · до ${maxReferencePhotos}`}
                 error={
-                  (showErrors.photos && requiresReference && !form.referencePhoto ? "Нужен референс." : "") ||
+                  (showErrors.photos && requiresReference && form.referencePhotos.length === 0 ? "Нужен референс." : "") ||
                   fileValidationError.reference ||
                   uploadError.reference
                 }
-                file={form.referencePhoto}
+                files={form.referencePhotos}
                 inputRef={referenceInputRef}
                 isLoading={uploading.reference}
                 isRequired={requiresReference}
-                onFileSelect={(file) => handlePhotoChange("reference", file)}
+                maxCount={maxReferencePhotos}
+                onFilesSelect={(files) => void handlePhotoFiles("reference", files)}
+                onOpenPhoto={setSelectedPhoto}
+                onRemovePhoto={removePhoto}
                 title={requiresReference ? "Референс" : "Референс, если нужен дизайн"}
               />
             </div>
@@ -828,7 +864,7 @@ export function ClientRequestForm({
           >
             {currentStep === "contact" ? (
               <>
-                {isSubmitting ? "Проверяю окошко..." : "Отправить заявку"} <Send size={18} />
+                {isSubmitting ? "Проверяю окошко..." : "Записаться"} <Send size={18} />
               </>
             ) : (
               <>
@@ -870,6 +906,13 @@ export function ClientRequestForm({
           <Info icon={<MessageCircle size={16} />} label="Ответ" value={summaryContact || "Не указан"} />
         </div>
       </aside>
+
+      <PhotoLightbox
+        photo={selectedPhoto}
+        photos={[...form.handPhotos, ...form.referencePhotos]}
+        onSelect={setSelectedPhoto}
+        onClose={() => setSelectedPhoto(null)}
+      />
     </section>
   );
 }
@@ -878,42 +921,59 @@ function UploadCard({
   inputRef,
   title,
   caption,
-  file,
+  files,
   error,
   isLoading,
   isRequired,
-  onFileSelect,
+  maxCount,
+  onFilesSelect,
+  onOpenPhoto,
+  onRemovePhoto,
 }: UploadCardProps) {
+  const canAddMore = files.length < maxCount;
+
   return (
-    <div className={`booking-upload-card${file ? " is-filled" : ""}${error ? " is-invalid" : ""}${!isRequired ? " is-optional" : ""}`}>
+    <div className={`booking-upload-card${files.length ? " is-filled" : ""}${error ? " is-invalid" : ""}${!isRequired ? " is-optional" : ""}`}>
       <input
         accept="image/jpeg,image/png,image/webp"
         className="booking-upload-input"
+        multiple
         ref={inputRef}
         type="file"
-        onChange={(event) => onFileSelect(event.target.files?.[0])}
+        onChange={(event) => {
+          onFilesSelect(Array.from(event.target.files ?? []));
+          event.currentTarget.value = "";
+        }}
       />
 
       <button
         className="booking-upload-card-trigger"
-        disabled={isLoading}
+        disabled={isLoading || !canAddMore}
         onClick={() => inputRef.current?.click()}
         type="button"
       >
         <span className="booking-upload-icon">
-          {file ? <Check size={18} /> : <ImagePlus size={18} />}
+          {files.length ? <Check size={18} /> : <ImagePlus size={18} />}
         </span>
 
         <span className="booking-upload-copy">
           <strong>{title}</strong>
           <small>{caption}</small>
           <em>
-            {isLoading ? "Загружаю..." : file ? file.fileName : isRequired ? "Добавить фото" : "Можно пропустить"}
+            {isLoading
+              ? "Загружаю..."
+              : files.length
+                ? `${files.length} из ${maxCount} добавлено`
+                : isRequired
+                  ? "Добавить фото"
+                  : "Можно пропустить"}
           </em>
         </span>
       </button>
 
-      {file ? <span className="success-text booking-upload-status">{photoKindLabel(file.kind)} добавлено</span> : null}
+      {files.length ? (
+        <PhotoGallery photos={files} onOpen={onOpenPhoto} onRemove={onRemovePhoto} />
+      ) : null}
       {error ? <small className="field-hint">{error}</small> : null}
     </div>
   );

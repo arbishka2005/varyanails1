@@ -56,7 +56,19 @@ async function cleanupStaleTimeWindows() {
   );
 }
 
+async function completePastAppointments() {
+  await pool.query(
+    `
+      UPDATE appointments
+      SET status = 'completed'
+      WHERE status = 'scheduled'
+        AND end_at < NOW()
+    `,
+  );
+}
+
 export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
+  await completePastAppointments();
   await cleanupStaleTimeWindows();
   const [services, windows, options] = await Promise.all([
     pool.query("SELECT * FROM service_presets ORDER BY title ASC"),
@@ -74,6 +86,7 @@ export async function getPublicBookingConfig(): Promise<PublicBookingConfig> {
 }
 
 export async function getSnapshot(): Promise<AppSnapshot> {
+  await completePastAppointments();
   await cleanupStaleTimeWindows();
   const [clients, photos, requests, appointments, windows, services, options] = await Promise.all([
     pool.query("SELECT * FROM clients ORDER BY id DESC"),
@@ -97,21 +110,25 @@ export async function getSnapshot(): Promise<AppSnapshot> {
 }
 
 export async function getBookingRequest(id: string) {
+  await completePastAppointments();
   const result = await pool.query("SELECT * FROM booking_requests WHERE id = $1", [id]);
   return result.rows[0] ? toBookingRequest(result.rows[0]) : null;
 }
 
 export async function getBookingRequestByPublicToken(token: string) {
+  await completePastAppointments();
   const result = await pool.query("SELECT * FROM booking_requests WHERE public_token = $1", [token]);
   return result.rows[0] ? toBookingRequest(result.rows[0]) : null;
 }
 
 export async function getAppointment(id: string) {
+  await completePastAppointments();
   const result = await pool.query("SELECT * FROM appointments WHERE id = $1", [id]);
   return result.rows[0] ? toAppointment(result.rows[0]) : null;
 }
 
 export async function getAppointmentByPublicToken(token: string) {
+  await completePastAppointments();
   const result = await pool.query("SELECT * FROM appointments WHERE public_token = $1", [token]);
   return result.rows[0] ? toAppointment(result.rows[0]) : null;
 }
