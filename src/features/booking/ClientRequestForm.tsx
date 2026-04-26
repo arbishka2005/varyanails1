@@ -30,6 +30,7 @@ import {
   type ClientFormStep,
   type FormState,
 } from "./formState";
+import { getBookingPhotoVisibility } from "./photoRequirements";
 import type { ContactChannel, PhotoAttachment, ServicePreset, TimeWindow } from "../../types";
 
 type StepDefinition = {
@@ -71,8 +72,6 @@ export function ClientRequestForm({
   form,
   estimatedMinutes,
   estimatedPriceFrom,
-  requiresHandPhoto,
-  requiresReference,
   services,
   selectedService,
   availableWindows,
@@ -91,8 +90,6 @@ export function ClientRequestForm({
   form: FormState;
   estimatedMinutes: number;
   estimatedPriceFrom: number;
-  requiresHandPhoto: boolean;
-  requiresReference: boolean;
   services: ServicePreset[];
   selectedService: ServicePreset;
   availableWindows: TimeWindow[];
@@ -130,7 +127,7 @@ export function ClientRequestForm({
     setForm((current) => ({ ...current, ...patch }));
   };
 
-  const needsPhotoStep = requiresHandPhoto || requiresReference;
+  const { needsPhotoStep, showHandPhoto, showReference } = getBookingPhotoVisibility(selectedService);
   const canSelectLength = allowsLengthSelection(selectedService);
   const formatQuestionOrder = canSelectLength ? fullFormatQuestionOrder : ownLengthFormatQuestionOrder;
   const steps = useMemo(
@@ -201,8 +198,8 @@ export function ClientRequestForm({
       uploadError.reference,
   );
   const isPhotoStepValid = Boolean(
-    (!requiresHandPhoto || form.handPhotos.length > 0) &&
-      (!requiresReference || form.referencePhotos.length > 0) &&
+    (!showHandPhoto || form.handPhotos.length > 0) &&
+      (!showReference || form.referencePhotos.length > 0) &&
       !hasPhotoErrors,
   );
   const isContactStepValid = Boolean(
@@ -229,11 +226,11 @@ export function ClientRequestForm({
       : `${contactLabels[form.contactChannel]} ${form.contactHandle.trim()}`.trim();
   const photosCount = form.handPhotos.length + form.referencePhotos.length;
   const photoStepHint =
-    requiresHandPhoto && requiresReference
+    showHandPhoto && showReference
       ? "Нужны фото рук и пример дизайна."
-      : requiresHandPhoto
+      : showHandPhoto
         ? "Нужно фото рук."
-        : requiresReference
+        : showReference
           ? "Нужен референс."
           : "Фото можно пропустить.";
   const handleFieldLabel = form.contactChannel === "telegram" ? "Telegram" : "VK";
@@ -701,41 +698,45 @@ export function ClientRequestForm({
             </div>
 
             <div className="booking-upload-grid">
-              <UploadCard
-                caption={requiresHandPhoto ? `минимум 1 · до ${maxHandPhotos}` : `по желанию · до ${maxHandPhotos}`}
-                error={
-                  (showErrors.photos && requiresHandPhoto && form.handPhotos.length === 0 ? "Нужно фото рук." : "") ||
-                  fileValidationError.hands ||
-                  uploadError.hands
-                }
-                files={form.handPhotos}
-                inputRef={handInputRef}
-                isLoading={uploading.hands}
-                isRequired={requiresHandPhoto}
-                maxCount={maxHandPhotos}
-                onFilesSelect={(files) => void handlePhotoFiles("hands", files)}
-                onOpenPhoto={setSelectedPhoto}
-                onRemovePhoto={removePhoto}
-                title={requiresHandPhoto ? "Фото рук" : "Фото рук, если есть нюансы"}
-              />
+              {showHandPhoto ? (
+                <UploadCard
+                  caption={`минимум 1 · до ${maxHandPhotos}`}
+                  error={
+                    (showErrors.photos && form.handPhotos.length === 0 ? "Нужно фото рук." : "") ||
+                    fileValidationError.hands ||
+                    uploadError.hands
+                  }
+                  files={form.handPhotos}
+                  inputRef={handInputRef}
+                  isLoading={uploading.hands}
+                  isRequired
+                  maxCount={maxHandPhotos}
+                  onFilesSelect={(files) => void handlePhotoFiles("hands", files)}
+                  onOpenPhoto={setSelectedPhoto}
+                  onRemovePhoto={removePhoto}
+                  title="Фото рук"
+                />
+              ) : null}
 
-              <UploadCard
-                caption={requiresReference ? `минимум 1 · до ${maxReferencePhotos}` : `по желанию · до ${maxReferencePhotos}`}
-                error={
-                  (showErrors.photos && requiresReference && form.referencePhotos.length === 0 ? "Нужен референс." : "") ||
-                  fileValidationError.reference ||
-                  uploadError.reference
-                }
-                files={form.referencePhotos}
-                inputRef={referenceInputRef}
-                isLoading={uploading.reference}
-                isRequired={requiresReference}
-                maxCount={maxReferencePhotos}
-                onFilesSelect={(files) => void handlePhotoFiles("reference", files)}
-                onOpenPhoto={setSelectedPhoto}
-                onRemovePhoto={removePhoto}
-                title={requiresReference ? "Референс" : "Референс, если нужен дизайн"}
-              />
+              {showReference ? (
+                <UploadCard
+                  caption={`минимум 1 · до ${maxReferencePhotos}`}
+                  error={
+                    (showErrors.photos && form.referencePhotos.length === 0 ? "Нужен референс." : "") ||
+                    fileValidationError.reference ||
+                    uploadError.reference
+                  }
+                  files={form.referencePhotos}
+                  inputRef={referenceInputRef}
+                  isLoading={uploading.reference}
+                  isRequired
+                  maxCount={maxReferencePhotos}
+                  onFilesSelect={(files) => void handlePhotoFiles("reference", files)}
+                  onOpenPhoto={setSelectedPhoto}
+                  onRemovePhoto={removePhoto}
+                  title="Референс"
+                />
+              ) : null}
             </div>
 
             {isUploading ? <small className="field-hint">Загружаю фото...</small> : null}

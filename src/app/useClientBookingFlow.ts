@@ -11,8 +11,9 @@ import {
   type ClientFormStep,
   type FormState,
 } from "../features/booking/formState";
+import { getClientHomeStatus } from "../features/client/clientBookingState";
 import { lengthLabels } from "../lib/bookingPresentation";
-import { getCurrentIsoTimestamp, isFutureDateTime, isPastDateTime } from "../lib/dateTime";
+import { getCurrentIsoTimestamp, isFutureDateTime } from "../lib/dateTime";
 import { readFileAsDataUrl } from "../lib/file";
 import { toStoredPhone } from "../lib/phone";
 import { allowsLengthSelection, getLengthDurationBoost, normalizeLengthForService } from "../lib/services";
@@ -279,14 +280,15 @@ export function useClientBookingFlow({
     () => windows.filter((window) => window.status === "available" && isFutureDateTime(window.startAt)),
     [windows],
   );
-  const lastSubmittedRequestId = lastRequestAccess?.requestId ?? lastRequestInfo?.request.id ?? null;
-  const lastRequestWindowIsPast = Boolean(lastRequestInfo?.window && isPastDateTime(lastRequestInfo.window.endAt));
-  const hasActiveLastRequest = lastRequestInfo
-    ? lastRequestInfo.request.status === "confirmed"
-      ? Boolean(lastRequestInfo.window && !lastRequestWindowIsPast)
-      : lastRequestInfo.request.status !== "declined" && !lastRequestWindowIsPast
-    : false;
-  const hasClientRequest = Boolean(hasActiveLastRequest || (lastRequestAccess && !lastRequestInfo));
+  const clientHomeStatus = getClientHomeStatus({
+    hasStoredAccess: Boolean(lastRequestAccess),
+    lastRequestInfo,
+    lookupStatus: lastRequestLookupStatus,
+  });
+  const lastSubmittedRequestId = clientHomeStatus.hasActiveBooking
+    ? lastRequestAccess?.requestId ?? lastRequestInfo?.request.id ?? null
+    : null;
+  const hasClientRequest = clientHomeStatus.hasActiveBooking;
 
   const setBookingDraftStep = (value: ClientFormStep | ((current: ClientFormStep) => ClientFormStep)) => {
     setBookingDraftUi((current) => ({

@@ -12,9 +12,10 @@ import {
 import heroMainImage from "../../assets/hero-main.jpg";
 import { Info } from "../../components/Info";
 import { contactLabels, statusLabels } from "../../lib/bookingPresentation";
-import { isFutureDateTime, isPastDateTime } from "../../lib/dateTime";
+import { isFutureDateTime } from "../../lib/dateTime";
 import { formatDayLabel } from "../../lib/displayTime";
 import type { ClientSection, TelegramUser } from "../../app/navigation";
+import { getClientHomeStatus, isActiveClientBooking, isFinishedClientVisit } from "./clientBookingState";
 import type { FormState } from "../booking/formState";
 import type { PublicBookingRequest, TimeWindow } from "../../types";
 
@@ -64,7 +65,6 @@ export function ClientScreenHeader({
 }
 
 export function ClientHomeScreen({
-  hasRequest,
   lastRequestInfo,
   lastSubmittedRequestId,
   lastRequestLookupStatus,
@@ -72,7 +72,6 @@ export function ClientHomeScreen({
   openRequests,
   openBookingFlow,
 }: {
-  hasRequest: boolean;
   lastRequestInfo: PublicBookingRequest | null;
   lastSubmittedRequestId: string | null;
   lastRequestLookupStatus: LastRequestLookupStatus;
@@ -80,20 +79,26 @@ export function ClientHomeScreen({
   openRequests: () => void;
   openBookingFlow: () => void;
 }) {
-  const request = lastRequestInfo?.request ?? null;
-  const isCheckingStoredRequest = hasRequest && !request && lastRequestLookupStatus === "loading";
-  const isStaleStoredRequest = !hasRequest && lastRequestLookupStatus === "stale";
-  const canConfirmWindow = canConfirmClientWindow(request?.status, lastRequestInfo?.window, request?.publicToken);
-  const isFinished = isFinishedClientVisit(lastRequestInfo);
-  const isConfirmed = request?.status === "confirmed" && !isFinished;
+  const homeStatus = getClientHomeStatus({
+    hasStoredAccess: Boolean(lastSubmittedRequestId),
+    lastRequestInfo,
+    lookupStatus: lastRequestLookupStatus,
+  });
+  const activeRequestInfo = homeStatus.activeRequestInfo;
+  const request = activeRequestInfo?.request ?? null;
+  const hasActiveHomeBooking = homeStatus.hasActiveBooking;
+  const isCheckingStoredRequest = homeStatus.kind === "loading";
+  const isStaleStoredRequest = homeStatus.kind === "stale";
+  const canConfirmWindow = canConfirmClientWindow(request?.status, activeRequestInfo?.window, request?.publicToken);
+  const isConfirmed = homeStatus.kind === "upcoming";
   const statusLabel = request
     ? statusLabels[request.status]
     : isCheckingStoredRequest
       ? "Проверяю запись"
       : "Запись";
   const windowLabel =
-    lastRequestInfo?.window?.label ?? request?.customWindowText ?? (isConfirmed ? "Время уточняется" : "");
-  const mainActionLabel = !hasRequest
+    activeRequestInfo?.window?.label ?? request?.customWindowText ?? (isConfirmed ? "Время уточняется" : "");
+  const mainActionLabel = !hasActiveHomeBooking
     ? "Начать запись"
     : canConfirmWindow
       ? "Подтвердить время"
@@ -102,7 +107,7 @@ export function ClientHomeScreen({
         : "Смотреть статус";
 
   const mainAction = () => {
-    if (!hasRequest) {
+    if (!hasActiveHomeBooking) {
       openBookingFlow();
       return;
     }
@@ -130,7 +135,7 @@ export function ClientHomeScreen({
               <p className="eyebrow">минутку</p>
               <h1>Проверяю запись</h1>
             </>
-          ) : !hasRequest ? (
+          ) : !hasActiveHomeBooking ? (
             <>
               <p className="eyebrow">vvrnailss</p>
               <h1>Привет, хочешь записаться?</h1>
@@ -277,7 +282,7 @@ export function ClientStatusPanel({
   refreshLastRequest: (requestToken: string) => Promise<PublicBookingRequest | null>;
   compact?: boolean;
 }) {
-  const currentRequestInfo = isActiveClientRequestInfo(lastRequestInfo) ? lastRequestInfo : null;
+  const currentRequestInfo = isActiveClientBooking(lastRequestInfo) ? lastRequestInfo : null;
   const completedVisitInfo = isFinishedClientVisit(lastRequestInfo) ? lastRequestInfo : null;
   const timelineIndex = getClientTimelineIndex(currentRequestInfo);
   const request = currentRequestInfo?.request ?? null;
@@ -436,32 +441,6 @@ function getClientTimelineIndex(lastRequestInfo: PublicBookingRequest | null) {
   }
 
   return 1;
-}
-
-function isFinishedClientVisit(lastRequestInfo: PublicBookingRequest | null) {
-  return Boolean(
-    lastRequestInfo?.request.status === "confirmed" &&
-      lastRequestInfo.window &&
-      isPastDateTime(lastRequestInfo.window.endAt),
-  );
-}
-
-function isActiveClientRequestInfo(lastRequestInfo: PublicBookingRequest | null) {
-  if (!lastRequestInfo || lastRequestInfo.request.status === "declined") {
-    return false;
-  }
-
-  const isPastWindow = Boolean(lastRequestInfo.window && isPastDateTime(lastRequestInfo.window.endAt));
-
-  if (isPastWindow) {
-    return false;
-  }
-
-  if (lastRequestInfo.request.status === "confirmed") {
-    return Boolean(lastRequestInfo.window);
-  }
-
-  return true;
 }
 
 function canConfirmClientWindow(

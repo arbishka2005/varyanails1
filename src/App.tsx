@@ -39,7 +39,6 @@ export function App() {
         <section className="client-portal">
           {route.section === "home" ? (
             <ClientHomeScreen
-              hasRequest={client.hasClientRequest}
               lastRequestInfo={client.lastRequestInfo}
               lastSubmittedRequestId={client.lastSubmittedRequestId}
               lastRequestLookupStatus={client.lastRequestLookupStatus}
@@ -61,8 +60,6 @@ export function App() {
                 form={client.form}
                 estimatedMinutes={client.estimatedMinutes}
                 estimatedPriceFrom={client.estimatedPriceFrom}
-                requiresHandPhoto={client.form.isNewClient || client.selectedService.requiresHandPhoto}
-                requiresReference={client.selectedService.requiresReference}
                 services={services}
                 selectedService={client.selectedService}
                 availableWindows={client.availableBookingWindows}

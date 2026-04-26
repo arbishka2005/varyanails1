@@ -8,7 +8,7 @@
     "dev:api": "tsx watch server/index.ts",
     "build": "npm run test:logic && tsc --noEmit && vite build",
     "build:api": "tsc -p tsconfig.server.json --noEmit",
-    "test:logic": "tsx --test server/tests/repositoryInvariants.test.ts",
+    "test:logic": "tsx --test server/tests/repositoryInvariants.test.ts server/tests/clientHomeStatus.test.ts server/tests/bookingPhotoVisibility.test.ts",
     "release:check": "npx tsc --noEmit --noUnusedLocals --noUnusedParameters -p tsconfig.json && npm run build && npm run build:api",
     "preview": "vite preview",
     "start:api": "tsx server/index.ts"
